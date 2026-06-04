@@ -252,6 +252,69 @@ function makeEntryWorkspace(config) {
   });
   bodyInput.addEventListener('input', saveNewDraft);
 
+  // Optional .txt upload (Source Material only). Reads the file in the renderer
+  // and fills the fields below — the user still reviews and clicks the add
+  // button to finalize, so nothing is stored without confirmation.
+  let uploadRow = null;
+  if (config.allowFileUpload) {
+    uploadRow = document.createElement('div');
+    uploadRow.className = 'upload-row';
+
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.txt,text/plain';
+    fileInput.style.display = 'none';
+
+    const uploadBtn = document.createElement('button');
+    uploadBtn.type = 'button';
+    uploadBtn.className = 'btn-secondary';
+    uploadBtn.textContent = 'Upload .txt file';
+    uploadBtn.addEventListener('click', () => fileInput.click());
+
+    const uploadHint = document.createElement('span');
+    uploadHint.className = 'upload-hint';
+    uploadHint.textContent = 'Fills the fields below — review, then add.';
+
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files && fileInput.files[0];
+      fileInput.value = ''; // allow re-selecting the same file later
+      if (!file) return;
+
+      const isText =
+        file.type === 'text/plain' || /\.txt$/i.test(file.name);
+      if (!isText) {
+        error.textContent = 'Only .txt files are supported for now.';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onerror = () => {
+        error.textContent = 'Could not read that file.';
+      };
+      reader.onload = () => {
+        const text = String(reader.result || '');
+        if (titleInput.value.trim() === '') {
+          titleInput.value = file.name.replace(/\.txt$/i, '');
+        }
+        bodyInput.value =
+          bodyInput.value.trim() === ''
+            ? text
+            : `${bodyInput.value}\n\n${text}`;
+        submit.disabled = titleInput.value.trim() === '';
+        error.textContent = '';
+        saveNewDraft();
+        setStatus(
+          formStatus,
+          `Loaded “${file.name}” — review and click “${addLabel}” to finalize.`
+        );
+        titleInput.focus();
+      };
+      reader.readAsText(file);
+    });
+
+    uploadRow.append(uploadBtn, uploadHint, fileInput);
+  }
+
   const list = document.createElement('div');
   list.className = 'entry-list';
 
@@ -571,6 +634,7 @@ function makeEntryWorkspace(config) {
     }
   });
 
+  if (uploadRow) form.append(uploadRow);
   form.append(titleInput, bodyInput, submit, formStatus, error);
   section.append(form, list, archived);
   loadList();
@@ -587,6 +651,7 @@ const CONTENT_RENDERERS = {
     apiName: 'sourceMaterial',
     draftPrefix: 'source_material',
     addLabel: 'Add Source',
+    allowFileUpload: true,
   }),
 };
 
