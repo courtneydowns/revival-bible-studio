@@ -216,6 +216,7 @@ function renderUnsorted(section) {
 
     const actions = document.createElement('div');
     actions.className = 'entry-actions';
+
     const editBtn = document.createElement('button');
     editBtn.type = 'button';
     editBtn.className = 'btn-secondary';
@@ -223,10 +224,55 @@ function renderUnsorted(section) {
     editBtn.addEventListener('click', () => {
       card.replaceWith(buildEditCard(item));
     });
-    actions.appendChild(editBtn);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn-danger';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', () => {
+      showDeleteConfirm(card, actions, item);
+    });
+
+    actions.append(editBtn, deleteBtn);
     card.appendChild(actions);
 
     return card;
+  }
+
+  // Swap the card's action row for an inline "are you sure?" confirm.
+  function showDeleteConfirm(card, actions, item) {
+    const confirmRow = document.createElement('div');
+    confirmRow.className = 'entry-actions confirm-row';
+
+    const prompt = document.createElement('span');
+    prompt.className = 'confirm-text';
+    prompt.textContent = 'Delete this entry? This cannot be undone.';
+
+    const yes = document.createElement('button');
+    yes.type = 'button';
+    yes.className = 'btn-danger';
+    yes.textContent = 'Delete';
+    yes.addEventListener('click', async () => {
+      yes.disabled = true;
+      try {
+        await window.revival.unsorted.delete(item.id);
+        await loadList();
+      } catch (e) {
+        prompt.textContent = e.message || 'Could not delete entry.';
+        yes.disabled = false;
+      }
+    });
+
+    const no = document.createElement('button');
+    no.type = 'button';
+    no.className = 'btn-secondary';
+    no.textContent = 'Cancel';
+    no.addEventListener('click', () => {
+      confirmRow.replaceWith(actions);
+    });
+
+    confirmRow.append(prompt, yes, no);
+    actions.replaceWith(confirmRow);
   }
 
   function buildEditCard(item) {

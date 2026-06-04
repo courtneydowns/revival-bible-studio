@@ -123,6 +123,11 @@ function updateUnsorted(id, { title, body } = {}) {
   return getUnsorted(id);
 }
 
+function deleteUnsorted(id) {
+  const info = getDb().prepare('DELETE FROM unsorted WHERE id = ?').run(id);
+  return { deleted: info.changes > 0 };
+}
+
 module.exports = {
   initDatabase,
   getDb,
@@ -133,4 +138,5 @@ module.exports = {
   getUnsorted,
   createUnsorted,
   updateUnsorted,
+  deleteUnsorted,
 };

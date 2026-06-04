@@ -21,6 +21,7 @@ function registerIpc() {
   ipcMain.handle('unsorted:list', () => db.listUnsorted());
   ipcMain.handle('unsorted:create', (_event, entry) => db.createUnsorted(entry));
   ipcMain.handle('unsorted:update', (_event, id, entry) => db.updateUnsorted(id, entry));
+  ipcMain.handle('unsorted:delete', (_event, id) => db.deleteUnsorted(id));
 }
 
 app.whenReady().then(() => {
