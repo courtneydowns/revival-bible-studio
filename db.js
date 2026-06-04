@@ -20,6 +20,22 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '002_unsorted',
+    up(db) {
+      // Unsorted: the general routing queue. Create + list for now;
+      // edit/delete/archive arrive in later phases via new migrations.
+      db.exec(`
+        CREATE TABLE unsorted (
+          id         INTEGER PRIMARY KEY AUTOINCREMENT,
+          title      TEXT NOT NULL,
+          body       TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -52,6 +68,14 @@ function runMigrations(db) {
   return appliedCount;
 }
 
+// Module-level singleton so the rest of the main process can run queries.
+let _db = null;
+
+function getDb() {
+  if (!_db) throw new Error('Database not initialized — call initDatabase() first.');
+  return _db;
+}
+
 // Opens (creating if needed) the DB at the app data dir and runs pending migrations.
 function initDatabase(userDataPath) {
   const dbPath = getDbPath(userDataPath);
@@ -59,7 +83,40 @@ function initDatabase(userDataPath) {
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   const applied = runMigrations(db);
+  _db = db;
   return { db, dbPath, applied };
 }
 
-module.exports = { initDatabase, getDbPath, DB_FILENAME, MIGRATIONS };
+// --- Unsorted repository ---------------------------------------------------
+function listUnsorted() {
+  return getDb()
+    .prepare('SELECT * FROM unsorted ORDER BY created_at DESC, id DESC')
+    .all();
+}
+
+function getUnsorted(id) {
+  return getDb().prepare('SELECT * FROM unsorted WHERE id = ?').get(id);
+}
+
+function createUnsorted({ title, body } = {}) {
+  const cleanTitle = (title || '').trim();
+  if (!cleanTitle) throw new Error('Title is required.');
+  const now = new Date().toISOString();
+  const info = getDb()
+    .prepare(
+      'INSERT INTO unsorted (title, body, created_at, updated_at) VALUES (?, ?, ?, ?)'
+    )
+    .run(cleanTitle, (body || '').trim(), now, now);
+  return getUnsorted(info.lastInsertRowid);
+}
+
+module.exports = {
+  initDatabase,
+  getDb,
+  getDbPath,
+  DB_FILENAME,
+  MIGRATIONS,
+  listUnsorted,
+  getUnsorted,
+  createUnsorted,
+};

@@ -119,9 +119,11 @@ const QUESTIONS = [
   ['How to edit, delete, archive, restore, or undo', (name, info) => info.lifecycle],
 ];
 
-// Reusable template: renders the 5-question panel for a workspace.
+// Reusable template: renders the 5-question panel for a workspace, then any
+// workspace-specific functional UI below it.
 function renderWorkspacePage(name) {
   const info = WORKSPACE_INFO[name];
+  const content = CONTENT_RENDERERS[name];
 
   const page = document.createElement('div');
 
@@ -129,10 +131,12 @@ function renderWorkspacePage(name) {
   h1.textContent = name;
   page.appendChild(h1);
 
-  const sub = document.createElement('p');
-  sub.className = 'placeholder';
-  sub.textContent = 'Placeholder — workspace features come in a later phase.';
-  page.appendChild(sub);
+  if (!content) {
+    const sub = document.createElement('p');
+    sub.className = 'placeholder';
+    sub.textContent = 'Placeholder — workspace features come in a later phase.';
+    page.appendChild(sub);
+  }
 
   const panel = document.createElement('dl');
   panel.className = 'principles';
@@ -145,8 +149,110 @@ function renderWorkspacePage(name) {
   }
   page.appendChild(panel);
 
+  if (content) {
+    const section = document.createElement('div');
+    section.className = 'ws-content';
+    page.appendChild(section);
+    content(section);
+  }
+
   return page;
 }
+
+// --- Unsorted: create + list ----------------------------------------------
+function renderUnsorted(section) {
+  // Create form
+  const form = document.createElement('form');
+  form.className = 'entry-form';
+
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.placeholder = 'Title';
+  titleInput.maxLength = 200;
+
+  const bodyInput = document.createElement('textarea');
+  bodyInput.placeholder = 'Notes (optional)';
+  bodyInput.rows = 3;
+
+  const submit = document.createElement('button');
+  submit.type = 'submit';
+  submit.textContent = 'Add to Unsorted';
+  submit.disabled = true;
+
+  const error = document.createElement('p');
+  error.className = 'form-error';
+
+  titleInput.addEventListener('input', () => {
+    submit.disabled = titleInput.value.trim() === '';
+    error.textContent = '';
+  });
+
+  const list = document.createElement('div');
+  list.className = 'entry-list';
+
+  async function loadList() {
+    const items = await window.revival.unsorted.list();
+    list.innerHTML = '';
+    if (items.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'placeholder';
+      empty.textContent = 'No entries yet. Add one above.';
+      list.appendChild(empty);
+      return;
+    }
+    for (const item of items) {
+      const card = document.createElement('div');
+      card.className = 'entry-card';
+
+      const t = document.createElement('div');
+      t.className = 'entry-title';
+      t.textContent = item.title;
+      card.appendChild(t);
+
+      if (item.body) {
+        const b = document.createElement('div');
+        b.className = 'entry-body';
+        b.textContent = item.body;
+        card.appendChild(b);
+      }
+
+      const meta = document.createElement('div');
+      meta.className = 'entry-meta';
+      meta.textContent = `Added ${new Date(item.created_at).toLocaleString()}`;
+      card.appendChild(meta);
+
+      list.appendChild(card);
+    }
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (titleInput.value.trim() === '') return;
+    submit.disabled = true;
+    try {
+      await window.revival.unsorted.create({
+        title: titleInput.value,
+        body: bodyInput.value,
+      });
+      titleInput.value = '';
+      bodyInput.value = '';
+      await loadList();
+    } catch (err) {
+      error.textContent = err.message || 'Could not save entry.';
+    } finally {
+      submit.disabled = titleInput.value.trim() === '';
+      titleInput.focus();
+    }
+  });
+
+  form.append(titleInput, bodyInput, submit, error);
+  section.append(form, list);
+  loadList();
+}
+
+const CONTENT_RENDERERS = {
+  'Unsorted': renderUnsorted,
+};
 
 const nav = document.getElementById('nav');
 const content = document.getElementById('content');

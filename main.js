@@ -1,6 +1,6 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
-const { initDatabase } = require('./db');
+const db = require('./db');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -10,16 +10,23 @@ function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      preload: path.join(__dirname, 'preload.js'),
     },
   });
 
   win.loadFile(path.join(__dirname, 'index.html'));
 }
 
+function registerIpc() {
+  ipcMain.handle('unsorted:list', () => db.listUnsorted());
+  ipcMain.handle('unsorted:create', (_event, entry) => db.createUnsorted(entry));
+}
+
 app.whenReady().then(() => {
-  const { dbPath, applied } = initDatabase(app.getPath('userData'));
+  const { dbPath, applied } = db.initDatabase(app.getPath('userData'));
   console.log(`[db] ready at ${dbPath} (${applied} migration(s) applied this boot)`);
 
+  registerIpc();
   createWindow();
 
   app.on('activate', () => {
