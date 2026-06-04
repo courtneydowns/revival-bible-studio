@@ -159,6 +159,33 @@ function renderWorkspacePage(name) {
   return page;
 }
 
+// --- Draft autosave (preservation only, never finalization) ----------------
+// In-progress create/edit text is mirrored to localStorage so quitting
+// mid-edit and reopening restores the draft. The committed entry in SQLite is
+// untouched until the user explicitly clicks Save. Slot is 'new' for the
+// create form, or an entry id for an edit in progress.
+const Drafts = {
+  _key: (slot) => `revival.draft.unsorted.${slot}`,
+  get(slot) {
+    try {
+      return JSON.parse(localStorage.getItem(Drafts._key(slot)));
+    } catch {
+      return null;
+    }
+  },
+  set(slot, data) {
+    localStorage.setItem(Drafts._key(slot), JSON.stringify(data));
+  },
+  clear(slot) {
+    localStorage.removeItem(Drafts._key(slot));
+  },
+};
+
+function setStatus(el, text) {
+  el.textContent = text;
+  el.style.display = text ? '' : 'none';
+}
+
 // --- Unsorted: create + list ----------------------------------------------
 function renderUnsorted(section) {
   // Create form
@@ -182,10 +209,37 @@ function renderUnsorted(section) {
   const error = document.createElement('p');
   error.className = 'form-error';
 
+  const formStatus = document.createElement('p');
+  formStatus.className = 'draft-status';
+
+  // Restore an in-progress create draft preserved from a previous session.
+  const newDraft = Drafts.get('new');
+  if (newDraft) {
+    titleInput.value = newDraft.title || '';
+    bodyInput.value = newDraft.body || '';
+    submit.disabled = titleInput.value.trim() === '';
+    setStatus(formStatus, 'Draft restored — not added yet. Click “Add to Unsorted” to finalize.');
+  } else {
+    setStatus(formStatus, '');
+  }
+
+  // Autosave the in-progress draft (preservation only; never finalizes).
+  function saveNewDraft() {
+    if (titleInput.value.trim() === '' && bodyInput.value.trim() === '') {
+      Drafts.clear('new');
+      setStatus(formStatus, '');
+    } else {
+      Drafts.set('new', { title: titleInput.value, body: bodyInput.value });
+      setStatus(formStatus, 'Draft saved — not added yet. Click “Add to Unsorted” to finalize.');
+    }
+  }
+
   titleInput.addEventListener('input', () => {
     submit.disabled = titleInput.value.trim() === '';
     error.textContent = '';
+    saveNewDraft();
   });
+  bodyInput.addEventListener('input', saveNewDraft);
 
   const list = document.createElement('div');
   list.className = 'entry-list';
@@ -223,16 +277,37 @@ function renderUnsorted(section) {
     }
     card.appendChild(meta);
 
+    // A preserved draft (e.g. quit mid-edit) is shown but not yet finalized.
+    const pendingDraft = Drafts.get(item.id);
+    if (pendingDraft) {
+      const badge = document.createElement('div');
+      badge.className = 'draft-badge';
+      badge.textContent = 'Unsaved draft preserved — not finalized.';
+      card.appendChild(badge);
+    }
+
     const actions = document.createElement('div');
     actions.className = 'entry-actions';
 
     const editBtn = document.createElement('button');
     editBtn.type = 'button';
     editBtn.className = 'btn-secondary';
-    editBtn.textContent = 'Edit';
+    editBtn.textContent = pendingDraft ? 'Resume editing' : 'Edit';
     editBtn.addEventListener('click', () => {
       card.replaceWith(buildEditCard(item));
     });
+
+    let discardBtn;
+    if (pendingDraft) {
+      discardBtn = document.createElement('button');
+      discardBtn.type = 'button';
+      discardBtn.className = 'btn-secondary';
+      discardBtn.textContent = 'Discard draft';
+      discardBtn.addEventListener('click', () => {
+        Drafts.clear(item.id);
+        card.replaceWith(buildViewCard(item));
+      });
+    }
 
     const archiveBtn = document.createElement('button');
     archiveBtn.type = 'button';
@@ -256,7 +331,9 @@ function renderUnsorted(section) {
       showDeleteConfirm(card, actions, item);
     });
 
-    actions.append(editBtn, archiveBtn, deleteBtn);
+    actions.append(editBtn);
+    if (discardBtn) actions.append(discardBtn);
+    actions.append(archiveBtn, deleteBtn);
     card.appendChild(actions);
 
     return card;
@@ -355,14 +432,21 @@ function renderUnsorted(section) {
     const card = document.createElement('div');
     card.className = 'entry-card';
 
+    // Prefer a preserved draft (e.g. quit mid-edit) over the saved values.
+    const draft = Drafts.get(item.id);
+    const initial = draft || { title: item.title, body: item.body || '' };
+
     const titleEdit = document.createElement('input');
     titleEdit.type = 'text';
     titleEdit.maxLength = 200;
-    titleEdit.value = item.title;
+    titleEdit.value = initial.title;
 
     const bodyEdit = document.createElement('textarea');
     bodyEdit.rows = 3;
-    bodyEdit.value = item.body || '';
+    bodyEdit.value = initial.body;
+
+    const status = document.createElement('p');
+    status.className = 'draft-status';
 
     const err = document.createElement('p');
     err.className = 'form-error';
@@ -380,10 +464,25 @@ function renderUnsorted(section) {
     cancelBtn.className = 'btn-secondary';
     cancelBtn.textContent = 'Cancel';
 
+    // Autosave the in-progress edit (preservation only; never finalizes).
+    function saveEditDraft() {
+      Drafts.set(item.id, { title: titleEdit.value, body: bodyEdit.value });
+      setStatus(status, 'Draft autosaved — click Save to finalize.');
+    }
+
+    setStatus(
+      status,
+      draft
+        ? 'Unsaved draft restored — click Save to finalize.'
+        : ''
+    );
+
     titleEdit.addEventListener('input', () => {
       saveBtn.disabled = titleEdit.value.trim() === '';
       err.textContent = '';
+      saveEditDraft();
     });
+    bodyEdit.addEventListener('input', saveEditDraft);
 
     saveBtn.addEventListener('click', async () => {
       if (titleEdit.value.trim() === '') return;
@@ -393,6 +492,7 @@ function renderUnsorted(section) {
           title: titleEdit.value,
           body: bodyEdit.value,
         });
+        Drafts.clear(item.id);
         await loadList();
       } catch (e) {
         err.textContent = e.message || 'Could not save changes.';
@@ -401,11 +501,13 @@ function renderUnsorted(section) {
     });
 
     cancelBtn.addEventListener('click', () => {
+      // Cancel abandons the edit: discard the preserved draft too.
+      Drafts.clear(item.id);
       card.replaceWith(buildViewCard(item));
     });
 
     actions.append(saveBtn, cancelBtn);
-    card.append(titleEdit, bodyEdit, err, actions);
+    card.append(titleEdit, bodyEdit, status, err, actions);
     titleEdit.focus();
     return card;
   }
@@ -447,6 +549,8 @@ function renderUnsorted(section) {
       });
       titleInput.value = '';
       bodyInput.value = '';
+      Drafts.clear('new');
+      setStatus(formStatus, '');
       await loadList();
     } catch (err) {
       error.textContent = err.message || 'Could not save entry.';
@@ -456,7 +560,7 @@ function renderUnsorted(section) {
     }
   });
 
-  form.append(titleInput, bodyInput, submit, error);
+  form.append(titleInput, bodyInput, submit, formStatus, error);
   section.append(form, list, archived);
   loadList();
 }
