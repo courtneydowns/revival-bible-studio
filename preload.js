@@ -6,5 +6,6 @@ contextBridge.exposeInMainWorld('revival', {
   unsorted: {
     list: () => ipcRenderer.invoke('unsorted:list'),
     create: (entry) => ipcRenderer.invoke('unsorted:create', entry),
+    update: (id, entry) => ipcRenderer.invoke('unsorted:update', id, entry),
   },
 });

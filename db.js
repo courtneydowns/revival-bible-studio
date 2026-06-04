@@ -110,6 +110,19 @@ function createUnsorted({ title, body } = {}) {
   return getUnsorted(info.lastInsertRowid);
 }
 
+function updateUnsorted(id, { title, body } = {}) {
+  const existing = getUnsorted(id);
+  if (!existing) throw new Error('Entry not found.');
+  const cleanTitle = (title || '').trim();
+  if (!cleanTitle) throw new Error('Title is required.');
+  getDb()
+    .prepare(
+      'UPDATE unsorted SET title = ?, body = ?, updated_at = ? WHERE id = ?'
+    )
+    .run(cleanTitle, (body || '').trim(), new Date().toISOString(), id);
+  return getUnsorted(id);
+}
+
 module.exports = {
   initDatabase,
   getDb,
@@ -119,4 +132,5 @@ module.exports = {
   listUnsorted,
   getUnsorted,
   createUnsorted,
+  updateUnsorted,
 };

@@ -20,6 +20,7 @@ function createWindow() {
 function registerIpc() {
   ipcMain.handle('unsorted:list', () => db.listUnsorted());
   ipcMain.handle('unsorted:create', (_event, entry) => db.createUnsorted(entry));
+  ipcMain.handle('unsorted:update', (_event, id, entry) => db.updateUnsorted(id, entry));
 }
 
 app.whenReady().then(() => {

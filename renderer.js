@@ -190,6 +190,104 @@ function renderUnsorted(section) {
   const list = document.createElement('div');
   list.className = 'entry-list';
 
+  function buildViewCard(item) {
+    const card = document.createElement('div');
+    card.className = 'entry-card';
+
+    const t = document.createElement('div');
+    t.className = 'entry-title';
+    t.textContent = item.title;
+    card.appendChild(t);
+
+    if (item.body) {
+      const b = document.createElement('div');
+      b.className = 'entry-body';
+      b.textContent = item.body;
+      card.appendChild(b);
+    }
+
+    const meta = document.createElement('div');
+    meta.className = 'entry-meta';
+    meta.textContent = `Added ${new Date(item.created_at).toLocaleString()}`;
+    if (item.updated_at && item.updated_at !== item.created_at) {
+      meta.textContent += ` · edited ${new Date(item.updated_at).toLocaleString()}`;
+    }
+    card.appendChild(meta);
+
+    const actions = document.createElement('div');
+    actions.className = 'entry-actions';
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'btn-secondary';
+    editBtn.textContent = 'Edit';
+    editBtn.addEventListener('click', () => {
+      card.replaceWith(buildEditCard(item));
+    });
+    actions.appendChild(editBtn);
+    card.appendChild(actions);
+
+    return card;
+  }
+
+  function buildEditCard(item) {
+    const card = document.createElement('div');
+    card.className = 'entry-card';
+
+    const titleEdit = document.createElement('input');
+    titleEdit.type = 'text';
+    titleEdit.maxLength = 200;
+    titleEdit.value = item.title;
+
+    const bodyEdit = document.createElement('textarea');
+    bodyEdit.rows = 3;
+    bodyEdit.value = item.body || '';
+
+    const err = document.createElement('p');
+    err.className = 'form-error';
+
+    const actions = document.createElement('div');
+    actions.className = 'entry-actions';
+
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'btn-primary';
+    saveBtn.textContent = 'Save';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'btn-secondary';
+    cancelBtn.textContent = 'Cancel';
+
+    titleEdit.addEventListener('input', () => {
+      saveBtn.disabled = titleEdit.value.trim() === '';
+      err.textContent = '';
+    });
+
+    saveBtn.addEventListener('click', async () => {
+      if (titleEdit.value.trim() === '') return;
+      saveBtn.disabled = true;
+      try {
+        await window.revival.unsorted.update(item.id, {
+          title: titleEdit.value,
+          body: bodyEdit.value,
+        });
+        await loadList();
+      } catch (e) {
+        err.textContent = e.message || 'Could not save changes.';
+        saveBtn.disabled = false;
+      }
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      card.replaceWith(buildViewCard(item));
+    });
+
+    actions.append(saveBtn, cancelBtn);
+    card.append(titleEdit, bodyEdit, err, actions);
+    titleEdit.focus();
+    return card;
+  }
+
   async function loadList() {
     const items = await window.revival.unsorted.list();
     list.innerHTML = '';
@@ -201,27 +299,7 @@ function renderUnsorted(section) {
       return;
     }
     for (const item of items) {
-      const card = document.createElement('div');
-      card.className = 'entry-card';
-
-      const t = document.createElement('div');
-      t.className = 'entry-title';
-      t.textContent = item.title;
-      card.appendChild(t);
-
-      if (item.body) {
-        const b = document.createElement('div');
-        b.className = 'entry-body';
-        b.textContent = item.body;
-        card.appendChild(b);
-      }
-
-      const meta = document.createElement('div');
-      meta.className = 'entry-meta';
-      meta.textContent = `Added ${new Date(item.created_at).toLocaleString()}`;
-      card.appendChild(meta);
-
-      list.appendChild(card);
+      list.appendChild(buildViewCard(item));
     }
   }
 
