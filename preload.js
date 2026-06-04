@@ -12,4 +12,13 @@ contextBridge.exposeInMainWorld('revival', {
     archive: (id) => ipcRenderer.invoke('unsorted:archive', id),
     restore: (id) => ipcRenderer.invoke('unsorted:restore', id),
   },
+  sourceMaterial: {
+    list: () => ipcRenderer.invoke('sourceMaterial:list'),
+    listArchived: () => ipcRenderer.invoke('sourceMaterial:listArchived'),
+    create: (entry) => ipcRenderer.invoke('sourceMaterial:create', entry),
+    update: (id, entry) => ipcRenderer.invoke('sourceMaterial:update', id, entry),
+    delete: (id) => ipcRenderer.invoke('sourceMaterial:delete', id),
+    archive: (id) => ipcRenderer.invoke('sourceMaterial:archive', id),
+    restore: (id) => ipcRenderer.invoke('sourceMaterial:restore', id),
+  },
 });

@@ -44,6 +44,24 @@ const MIGRATIONS = [
       db.exec(`ALTER TABLE unsorted ADD COLUMN archived_at TEXT;`);
     },
   },
+  {
+    name: '004_source_material',
+    up(db) {
+      // Source Material: reference inputs (the only thing attachable to Chat).
+      // Same lifecycle/shape as unsorted; kept in its own table so the two
+      // workspaces stay visibly separate (per CLAUDE.md).
+      db.exec(`
+        CREATE TABLE source_material (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          title       TEXT NOT NULL,
+          body        TEXT NOT NULL DEFAULT '',
+          created_at  TEXT NOT NULL,
+          updated_at  TEXT NOT NULL,
+          archived_at TEXT
+        );
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -164,12 +182,80 @@ function restoreUnsorted(id) {
   return getUnsorted(id);
 }
 
+// --- Generic entry repository ----------------------------------------------
+// Builds the standard create/list/edit/delete/archive/restore API for any
+// table that shares the unsorted shape (title, body, timestamps, archived_at).
+// `table` is a trusted constant from this module — never user input.
+function makeEntryRepo(table) {
+  const getOne = (id) =>
+    getDb().prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
+
+  return {
+    list: () =>
+      getDb()
+        .prepare(
+          `SELECT * FROM ${table} WHERE archived_at IS NULL ORDER BY created_at DESC, id DESC`
+        )
+        .all(),
+    listArchived: () =>
+      getDb()
+        .prepare(
+          `SELECT * FROM ${table} WHERE archived_at IS NOT NULL ORDER BY archived_at DESC, id DESC`
+        )
+        .all(),
+    get: getOne,
+    create: ({ title, body } = {}) => {
+      const cleanTitle = (title || '').trim();
+      if (!cleanTitle) throw new Error('Title is required.');
+      const now = new Date().toISOString();
+      const info = getDb()
+        .prepare(
+          `INSERT INTO ${table} (title, body, created_at, updated_at) VALUES (?, ?, ?, ?)`
+        )
+        .run(cleanTitle, (body || '').trim(), now, now);
+      return getOne(info.lastInsertRowid);
+    },
+    update: (id, { title, body } = {}) => {
+      if (!getOne(id)) throw new Error('Entry not found.');
+      const cleanTitle = (title || '').trim();
+      if (!cleanTitle) throw new Error('Title is required.');
+      getDb()
+        .prepare(
+          `UPDATE ${table} SET title = ?, body = ?, updated_at = ? WHERE id = ?`
+        )
+        .run(cleanTitle, (body || '').trim(), new Date().toISOString(), id);
+      return getOne(id);
+    },
+    delete: (id) => {
+      const info = getDb().prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
+      return { deleted: info.changes > 0 };
+    },
+    archive: (id) => {
+      if (!getOne(id)) throw new Error('Entry not found.');
+      getDb()
+        .prepare(`UPDATE ${table} SET archived_at = ? WHERE id = ?`)
+        .run(new Date().toISOString(), id);
+      return getOne(id);
+    },
+    restore: (id) => {
+      if (!getOne(id)) throw new Error('Entry not found.');
+      getDb()
+        .prepare(`UPDATE ${table} SET archived_at = NULL WHERE id = ?`)
+        .run(id);
+      return getOne(id);
+    },
+  };
+}
+
+const sourceMaterial = makeEntryRepo('source_material');
+
 module.exports = {
   initDatabase,
   getDb,
   getDbPath,
   DB_FILENAME,
   MIGRATIONS,
+  sourceMaterial,
   listUnsorted,
   listArchivedUnsorted,
   getUnsorted,

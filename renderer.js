@@ -163,31 +163,42 @@ function renderWorkspacePage(name) {
 // In-progress create/edit text is mirrored to localStorage so quitting
 // mid-edit and reopening restores the draft. The committed entry in SQLite is
 // untouched until the user explicitly clicks Save. Slot is 'new' for the
-// create form, or an entry id for an edit in progress.
-const Drafts = {
-  _key: (slot) => `revival.draft.unsorted.${slot}`,
-  get(slot) {
-    try {
-      return JSON.parse(localStorage.getItem(Drafts._key(slot)));
-    } catch {
-      return null;
-    }
-  },
-  set(slot, data) {
-    localStorage.setItem(Drafts._key(slot), JSON.stringify(data));
-  },
-  clear(slot) {
-    localStorage.removeItem(Drafts._key(slot));
-  },
-};
+// create form, or an entry id for an edit in progress. `prefix` namespaces
+// drafts per workspace so e.g. Unsorted and Source Material don't collide.
+function makeDrafts(prefix) {
+  const keyFor = (slot) => `revival.draft.${prefix}.${slot}`;
+  return {
+    get(slot) {
+      try {
+        return JSON.parse(localStorage.getItem(keyFor(slot)));
+      } catch {
+        return null;
+      }
+    },
+    set(slot, data) {
+      localStorage.setItem(keyFor(slot), JSON.stringify(data));
+    },
+    clear(slot) {
+      localStorage.removeItem(keyFor(slot));
+    },
+  };
+}
 
 function setStatus(el, text) {
   el.textContent = text;
   el.style.display = text ? '' : 'none';
 }
 
-// --- Unsorted: create + list ----------------------------------------------
-function renderUnsorted(section) {
+// --- Shared entry workspace (create + list + edit/delete/archive/restore) ---
+// Unsorted and Source Material share one lifecycle. `config` supplies the
+// IPC namespace, the draft localStorage prefix, and the add-button label.
+function makeEntryWorkspace(config) {
+  const api = window.revival[config.apiName];
+  const Drafts = makeDrafts(config.draftPrefix);
+  const addLabel = config.addLabel;
+  const finalizeHint = `Click “${addLabel}” to finalize.`;
+
+  return function renderEntryWorkspace(section) {
   // Create form
   const form = document.createElement('form');
   form.className = 'entry-form';
@@ -203,7 +214,7 @@ function renderUnsorted(section) {
 
   const submit = document.createElement('button');
   submit.type = 'submit';
-  submit.textContent = 'Add to Unsorted';
+  submit.textContent = addLabel;
   submit.disabled = true;
 
   const error = document.createElement('p');
@@ -218,7 +229,7 @@ function renderUnsorted(section) {
     titleInput.value = newDraft.title || '';
     bodyInput.value = newDraft.body || '';
     submit.disabled = titleInput.value.trim() === '';
-    setStatus(formStatus, 'Draft restored — not added yet. Click “Add to Unsorted” to finalize.');
+    setStatus(formStatus, `Draft restored — not added yet. ${finalizeHint}`);
   } else {
     setStatus(formStatus, '');
   }
@@ -230,7 +241,7 @@ function renderUnsorted(section) {
       setStatus(formStatus, '');
     } else {
       Drafts.set('new', { title: titleInput.value, body: bodyInput.value });
-      setStatus(formStatus, 'Draft saved — not added yet. Click “Add to Unsorted” to finalize.');
+      setStatus(formStatus, `Draft saved — not added yet. ${finalizeHint}`);
     }
   }
 
@@ -316,7 +327,7 @@ function renderUnsorted(section) {
     archiveBtn.addEventListener('click', async () => {
       archiveBtn.disabled = true;
       try {
-        await window.revival.unsorted.archive(item.id);
+        await api.archive(item.id);
         await loadList();
       } catch (e) {
         archiveBtn.disabled = false;
@@ -371,7 +382,7 @@ function renderUnsorted(section) {
     restoreBtn.addEventListener('click', async () => {
       restoreBtn.disabled = true;
       try {
-        await window.revival.unsorted.restore(item.id);
+        await api.restore(item.id);
         await loadList();
       } catch (e) {
         restoreBtn.disabled = false;
@@ -408,7 +419,7 @@ function renderUnsorted(section) {
     yes.addEventListener('click', async () => {
       yes.disabled = true;
       try {
-        await window.revival.unsorted.delete(item.id);
+        await api.delete(item.id);
         await loadList();
       } catch (e) {
         prompt.textContent = e.message || 'Could not delete entry.';
@@ -488,7 +499,7 @@ function renderUnsorted(section) {
       if (titleEdit.value.trim() === '') return;
       saveBtn.disabled = true;
       try {
-        await window.revival.unsorted.update(item.id, {
+        await api.update(item.id, {
           title: titleEdit.value,
           body: bodyEdit.value,
         });
@@ -514,8 +525,8 @@ function renderUnsorted(section) {
 
   async function loadList() {
     const [items, archivedItems] = await Promise.all([
-      window.revival.unsorted.list(),
-      window.revival.unsorted.listArchived(),
+      api.list(),
+      api.listArchived(),
     ]);
 
     list.innerHTML = '';
@@ -543,7 +554,7 @@ function renderUnsorted(section) {
     if (titleInput.value.trim() === '') return;
     submit.disabled = true;
     try {
-      await window.revival.unsorted.create({
+      await api.create({
         title: titleInput.value,
         body: bodyInput.value,
       });
@@ -563,10 +574,20 @@ function renderUnsorted(section) {
   form.append(titleInput, bodyInput, submit, formStatus, error);
   section.append(form, list, archived);
   loadList();
+  };
 }
 
 const CONTENT_RENDERERS = {
-  'Unsorted': renderUnsorted,
+  'Unsorted': makeEntryWorkspace({
+    apiName: 'unsorted',
+    draftPrefix: 'unsorted',
+    addLabel: 'Add to Unsorted',
+  }),
+  'Source Material': makeEntryWorkspace({
+    apiName: 'sourceMaterial',
+    draftPrefix: 'source_material',
+    addLabel: 'Add Source',
+  }),
 };
 
 const nav = document.getElementById('nav');
