@@ -1,0 +1,1085 @@
+============================================================
+REBUILT REVIVAL STUDIO PLAN
+============================================================
+
+WORKING APP NAME
+Revival Studio
+
+WHY THIS NAME
+Revival Studio avoids confusion with the old Revival Bible AI project. It sounds like a creative workspace, not a generic AI wrapper or database utility. The app should support writing, canon, source material, chat, documents, research, brainstorming, review, and project organization.
+
+CORE PRODUCT IDENTITY
+Revival Studio is a local-first creative/editorial workspace for the Revival project.
+
+It is not:
+- a ChatGPT wrapper
+- an OpenAI app
+- a generic AI Studio
+- a database admin tool
+- a confusing all-in-one scrolling dashboard
+- a hidden retrieval system
+- an AI canon-mutation tool
+
+It is:
+- a Revival-only project workspace
+- a place to store and organize source material
+- a place to chat with Claude
+- a place to save and route Claude output
+- a place to manage writing, documents, brainstorming, research, questions, conflicts, decisions, and canon
+- a place where AI can suggest, but the human always approves before anything is stored, routed, locked, or finalized
+
+HARD AI RULE
+No ChatGPT integration.
+No OpenAI integration.
+No OpenAI provider code.
+No generic provider router.
+No ChatGPT model picker.
+No OpenAI API key fields.
+No ChatGPT-branded UI.
+
+Claude/Anthropic may be used later as the only AI provider.
+
+AI must never silently mutate canon, decisions, tags, archived state, or stored records.
+AI may suggest.
+The human approves.
+
+GLOBAL SIMPLE UI RULE
+Every screen must answer:
+1. Where am I?
+2. What is this page for?
+3. What is the main action?
+4. Where will this saved thing go?
+5. Can I edit, delete, archive, or restore if I made a mistake?
+6. What should I do next, if anything?
+
+Avoid:
+- long confusing scroll pages
+- fake future features pretending to work
+- developer diagnostics in normal user flow
+- hidden context
+- unclear save destinations
+- too many simultaneous buttons
+- one-table-per-page database sprawl
+
+
+============================================================
+PRIMARY WORKSPACES
+============================================================
+
+Recommended sidebar grouping:
+
+MAIN
+- Home
+- Chat
+- Writing Lab
+
+PROJECT MATERIAL
+- Source Material
+- Documents
+- Canon Bible
+
+REVIEW & DECISIONS
+- Unsorted
+- Canon Review
+- Open Questions
+- Conflicts
+- Decisions
+
+CREATIVE WORK
+- Brainstorm
+- Research
+
+SYSTEM
+- Settings
+
+
+============================================================
+HOME
+============================================================
+
+PURPOSE
+Home tells the user what needs attention and where to go next.
+
+Home should be compact and workflow-focused.
+
+Recommended Home sections:
+- Continue Working
+- Active Chat
+- Recent Source Material
+- Items in Unsorted
+- Items in Canon Review
+- Open Questions
+- Active Conflicts
+- Recent Decisions
+- Recent Documents / Brainstorms / Research
+- Optional Next Step Suggestions
+
+Home should not show large technical panels or internal safety/debug content.
+
+
+============================================================
+CHAT
+============================================================
+
+NAME
+Chat
+
+PURPOSE
+A global Claude chat workspace available from everywhere in the app.
+
+APP SCOPE
+The app is only for the Revival project.
+There are multiple chats inside this one Revival project.
+There is no multi-project system.
+
+CHAT ACCESS
+Chat should be accessible globally as a right-side drawer from every workspace.
+The user should also be able to expand Chat into a larger panel without replacing the whole app.
+The user also wants a separate pop-out chat window later.
+
+CHAT FEATURES
+Must support:
+- multiple chats inside the Revival project
+- chat title dropdown
+- new chat
+- rename chat
+- archive chat
+- restore archived chat
+- search chats
+- persistent history
+- load older history if needed
+- autosaved composer draft
+- clear draft
+- expand chat panel
+- pop-out chat window
+- attach Source Material
+- visible Active Sources area
+- export full conversation
+- highlight sections and route/export them
+- Claude model selector
+- model may change inside a chat
+- model used should be stored per message behind the scenes
+
+Avoid:
+- forced chat categories
+- confusing folders too early
+- generic provider switching
+- ChatGPT/OpenAI
+- hidden context
+- automatic database/canon mutation
+
+CHAT ORGANIZATION
+Use simple organization first:
+- chat title dropdown
+- search
+- archive/restore
+- rename
+- optional pin/favorite later
+- optional tags later if needed
+
+Do not force chat type categories in MVP because one chat may include brainstorming, rewriting, canon analysis, and research.
+
+CLAUDE MODEL HISTORY RULE
+Because the app is Claude-only, do not split histories by provider.
+A chat can switch Claude models if needed.
+Each message should store which Claude model generated it.
+The user should not have to create a new chat just to switch Claude models.
+
+CHAT ATTACHMENTS
+No Context Packets.
+No Manual Context page.
+No Text Context system.
+No selected-excerpt attachment workflow in MVP.
+
+For MVP, Chat attachments should support Source Material only.
+
+ATTACHMENT MODES
+Source Material attachments should support two modes:
+
+1. Keep active in this chat
+- Default for MVP.
+- The source stays visibly attached until the user removes it.
+- Claude can continue using it throughout the conversation.
+- The app should show this in an Active Sources area.
+
+2. Use for next message only
+- Optional mode for one-off questions.
+- The source is used for one message.
+- Then it clears from the active attachment area.
+- The chat should still record that the source was used.
+
+Simple rule:
+Attach Source Material -> choose Keep Active or Next Message Only -> send -> app visibly tracks what Claude used -> user can remove active sources anytime.
+
+ACTIVE SOURCES UI
+Chat should show an Active Sources strip/list so the user always knows what Claude is using.
+
+Each active source should show:
+- source title
+- source type
+- mode: Keep active / Next message only
+- remove button
+
+No hidden attachments.
+No hidden retrieval.
+No automatic source loading.
+
+PROJECT RULES VS ACTIVE SOURCES
+Project Rules are always-on instructions in Settings.
+Active Sources are specific attached materials Claude should use for a chat.
+Canon Bible is the source of locked/current truth later.
+Chat history is the ongoing conversation.
+
+EXPORT FROM CHAT
+Chat should eventually support:
+- export entire conversation
+- export a selected message
+- highlight text and export only that section
+- route exported material to the appropriate destination
+- AI-suggested tags/destination with human review
+- no automatic final storage without user approval
+
+Export destinations:
+- Unsorted
+- Documents
+- Brainstorm
+- Research
+- Open Questions
+- Conflicts
+- Decisions
+- Canon Review
+- Copy text
+
+
+============================================================
+WRITING LAB
+============================================================
+
+NAME
+Writing Lab
+
+PURPOSE
+A task-based Claude workspace.
+
+Chat is conversational.
+Writing Lab is action/task-based.
+
+Writing Lab should help with:
+- rewrite selected text
+- analyze selected source
+- brainstorm options
+- find contradictions
+- extract possible canon/review candidates
+- draft scene notes
+- summarize canon area later
+- Flannagan/style check later
+
+Recommended task order:
+1. Rewrite selected text
+2. Analyze selected source
+3. Brainstorm options
+4. Find contradictions
+5. Extract canon/review candidates
+6. Draft scene notes
+7. Summarize canon area
+
+WRITING LAB OUTPUT RULE
+Claude output should appear as an unsaved/reviewable result first.
+The user chooses what to do with it.
+
+Possible actions:
+- Copy
+- Save to Documents
+- Save to Brainstorm
+- Save to Research
+- Create Open Question
+- Create Conflict
+- Create Decision Draft
+- Send to Canon Review
+- Send to Unsorted
+- Discard
+
+AI may suggest tags/title/destination.
+Human must approve before storage/routing/finalization.
+
+
+============================================================
+SOURCE MATERIAL
+============================================================
+
+PURPOSE
+Source Material is evidence/input.
+
+Examples:
+- Story Bible versions
+- Canon truth docs
+- final seed docs
+- official project reference docs
+- imported project knowledge files
+- project notes used as evidence
+- documents Claude uses for schema/canon design later
+
+Source Material should support:
+- create/import source
+- paste source
+- source batches if useful
+- title
+- source type
+- project area
+- notes
+- body/content
+- created/updated timestamps
+- archive
+- delete mistakes
+- restore archived
+- attach to Chat
+- send to Writing Lab
+- send to Unsorted
+- send to Canon Review where appropriate
+
+Rule:
+Source Material is evidence.
+Documents are working material.
+
+
+============================================================
+DOCUMENTS
+============================================================
+
+PURPOSE
+Documents are working/writing material.
+
+Examples:
+- drafts
+- outlines
+- scene notes
+- rewritten passages
+- style drafts
+- working docs
+- saved Claude outputs that are document-like
+
+Documents should support:
+- create
+- edit
+- autosave draft
+- save
+- delete mistakes
+- archive/restore
+- tags later
+- route to Chat/Writing Lab
+- route to Unsorted or Canon Review if needed
+
+Rule:
+Documents are work product, not automatically canon.
+
+
+============================================================
+CANON BIBLE
+============================================================
+
+PURPOSE
+Canon Bible is the official home for locked/current Revival information.
+
+However, the final Canon Bible structure, categories, and SQLite schema should be proposed by Claude after inspecting the finalized project knowledge files. The project knowledge files live in Claude and are evolving/finalizing there.
+
+Do not over-prescribe the detailed Canon Bible schema before Claude inspects the files.
+
+Canon Bible will likely include categories such as:
+- Characters
+- Relationships
+- Worldbuilding
+- Virus Master Rules
+- Timeline
+- Episodes / Seasons
+- Locations
+- Organizations
+- Themes
+- Mythology / supernatural rules if needed
+- Style/tone rules if they are treated as canon
+- Other categories Claude identifies from the actual project knowledge files
+
+IMPORTANT CANON RULE
+Locked means currently accepted, not impossible to change.
+The user must be able to edit entries in Canon Bible.
+Future changes to locked canon should preserve some kind of history / superseded state / decision trail where appropriate.
+
+CANON BIBLE SHOULD SUPPORT
+- active/current entries
+- edit entries
+- delete mistaken entries, with confirmation
+- archive/retire/supersede entries
+- collapsed retired/superseded section by default
+- restore where appropriate
+- link to source material
+- link to decisions
+- link to open questions/conflicts where appropriate
+
+Canon Bible should not be finalized until the schema approval checkpoint.
+
+
+============================================================
+UNSORTED
+============================================================
+
+PURPOSE
+Unsorted is saved material that needs routing.
+
+This replaces Creative Inbox as the simple general queue.
+
+Definition:
+Unsorted = saved material that does not clearly fit somewhere yet.
+
+Examples:
+- interesting Claude output the user does not know where to put yet
+- half-formed idea
+- possible note
+- possible future document
+- exported chat section needing sorting
+- AI output with suggested destination not yet approved
+- useful material that is not obviously canon/research/brainstorm/document/question/conflict/decision yet
+
+UNSORTED ACTIONS
+- Move to Documents
+- Move to Brainstorm
+- Move to Research
+- Create Open Question
+- Create Conflict
+- Create Decision Draft
+- Send to Canon Review
+- Archive
+- Delete
+
+Unsorted should not become a confusing dumping ground. It should show simple routing actions and optional Next Step Suggestions.
+
+AI may suggest destination/tags.
+Human approves.
+
+
+============================================================
+CANON REVIEW
+============================================================
+
+PURPOSE
+Canon Review is possible canon/project-truth material waiting for approval.
+
+Definition:
+Canon Review = material that may affect official Revival truth.
+
+Examples:
+- possible character fact
+- possible worldbuilding rule
+- possible virus rule
+- possible timeline fact
+- possible episode/season fact
+- possible relationship fact
+- possible source-backed canon update
+- possible decision affecting Canon Bible
+
+Canon Review is separate from Unsorted.
+
+Reason:
+Unsorted is a general routing bucket.
+Canon Review is official approval work.
+Canon Review needs a more careful UI with source/evidence/proposed destination.
+
+CANON REVIEW ACTIONS
+- Approve / Save As...
+- Save to Canon Bible
+- Create Open Question
+- Create Conflict
+- Create Decision
+- Save to Documents
+- Defer
+- Reject
+- Archive
+- Delete mistake
+
+AI may suggest Canon Review items, but the user must approve before they are stored.
+
+Flow:
+1. Claude suggests possible canon/review items.
+2. App shows a review panel.
+3. User checks/edits/approves.
+4. User clicks Add to Canon Review.
+5. Items are stored only after approval.
+
+
+============================================================
+OPEN QUESTIONS
+============================================================
+
+PURPOSE
+Open Questions are things the project does not know yet.
+
+Examples:
+- unanswered story logic
+- unresolved character motivation
+- unclear timeline point
+- worldbuilding unknown
+- canon gap
+
+Open Questions should support:
+- create
+- edit
+- delete mistakes
+- archive/resolve
+- collapsed archived/resolved section
+- link to Source Material
+- link to Canon Bible later
+- link to Decisions later
+- route to Chat/Writing Lab
+- AI suggestions with human approval
+
+
+============================================================
+CONFLICTS
+============================================================
+
+PURPOSE
+Conflicts are things that disagree, contradict, or create canon/continuity risk.
+
+Examples:
+- two source materials disagree
+- timeline mismatch
+- character motivation contradiction
+- old canon conflicts with new draft
+- virus rule inconsistency
+
+Conflicts should be separate from Open Questions.
+
+Reason:
+Questions mean “we do not know.”
+Conflicts mean “two or more things disagree or create risk.”
+
+Conflicts should support:
+- create
+- edit
+- delete mistakes
+- archive/resolve
+- collapsed archived/resolved section
+- link to Source Material
+- link to Canon Bible later
+- link to Decisions later
+- route to Chat/Writing Lab
+- AI suggestions with human approval
+
+
+============================================================
+DECISIONS
+============================================================
+
+PURPOSE
+Decisions explain why a creative/editorial choice was made.
+
+Examples:
+- why a canon rule changed
+- why one answer was selected over another
+- why a conflict was resolved a certain way
+- why a question was closed
+- why an old version was superseded
+
+Decisions should support:
+- create
+- edit
+- delete mistakes
+- archive/supersede
+- collapsed archived/superseded section
+- link to Canon Bible
+- link to Source Material
+- link to Open Questions
+- link to Conflicts
+- route to Chat/Writing Lab
+- AI-suggested decision drafts with human approval
+
+
+============================================================
+BRAINSTORM
+============================================================
+
+PURPOSE
+Brainstorm is for messy creative ideas that are not canon by default.
+
+Examples:
+- what-if branches
+- character turns
+- scene concepts
+- episode possibilities
+- theme explorations
+- dialogue experiments
+- saved brainstorming outputs from Chat or Writing Lab
+
+Brainstorm should support:
+- create
+- edit
+- save
+- archive/restore
+- delete mistakes
+- route to Chat/Writing Lab
+- route to Unsorted/Canon Review if something becomes important
+- AI tag/destination suggestions with human approval
+
+Brainstorm is not canon unless routed through the proper review/approval flow.
+
+
+============================================================
+RESEARCH
+============================================================
+
+PURPOSE
+Research is for analytical/reference/story-logic material.
+
+Examples:
+- internal lore research
+- continuity analysis
+- reference notes
+- theme research
+- story logic analysis
+- saved analytical Claude outputs
+
+Research should support:
+- create
+- edit
+- save
+- archive/restore
+- delete mistakes
+- route to Chat/Writing Lab
+- route to Unsorted/Canon Review if something becomes important
+- AI tag/destination suggestions with human approval
+
+Research is not canon unless routed through the proper review/approval flow.
+
+
+============================================================
+SETTINGS
+============================================================
+
+PURPOSE
+Settings should hold app-level options and Project Rules.
+
+PROJECT RULES
+Project Rules replaces vague Project Memory.
+
+Definition:
+Project Rules = always-on guidance for Claude.
+
+Examples:
+- This app is only for Revival.
+- Do not treat Brainstorm as canon.
+- Do not store AI suggestions without human approval.
+- Canon Bible is the source of locked/current truth.
+- If unsure, flag uncertainty.
+- Do not mutate canon automatically.
+- Use simple, clear workflow suggestions.
+- Respect human review for tags, destination, canon, decisions, archive/delete.
+
+Project Rules should be:
+- visible
+- editable
+- understandable
+- small enough to avoid becoming a hidden memory dump
+
+Project Rules are not the same as Canon Bible.
+Project Rules are not the same as Source Material.
+Project Rules are not hidden retrieval.
+
+
+============================================================
+EDIT / DELETE / ARCHIVE / RETIRED RULES
+============================================================
+
+The user wants to be able to:
+- edit entries in all workspace sections, including Canon Bible
+- delete entries where mistakes or typos were made
+- archive entries that no longer apply
+- retire/supersede entries that were overridden
+- avoid a separate global archive page
+
+RULE
+Every workspace where it makes sense should have its own collapsed Archive/Retired section.
+
+No separate Archive page.
+
+DEFAULT LIST STRUCTURE
+- Active items shown by default
+- Archived/Retired/Superseded collapsed by default
+- Restore option where appropriate
+- Delete option with confirmation
+
+DELETE
+Use when:
+- typo/test entry
+- duplicate mistake
+- accidental creation
+- junk record
+
+ARCHIVE
+Use when:
+- no longer relevant
+- old but worth keeping
+- retired note
+- old chat
+- old source material
+- old brainstorm/research/document
+
+RETIRED / SUPERSEDED
+Use especially for Canon Bible and Decisions when something has been overridden but should not disappear.
+
+Canon Bible should support:
+- active/current canon
+- retired/superseded canon collapsed by default
+- reason for retirement/supersession where appropriate
+- related decision where available
+
+
+============================================================
+AUTOSAVE
+============================================================
+
+Autosave should be foundational and app-wide.
+
+Autosave should exist for:
+- Chat composer
+- expanded Chat
+- pop-out Chat
+- Writing Lab inputs
+- Documents
+- Source Material forms
+- Brainstorm
+- Research
+- Open Questions
+- Conflicts
+- Decisions
+- Canon Bible editing
+- Unsorted item editing
+- Canon Review editing
+- tag/route/save modals
+
+IMPORTANT AUTOSAVE RULE
+Autosave means draft preservation, not silent final approval.
+
+Especially for:
+- Canon Bible
+- Decisions
+- Canon Review
+- Conflicts
+
+The app can autosave the edit draft, but meaningful record changes should still have clear save/approve/update actions where appropriate.
+
+
+============================================================
+PANIC EXPORT
+============================================================
+
+Panic Export should be foundational and expand over time.
+
+Eventually Panic Export should include:
+- chats
+- chat drafts
+- source material
+- documents
+- Canon Bible
+- Unsorted
+- Canon Review
+- open questions
+- conflicts
+- decisions
+- brainstorm
+- research
+- project rules
+- settings excluding secrets
+- archive/retired records
+- metadata/tags
+
+No secrets.
+No raw provider payloads by default.
+No hidden API keys.
+
+
+============================================================
+AI SUGGESTIONS WITH HUMAN REVIEW
+============================================================
+
+Global rule:
+AI may suggest.
+Human approves.
+
+AI can suggest:
+- title
+- summary
+- tags
+- destination
+- related area
+- whether something might be canon-relevant
+- whether something might be a conflict
+- whether something might be an open question
+- whether something belongs in Canon Review
+- possible decision draft
+- possible routing from Unsorted
+
+AI cannot automatically:
+- finalize tags
+- save final records
+- change Canon Bible
+- lock canon
+- create final decisions
+- archive/delete records
+- approve its own suggestions
+
+The UI should always show a review/approval step.
+
+
+============================================================
+NEXT STEP SUGGESTIONS
+============================================================
+
+The app should support optional Next Step Suggestions.
+
+Purpose:
+Help the user know what to do next without forcing a rigid workflow.
+
+Examples:
+After importing Source Material:
+- Next: Attach to Chat
+- Next: Analyze in Writing Lab
+- Next: Send possible canon items to Canon Review
+- Other: Do later
+
+After saving Claude output:
+- Next: Save to Unsorted
+- Next: Save to Brainstorm
+- Next: Create Open Question
+- Other: Discard
+
+After resolving a Conflict:
+- Next: Create Decision
+- Next: Update Canon Bible
+- Next: Archive Conflict
+- Other: Do later
+
+UI rule:
+Next Step Suggestions should be small and dismissible.
+The user can ignore them.
+They should not trap the user in a workflow.
+
+
+============================================================
+DATABASE / SCHEMA DIRECTION
+============================================================
+
+Database:
+SQLite.
+
+Important:
+Do not design the detailed Canon Bible schema until Claude inspects the finalized project knowledge files.
+
+The user’s project files live in Claude.
+The seeding documents are still being finalized.
+Claude should make the final Canon Bible format/schema proposal because it has access to the project knowledge files.
+
+SAFE TO BUILD EARLY
+- app shell
+- simple navigation
+- Chat UI
+- autosave foundation
+- Panic Export foundation
+- Source Material shell
+- Documents shell
+- Unsorted shell
+- simple note-like Brainstorm/Research shell
+- Project Rules UI
+- simple local storage/database foundation if not canon-specific
+
+WAIT FOR PROJECT KNOWLEDGE FILE INSPECTION
+- final Canon Bible schema
+- canon categories
+- relationships
+- virus rule structure
+- timeline/episode schema
+- seeding/import logic
+- final provenance model for canon
+
+SCHEMA APPROVAL CHECKPOINT
+Before implementing the real canon database, Claude must:
+1. inspect finalized project knowledge files
+2. identify required canon categories
+3. propose SQLite tables/entities
+4. propose relationships
+5. explain how editing/locking/archive/superseding works
+6. explain how source provenance works
+7. explain how future changes are handled
+8. stop for user approval before implementing
+
+Reason:
+This prevents expensive database rewrites.
+
+
+============================================================
+SIMPLE BUILD PHILOSOPHY
+============================================================
+
+Build in small phases.
+Do not attempt giant rebuilds.
+Do not add unrelated features.
+Do not implement future features as fake working UI.
+Do not add ChatGPT/OpenAI.
+Do not add hidden retrieval.
+Do not add automatic canon mutation.
+Do not design final canon schema until project knowledge files are inspected.
+Every phase should have a manual smoke checklist.
+Every phase should have automated gates where possible.
+No commit until manual smoke passes.
+
+
+============================================================
+RECOMMENDED HIGH-LEVEL BUILD PHASES
+============================================================
+
+PHASE 0 — Product Lock / Docs
+Create repo docs:
+- PRODUCT_SPEC.md
+- WORKFLOW_RULES.md
+- ACTIVE_SCOPE.md
+- ROADMAP.md
+- CURRENT_STATE.md
+- PHASE_LEDGER.md
+
+Lock:
+- Revival Studio name
+- Claude-only direction
+- no ChatGPT/OpenAI
+- simple UI/workflow rules
+- AI suggestions require human approval
+- no hidden context
+- app-wide edit/delete/archive expectations
+- Schema approval checkpoint required
+
+PHASE 1 — App Shell
+Build:
+- sidebar/nav
+- Home placeholder
+- Chat placeholder/drawer
+- Writing Lab placeholder
+- Source Material placeholder
+- Documents placeholder
+- Canon Bible placeholder
+- Unsorted placeholder
+- Canon Review placeholder
+- Open Questions placeholder
+- Conflicts placeholder
+- Decisions placeholder
+- Brainstorm placeholder
+- Research placeholder
+- Settings placeholder
+
+PHASE 2 — Autosave Foundation
+Build autosave as draft preservation.
+Start with Chat composer and general draft framework.
+Do not silently finalize canon or decisions.
+
+PHASE 3 — Panic Export Foundation
+Build basic Panic Export early.
+No secrets.
+No raw provider payloads by default.
+
+PHASE 4 — Source Material Foundation
+Build basic Source Material workspace.
+Import/create/edit/archive/delete.
+Prepare for attaching source material to Chat.
+
+PHASE 5 — Chat Foundation
+Build global Chat drawer.
+Multiple chats.
+Dropdown titles.
+Rename.
+Archive/restore.
+Search later if needed.
+Persistent history.
+Autosave composer.
+Claude-only but provider execution may still be deferred until safe.
+
+PHASE 6 — Source Material Attachments for Chat
+Build Active Sources.
+Support:
+- Keep active in this chat
+- Use for next message only
+- visible attachment tracking
+- remove active source
+- no hidden context
+- no selected excerpts
+
+PHASE 7 — Expanded Chat + Pop-Out
+Build:
+- larger chat panel
+- separate pop-out chat window
+- same chat state/draft/history
+- simple controls
+
+PHASE 8 — Chat Export and Routing
+Build:
+- export full conversation
+- export message
+- highlight text and export selection
+- route to Unsorted first
+- later route to Documents/Brainstorm/Research/Open Questions/Conflicts/Decisions/Canon Review
+
+PHASE 9 — Unsorted
+Build:
+- saved material that needs routing
+- move to other destinations
+- archive/delete
+- AI destination suggestions later
+
+PHASE 10 — Documents / Brainstorm / Research
+Build simple list/detail/edit/archive/delete workspaces.
+Keep separate.
+No canon mutation.
+
+PHASE 11 — Open Questions / Conflicts / Decisions
+Build separate simple workspaces.
+Edit/delete/archive/resolve.
+No forced canon schema yet.
+
+PHASE 12 — Writing Lab Foundation
+Build task-based Writing Lab.
+Start with low-risk tasks:
+- rewrite selected text
+- analyze selected source
+- brainstorm options
+Then later:
+- find contradictions
+- extract canon/review candidates
+- draft scene notes
+
+PHASE 13 — AI Suggestions with Human Review
+Add AI-suggested title/tags/destination/routing.
+User approves before saving/applying.
+
+PHASE 14 — Canon Schema Proposal From Project Knowledge Files
+Claude inspects project knowledge files and proposes Canon Bible SQLite schema.
+Stop for user approval.
+
+PHASE 15 — Canon Bible Implementation
+After approval, implement Canon Bible schema and UI.
+Support edit/delete/archive/retire/supersede.
+Support source links and decision trails as scoped.
+
+PHASE 16 — Canon Review
+Build canon-impacting approval workflow.
+AI may suggest candidates.
+User approves before storage.
+Accepted candidates can become Canon Bible entries, Open Questions, Conflicts, Decisions, Documents, Brainstorm, or Research.
+
+PHASE 17 — Project Rules
+Settings-based Project Rules.
+Visible/editable always-on guidance for Claude.
+No vague hidden Project Memory.
+
+PHASE 18 — Expanded Panic Export
+Export all major records, including archived/retired.
+No secrets.
+
+PHASE 19 — Style / Flannagan Check
+Only after Writing Lab/Documents are stable.
+Use user-approved style parameter documents/rules.
+AI gives notes first.
+Rewrite only if requested.
