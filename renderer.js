@@ -190,6 +190,15 @@ function renderUnsorted(section) {
   const list = document.createElement('div');
   list.className = 'entry-list';
 
+  // Collapsed-by-default Archived section (no global Archive page).
+  const archived = document.createElement('details');
+  archived.className = 'archived-section';
+  const archivedSummary = document.createElement('summary');
+  archived.appendChild(archivedSummary);
+  const archivedList = document.createElement('div');
+  archivedList.className = 'entry-list';
+  archived.appendChild(archivedList);
+
   function buildViewCard(item) {
     const card = document.createElement('div');
     card.className = 'entry-card';
@@ -225,6 +234,20 @@ function renderUnsorted(section) {
       card.replaceWith(buildEditCard(item));
     });
 
+    const archiveBtn = document.createElement('button');
+    archiveBtn.type = 'button';
+    archiveBtn.className = 'btn-secondary';
+    archiveBtn.textContent = 'Archive';
+    archiveBtn.addEventListener('click', async () => {
+      archiveBtn.disabled = true;
+      try {
+        await window.revival.unsorted.archive(item.id);
+        await loadList();
+      } catch (e) {
+        archiveBtn.disabled = false;
+      }
+    });
+
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'btn-danger';
@@ -233,7 +256,60 @@ function renderUnsorted(section) {
       showDeleteConfirm(card, actions, item);
     });
 
-    actions.append(editBtn, deleteBtn);
+    actions.append(editBtn, archiveBtn, deleteBtn);
+    card.appendChild(actions);
+
+    return card;
+  }
+
+  // Read-only card for the collapsed Archived section: Restore or Delete.
+  function buildArchivedCard(item) {
+    const card = document.createElement('div');
+    card.className = 'entry-card';
+
+    const t = document.createElement('div');
+    t.className = 'entry-title';
+    t.textContent = item.title;
+    card.appendChild(t);
+
+    if (item.body) {
+      const b = document.createElement('div');
+      b.className = 'entry-body';
+      b.textContent = item.body;
+      card.appendChild(b);
+    }
+
+    const meta = document.createElement('div');
+    meta.className = 'entry-meta';
+    meta.textContent = `Archived ${new Date(item.archived_at).toLocaleString()}`;
+    card.appendChild(meta);
+
+    const actions = document.createElement('div');
+    actions.className = 'entry-actions';
+
+    const restoreBtn = document.createElement('button');
+    restoreBtn.type = 'button';
+    restoreBtn.className = 'btn-primary';
+    restoreBtn.textContent = 'Restore';
+    restoreBtn.addEventListener('click', async () => {
+      restoreBtn.disabled = true;
+      try {
+        await window.revival.unsorted.restore(item.id);
+        await loadList();
+      } catch (e) {
+        restoreBtn.disabled = false;
+      }
+    });
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn-danger';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', () => {
+      showDeleteConfirm(card, actions, item);
+    });
+
+    actions.append(restoreBtn, deleteBtn);
     card.appendChild(actions);
 
     return card;
@@ -335,17 +411,28 @@ function renderUnsorted(section) {
   }
 
   async function loadList() {
-    const items = await window.revival.unsorted.list();
+    const [items, archivedItems] = await Promise.all([
+      window.revival.unsorted.list(),
+      window.revival.unsorted.listArchived(),
+    ]);
+
     list.innerHTML = '';
     if (items.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'placeholder';
       empty.textContent = 'No entries yet. Add one above.';
       list.appendChild(empty);
-      return;
+    } else {
+      for (const item of items) {
+        list.appendChild(buildViewCard(item));
+      }
     }
-    for (const item of items) {
-      list.appendChild(buildViewCard(item));
+
+    archivedList.innerHTML = '';
+    archivedSummary.textContent = `Archived (${archivedItems.length})`;
+    archived.style.display = archivedItems.length === 0 ? 'none' : '';
+    for (const item of archivedItems) {
+      archivedList.appendChild(buildArchivedCard(item));
     }
   }
 
@@ -370,7 +457,7 @@ function renderUnsorted(section) {
   });
 
   form.append(titleInput, bodyInput, submit, error);
-  section.append(form, list);
+  section.append(form, list, archived);
   loadList();
 }
 

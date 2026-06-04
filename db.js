@@ -36,6 +36,14 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '003_unsorted_archive',
+    up(db) {
+      // Archive is reversible: a non-null archived_at hides an entry from the
+      // active list and shows it in the collapsed "Archived" section. NULL = active.
+      db.exec(`ALTER TABLE unsorted ADD COLUMN archived_at TEXT;`);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -90,7 +98,17 @@ function initDatabase(userDataPath) {
 // --- Unsorted repository ---------------------------------------------------
 function listUnsorted() {
   return getDb()
-    .prepare('SELECT * FROM unsorted ORDER BY created_at DESC, id DESC')
+    .prepare(
+      'SELECT * FROM unsorted WHERE archived_at IS NULL ORDER BY created_at DESC, id DESC'
+    )
+    .all();
+}
+
+function listArchivedUnsorted() {
+  return getDb()
+    .prepare(
+      'SELECT * FROM unsorted WHERE archived_at IS NOT NULL ORDER BY archived_at DESC, id DESC'
+    )
     .all();
 }
 
@@ -128,6 +146,24 @@ function deleteUnsorted(id) {
   return { deleted: info.changes > 0 };
 }
 
+function archiveUnsorted(id) {
+  const existing = getUnsorted(id);
+  if (!existing) throw new Error('Entry not found.');
+  getDb()
+    .prepare('UPDATE unsorted SET archived_at = ? WHERE id = ?')
+    .run(new Date().toISOString(), id);
+  return getUnsorted(id);
+}
+
+function restoreUnsorted(id) {
+  const existing = getUnsorted(id);
+  if (!existing) throw new Error('Entry not found.');
+  getDb()
+    .prepare('UPDATE unsorted SET archived_at = NULL WHERE id = ?')
+    .run(id);
+  return getUnsorted(id);
+}
+
 module.exports = {
   initDatabase,
   getDb,
@@ -135,8 +171,11 @@ module.exports = {
   DB_FILENAME,
   MIGRATIONS,
   listUnsorted,
+  listArchivedUnsorted,
   getUnsorted,
   createUnsorted,
   updateUnsorted,
   deleteUnsorted,
+  archiveUnsorted,
+  restoreUnsorted,
 };

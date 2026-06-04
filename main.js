@@ -19,9 +19,12 @@ function createWindow() {
 
 function registerIpc() {
   ipcMain.handle('unsorted:list', () => db.listUnsorted());
+  ipcMain.handle('unsorted:listArchived', () => db.listArchivedUnsorted());
   ipcMain.handle('unsorted:create', (_event, entry) => db.createUnsorted(entry));
   ipcMain.handle('unsorted:update', (_event, id, entry) => db.updateUnsorted(id, entry));
   ipcMain.handle('unsorted:delete', (_event, id) => db.deleteUnsorted(id));
+  ipcMain.handle('unsorted:archive', (_event, id) => db.archiveUnsorted(id));
+  ipcMain.handle('unsorted:restore', (_event, id) => db.restoreUnsorted(id));
 }
 
 app.whenReady().then(() => {
