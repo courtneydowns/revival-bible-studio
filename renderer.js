@@ -152,6 +152,31 @@ const nav = document.getElementById('nav');
 const content = document.getElementById('content');
 const buttons = {};
 
+// --- Theme (dark default / light), persisted across restarts via localStorage ---
+const THEME_KEY = 'revival.theme';
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  if (themeToggle) {
+    themeToggle.textContent = theme === 'dark' ? '☾  Dark' : '☀  Light';
+  }
+}
+
+function loadTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  return saved === 'light' || saved === 'dark' ? saved : 'dark';
+}
+
+const themeToggle = document.createElement('button');
+themeToggle.id = 'theme-toggle';
+themeToggle.addEventListener('click', () => {
+  const next =
+    document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+});
+applyTheme(loadTheme());
+
 function route(name) {
   for (const key in buttons) {
     buttons[key].classList.toggle('active', key === name);
@@ -167,5 +192,7 @@ for (const name of WORKSPACES) {
   buttons[name] = btn;
   nav.appendChild(btn);
 }
+
+nav.appendChild(themeToggle);
 
 route('Home');

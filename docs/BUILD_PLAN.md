@@ -24,11 +24,16 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - One reusable component answering the 5 UI questions, dropped into every placeholder page
 - **Smoke:** Every workspace shows the 5 answers
 
+### P4 — Dark / light mode toggle
+- Theme toggle in the nav or header; preference persists across restarts
+- CSS variables drive all colors so every subsequent phase inherits it automatically
+- **Smoke:** Toggle dark/light, restart app, preference is remembered; both modes look intentional
+
 ---
 
 ## Data layer
 
-### P4 — SQLite + migrations
+### P5 — SQLite + migrations
 - DB file in app data dir, migration runner, no UI changes
 - **Smoke:** App boots, DB file exists in expected path
 
@@ -36,23 +41,23 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Unsorted (the pattern workspace)
 
-### P5 — Unsorted: create + list
+### P6 — Unsorted: create + list
 - One table, create entry, list entries
 - **Smoke:** Add entry, restart app, entry persists
 
-### P6 — Unsorted: edit
+### P7 — Unsorted: edit
 - Edit existing entries, save
 - **Smoke:** Edit + save survives restart
 
-### P7 — Unsorted: delete
+### P8 — Unsorted: delete
 - Delete with confirm prompt
 - **Smoke:** Delete an entry, confirm prompt appears, entry gone
 
-### P8 — Unsorted: archive + restore
+### P9 — Unsorted: archive + restore
 - Collapsed "Archived" section at bottom of same page (no global Archive)
 - **Smoke:** Archive an entry, see it under collapsed section, restore it
 
-### P9 — Autosave system
+### P10 — Autosave system
 - Drafts preserved on edit; preservation only, not finalization
 - **Smoke:** Quit mid-edit, reopen, draft intact; "save" still required to finalize
 
@@ -60,15 +65,15 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Source Material + Documents
 
-### P10 — Source Material CRUD
+### P11 — Source Material CRUD
 - Same lifecycle as Unsorted
 - **Smoke:** Add, edit, delete, archive, restore on a Source entry
 
-### P11 — Source Material file upload
+### P12 — Source Material file upload
 - Text files first (other types deferred)
 - **Smoke:** Upload a .txt file, view contents in entry
 
-### P12 — Documents CRUD
+### P13 — Documents CRUD
 - Same lifecycle as Unsorted; visibly separate from Source Material
 - **Smoke:** Create a Document, edit, archive, restore; Source and Documents are not blended
 
@@ -76,18 +81,18 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Chat shell (no AI)
 
-### P13 — Chat drawer shell
+### P14 — Chat drawer shell
 - Global drawer, opens/closes from any workspace, one default chat
 - **Smoke:** Open drawer from 3 different workspaces
 
-### P14 — Multiple chats + title dropdown
+### P15 — Multiple chats + title dropdown
 - Create, switch, title dropdown lists them
 - **Smoke:** Create 3 chats, switch between them via dropdown
 
-### P15 — Rename + archive + restore chats
+### P16 — Rename + archive + restore chats
 - **Smoke:** Rename one chat, archive one, restore it
 
-### P16 — Chat expand mode
+### P17 — Chat expand mode
 - Larger view, not full-screen takeover; rest of app still reachable
 - **Smoke:** Expand chat, confirm other workspaces still clickable
 
@@ -95,11 +100,11 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Chat ↔ Source attachments (still no AI)
 
-### P17 — Attach Source: keep active mode
+### P18 — Attach Source: keep active mode
 - Picker shows Source Material only (no other types, no Context Packets), active sources listed in chat
 - **Smoke:** Attach a source, send a message, source still listed
 
-### P18 — Attach Source: next message only + manual remove
+### P19 — Attach Source: next message only + manual remove
 - Second mode; active sources removable in one click
 - **Smoke:** Attach "next message only," send, source disappears; manually remove a "keep active" source
 
@@ -107,11 +112,11 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Settings + Safety
 
-### P19 — Settings: Project Rules editor
+### P20 — Settings: Project Rules editor
 - Always-on visible Project Rules text in Settings (no hidden Project Memory)
 - **Smoke:** Edit a rule, save, value persists across restart
 
-### P20 — Panic Export v1
+### P21 — Panic Export v1
 - Dump entire DB + uploaded source files to a timestamped folder
 - **Smoke:** Run Panic Export, output folder contains DB dump + sources
 
@@ -119,20 +124,20 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Remaining queue/decision workspaces (one per phase)
 
-### P21 — Open Questions
+### P22 — Open Questions
 - **Smoke:** Full lifecycle on one entry
 
-### P22 — Conflicts
+### P23 — Conflicts
 - Visibly distinct from Open Questions
 - **Smoke:** Full lifecycle; UI clearly differentiates from Open Questions
 
-### P23 — Decisions
+### P24 — Decisions
 - **Smoke:** Full lifecycle on one entry
 
-### P24 — Brainstorm
+### P25 — Brainstorm
 - **Smoke:** Full lifecycle on one entry
 
-### P25 — Research
+### P26 — Research
 - Not blended with Brainstorm
 - **Smoke:** Full lifecycle; UI clearly differentiates from Brainstorm
 
@@ -140,11 +145,11 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Home + Writing Lab
 
-### P26 — Home dashboard
+### P27 — Home dashboard
 - Counts per workspace, recent activity, dismissible Next Step Suggestions
 - **Smoke:** Counts match reality, dismissed suggestions stay dismissed
 
-### P27 — Writing Lab
+### P28 — Writing Lab
 - Long-form drafting with autosave
 - **Smoke:** Draft 500 words, quit, reopen, content intact
 
@@ -152,26 +157,26 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Canon Bible — schema first, then build
 
-### P28 — Canon schema design (CHECKPOINT, no code)
+### P29 — Canon schema design (CHECKPOINT, no code)
 - Move to claude.ai (Opus). Inspect finalized project knowledge files. Propose schema covering: categories, tables/entities, relationships, edit/lock/archive/supersede behavior, source provenance, future change handling.
-- **Gate:** User explicitly approves schema in writing before P29 starts.
+- **Gate:** User explicitly approves schema in writing before P30 starts.
 
-### P29 — Canon tables + read view
+### P30 — Canon tables + read view
 - Migration creates approved tables, read-only list view
 - **Smoke:** Seed a few entries, list view shows them with provenance fields visible
 
-### P30 — Canon entries: create + edit
+### P31 — Canon entries: create + edit
 - **Smoke:** Add an entry, edit it, changes persist
 
-### P31 — Canon lock / unlock
+### P32 — Canon lock / unlock
 - Lock = currently accepted, edits still allowed but warn user
 - **Smoke:** Lock an entry, attempt edit, warning appears, proceed, change saved
 
-### P32 — Canon supersede + retired collapsed section
+### P33 — Canon supersede + retired collapsed section
 - Superseding marks prior version retired and visible under collapsed section
 - **Smoke:** Supersede an entry, find old version in collapsed retired section
 
-### P33 — Canon Review queue
+### P34 — Canon Review queue
 - Approval queue for proposed changes (approve / reject / send back). No AI yet.
 - **Smoke:** Manually submit a change to the queue, approve it, see it in Canon Bible
 
@@ -179,21 +184,21 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## AI integration (Claude only)
 
-### P34 — Claude API config + request preview
+### P35 — Claude API config + request preview
 - API key field in Settings (Claude only — no provider picker, no OpenAI scaffolding)
 - Request preview UI shows exact payload that would be sent
 - **Smoke:** Enter key, draft a message, preview shows expected payload (user msg + Project Rules + active sources, nothing else)
 
-### P35 — Chat AI send/receive
+### P36 — Chat AI send/receive
 - Send a message, receive Claude's response, display in chat
 - **Smoke:** Send a message, get a response back, conversation history persists
 
-### P36 — AI suggestion → Canon Review pipeline
+### P37 — AI suggestion → Canon Review pipeline
 - If Claude proposes a structured canon change, it lands in Canon Review (never directly in Canon Bible)
 - **Smoke:** Ask Claude to propose a canon addition, confirm it appears in Canon Review, approve it, then see it in Canon Bible
 
 ---
 
-## Deferred (P37+)
+## Deferred (P38+)
 
-Held until base is stable: chat search, chat pop-out, chat export, expanded Panic Export, additional Source file types, performance, themes.
+Held until base is stable: chat search, chat pop-out, chat export, expanded Panic Export, additional Source file types, performance.

@@ -5,13 +5,25 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'" />
     <title>Revival Studio</title>
     <style>
-      :root {
+      /* Dark is the default theme; light overrides below.
+         All colors are CSS variables so later phases inherit theming for free. */
+      :root, :root[data-theme='dark'] {
         --bg: #1a1a1a;
         --panel: #232323;
-        --border: #333;
+        --border: #333333;
+        --hover: #2c2c2c;
         --text: #e8e8e8;
         --muted: #9a9a9a;
         --accent: #c98b5e;
+      }
+      :root[data-theme='light'] {
+        --bg: #f6f4f1;
+        --panel: #ffffff;
+        --border: #e2ddd6;
+        --hover: #ece8e2;
+        --text: #2a2723;
+        --muted: #6b655d;
+        --accent: #b3713f;
       }
       * { box-sizing: border-box; }
       html, body {
@@ -50,13 +62,27 @@
         padding: 9px 18px;
         cursor: pointer;
       }
-      #nav button:hover { background: #2c2c2c; }
+      #nav button:hover { background: var(--hover); }
       #nav button.active {
-        background: #2c2c2c;
+        background: var(--hover);
         color: var(--accent);
         box-shadow: inset 3px 0 0 var(--accent);
         font-weight: 600;
       }
+
+      #theme-toggle {
+        margin: 14px 18px 4px;
+        width: calc(100% - 36px);
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--muted);
+        font: inherit;
+        font-size: 13px;
+        padding: 7px 10px;
+        cursor: pointer;
+      }
+      #theme-toggle:hover { background: var(--hover); color: var(--text); }
 
       #content {
         flex: 1;
