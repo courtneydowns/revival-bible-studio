@@ -232,6 +232,97 @@
       }
       .archived-section > summary:hover { color: var(--text); }
       .archived-section .entry-list { margin-top: 12px; }
+
+      /* --- Global Chat drawer (P14) ----------------------------------- */
+      /* Fixed toggle, always visible so the drawer is reachable from any
+         workspace. The drawer overlays the right edge without taking over
+         the app — the rest stays clickable. */
+      #chat-toggle {
+        position: fixed;
+        right: 22px;
+        bottom: 22px;
+        z-index: 30;
+        font: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        background: var(--accent);
+        color: #1a1a1a;
+        border: none;
+        border-radius: 999px;
+        padding: 11px 18px;
+        cursor: pointer;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+      }
+      #chat-toggle:hover { filter: brightness(1.06); }
+
+      #chat-drawer {
+        position: fixed;
+        top: 0;
+        right: 0;
+        height: 100%;
+        width: 380px;
+        max-width: 90vw;
+        z-index: 40;
+        display: flex;
+        flex-direction: column;
+        background: var(--panel);
+        border-left: 1px solid var(--border);
+        box-shadow: -8px 0 24px rgba(0, 0, 0, 0.28);
+        transform: translateX(100%);
+        transition: transform 0.18s ease;
+      }
+      #chat-drawer.open { transform: translateX(0); }
+
+      .chat-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 16px 18px;
+        border-bottom: 1px solid var(--border);
+      }
+      .chat-title { font-size: 16px; font-weight: 600; }
+      .chat-subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+      #chat-close {
+        background: none;
+        border: none;
+        color: var(--muted);
+        font: inherit;
+        font-size: 16px;
+        line-height: 1;
+        padding: 4px 6px;
+        cursor: pointer;
+        border-radius: 6px;
+      }
+      #chat-close:hover { background: var(--hover); color: var(--text); }
+
+      .chat-messages { flex: 1; overflow-y: auto; padding: 18px; }
+      .chat-empty {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+        margin: 0;
+      }
+
+      .chat-composer {
+        display: flex;
+        gap: 8px;
+        align-items: flex-end;
+        padding: 14px 18px;
+        border-top: 1px solid var(--border);
+      }
+      .chat-input {
+        flex: 1;
+        font: inherit;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 9px 11px;
+        resize: none;
+      }
+      .chat-input:disabled { opacity: 0.7; cursor: not-allowed; }
+      .chat-composer .btn-primary { padding: 8px 16px; }
     </style>
   </head>
   <body>
@@ -239,6 +330,39 @@
       <nav id="nav"><div class="brand">Revival Studio</div></nav>
       <main id="content"></main>
     </div>
+
+    <!-- Global Chat drawer (P14): reachable from every workspace. Shell only —
+         AI send/receive is wired up in a later phase. -->
+    <button id="chat-toggle" aria-expanded="false" aria-controls="chat-drawer">
+      💬 Chat
+    </button>
+    <aside id="chat-drawer" aria-hidden="true" aria-label="Chat">
+      <header class="chat-header">
+        <div class="chat-heading">
+          <div class="chat-title">Revival Chat</div>
+          <div class="chat-subtitle">Default chat · reachable from anywhere</div>
+        </div>
+        <button id="chat-close" aria-label="Close chat">✕</button>
+      </header>
+      <div class="chat-messages">
+        <p class="chat-empty">
+          This is your project chat — open from any workspace.
+          Messaging Claude here is added in a later phase. Attachments will come
+          from Source Material only. Nothing here is saved or sent without your
+          confirmation.
+        </p>
+      </div>
+      <form class="chat-composer" id="chat-composer">
+        <textarea
+          class="chat-input"
+          rows="2"
+          placeholder="Sending is added in a later phase — this is the chat shell."
+          disabled
+        ></textarea>
+        <button type="submit" class="btn-primary" disabled>Send</button>
+      </form>
+    </aside>
+
     <script src="renderer.js"></script>
   </body>
 </html>

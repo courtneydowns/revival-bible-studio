@@ -33,7 +33,7 @@ const WORKSPACE_INFO = {
   },
   'Chat': {
     purpose: 'Talk through the Revival project with Claude. (Becomes a global drawer in a later phase.)',
-    next: 'Start or continue a chat; attach Source Material when you need Claude to reference it.',
+    next: 'Open the chat drawer (💬 Chat, bottom-right of any workspace) to start. Attaching Source Material comes in a later phase.',
     savedTo: 'Chats are kept in this Chat workspace. Attachments come from Source Material only.',
     lifecycle: 'Chats can be renamed, archived, and restored. Nothing is finalized without your confirmation.',
   },
@@ -641,7 +641,19 @@ function makeEntryWorkspace(config) {
   };
 }
 
+// Chat workspace page: the chat itself lives in the global drawer, so this
+// page's job is to explain that and offer a way in.
+function renderChatPage(section) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn-primary';
+  btn.textContent = 'Open chat drawer';
+  btn.addEventListener('click', () => setChatOpen(true));
+  section.appendChild(btn);
+}
+
 const CONTENT_RENDERERS = {
+  'Chat': renderChatPage,
   'Unsorted': makeEntryWorkspace({
     apiName: 'unsorted',
     draftPrefix: 'unsorted',
@@ -706,5 +718,28 @@ for (const name of WORKSPACES) {
 }
 
 nav.appendChild(themeToggle);
+
+// --- Global Chat drawer (shell only; no AI yet) -----------------------------
+// The toggle is fixed and outside #content, so the drawer opens/closes from
+// every workspace without taking over the app.
+const chatDrawer = document.getElementById('chat-drawer');
+const chatToggle = document.getElementById('chat-toggle');
+const chatClose = document.getElementById('chat-close');
+
+function setChatOpen(open) {
+  chatDrawer.classList.toggle('open', open);
+  chatDrawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+  chatToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+chatToggle.addEventListener('click', () =>
+  setChatOpen(!chatDrawer.classList.contains('open'))
+);
+chatClose.addEventListener('click', () => setChatOpen(false));
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && chatDrawer.classList.contains('open')) {
+    setChatOpen(false);
+  }
+});
 
 route('Home');
