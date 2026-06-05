@@ -272,6 +272,10 @@
         transition: transform 0.18s ease;
       }
       #chat-drawer.open { transform: translateX(0); }
+      /* Expand mode (P17): a larger view, not a full-screen takeover. The
+         drawer widens but max-width leaves the left nav and content visible
+         and clickable — the rest of the app stays reachable. */
+      #chat-drawer.expanded { width: 760px; max-width: 72vw; }
 
       .chat-header {
         display: flex;
@@ -311,6 +315,19 @@
         border-radius: 6px;
       }
       #chat-close:hover { background: var(--hover); color: var(--text); }
+      #chat-expand {
+        background: none;
+        border: none;
+        color: var(--muted);
+        font: inherit;
+        font-size: 16px;
+        line-height: 1;
+        padding: 4px 6px;
+        cursor: pointer;
+        border-radius: 6px;
+      }
+      #chat-expand:hover { background: var(--hover); color: var(--text); }
+      #chat-expand[aria-pressed="true"] { color: var(--accent); }
 
       /* Active-chat tools + inline rename (P16) */
       .chat-tools {
@@ -439,6 +456,7 @@
         </div>
         <div class="chat-header-actions">
           <button id="chat-new" class="btn-secondary" type="button">+ New chat</button>
+          <button id="chat-expand" type="button" aria-pressed="false" aria-label="Expand chat" title="Expand chat">⤢</button>
           <button id="chat-close" aria-label="Close chat">✕</button>
         </div>
       </header>

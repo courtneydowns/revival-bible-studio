@@ -728,6 +728,7 @@ nav.appendChild(themeToggle);
 const chatDrawer = document.getElementById('chat-drawer');
 const chatToggle = document.getElementById('chat-toggle');
 const chatClose = document.getElementById('chat-close');
+const chatExpand = document.getElementById('chat-expand');
 const chatSelect = document.getElementById('chat-select');
 const chatNewBtn = document.getElementById('chat-new');
 const chatMessages = document.getElementById('chat-messages');
@@ -741,6 +742,7 @@ const chatArchived = document.getElementById('chat-archived');
 const chatArchivedList = document.getElementById('chat-archived-list');
 
 const ACTIVE_CHAT_KEY = 'revival.chat.active';
+const CHAT_EXPANDED_KEY = 'revival.chat.expanded';
 let chatList = [];
 let archivedChats = [];
 let activeChatId = null;
@@ -749,6 +751,18 @@ function setChatOpen(open) {
   chatDrawer.classList.toggle('open', open);
   chatDrawer.setAttribute('aria-hidden', open ? 'false' : 'true');
   chatToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+// Expand mode (P17): a larger view, not a full-screen takeover. The drawer
+// only widens — it never covers the whole window, so the left nav and content
+// stay clickable. The preference persists across restarts.
+function setChatExpanded(expanded) {
+  chatDrawer.classList.toggle('expanded', expanded);
+  chatExpand.setAttribute('aria-pressed', expanded ? 'true' : 'false');
+  chatExpand.setAttribute('aria-label', expanded ? 'Collapse chat' : 'Expand chat');
+  chatExpand.title = expanded ? 'Collapse chat' : 'Expand chat';
+  chatExpand.textContent = expanded ? '⤡' : '⤢';
+  localStorage.setItem(CHAT_EXPANDED_KEY, expanded ? '1' : '0');
 }
 
 // The message area is a shell: no messages exist yet. It names the active chat
@@ -879,6 +893,9 @@ chatToggle.addEventListener('click', () =>
   setChatOpen(!chatDrawer.classList.contains('open'))
 );
 chatClose.addEventListener('click', () => setChatOpen(false));
+chatExpand.addEventListener('click', () =>
+  setChatExpanded(!chatDrawer.classList.contains('expanded'))
+);
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && chatDrawer.classList.contains('open')) {
     setChatOpen(false);
@@ -933,6 +950,7 @@ chatArchiveBtn.addEventListener('click', async () => {
   }
 });
 
+setChatExpanded(localStorage.getItem(CHAT_EXPANDED_KEY) === '1');
 loadChats();
 
 route('Home');
