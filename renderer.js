@@ -653,6 +653,11 @@ const CONTENT_RENDERERS = {
     addLabel: 'Add Source',
     allowFileUpload: true,
   }),
+  'Documents': makeEntryWorkspace({
+    apiName: 'documents',
+    draftPrefix: 'documents',
+    addLabel: 'Add Document',
+  }),
 };
 
 const nav = document.getElementById('nav');

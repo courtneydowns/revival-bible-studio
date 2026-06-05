@@ -62,6 +62,24 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '005_documents',
+    up(db) {
+      // Documents: working/finished documents. Same lifecycle/shape as the
+      // others; its own table keeps it visibly separate from Source Material
+      // (per CLAUDE.md — the two must not be blended).
+      db.exec(`
+        CREATE TABLE documents (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          title       TEXT NOT NULL,
+          body        TEXT NOT NULL DEFAULT '',
+          created_at  TEXT NOT NULL,
+          updated_at  TEXT NOT NULL,
+          archived_at TEXT
+        );
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -248,6 +266,7 @@ function makeEntryRepo(table) {
 }
 
 const sourceMaterial = makeEntryRepo('source_material');
+const documents = makeEntryRepo('documents');
 
 module.exports = {
   initDatabase,
@@ -256,6 +275,7 @@ module.exports = {
   DB_FILENAME,
   MIGRATIONS,
   sourceMaterial,
+  documents,
   listUnsorted,
   listArchivedUnsorted,
   getUnsorted,

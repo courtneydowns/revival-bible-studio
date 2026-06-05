@@ -33,6 +33,14 @@ function registerIpc() {
   ipcMain.handle('sourceMaterial:delete', (_event, id) => db.sourceMaterial.delete(id));
   ipcMain.handle('sourceMaterial:archive', (_event, id) => db.sourceMaterial.archive(id));
   ipcMain.handle('sourceMaterial:restore', (_event, id) => db.sourceMaterial.restore(id));
+
+  ipcMain.handle('documents:list', () => db.documents.list());
+  ipcMain.handle('documents:listArchived', () => db.documents.listArchived());
+  ipcMain.handle('documents:create', (_event, entry) => db.documents.create(entry));
+  ipcMain.handle('documents:update', (_event, id, entry) => db.documents.update(id, entry));
+  ipcMain.handle('documents:delete', (_event, id) => db.documents.delete(id));
+  ipcMain.handle('documents:archive', (_event, id) => db.documents.archive(id));
+  ipcMain.handle('documents:restore', (_event, id) => db.documents.restore(id));
 }
 
 app.whenReady().then(() => {

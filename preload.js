@@ -21,4 +21,13 @@ contextBridge.exposeInMainWorld('revival', {
     archive: (id) => ipcRenderer.invoke('sourceMaterial:archive', id),
     restore: (id) => ipcRenderer.invoke('sourceMaterial:restore', id),
   },
+  documents: {
+    list: () => ipcRenderer.invoke('documents:list'),
+    listArchived: () => ipcRenderer.invoke('documents:listArchived'),
+    create: (entry) => ipcRenderer.invoke('documents:create', entry),
+    update: (id, entry) => ipcRenderer.invoke('documents:update', id, entry),
+    delete: (id) => ipcRenderer.invoke('documents:delete', id),
+    archive: (id) => ipcRenderer.invoke('documents:archive', id),
+    restore: (id) => ipcRenderer.invoke('documents:restore', id),
+  },
 });
