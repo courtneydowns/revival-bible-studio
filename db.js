@@ -1122,6 +1122,45 @@ const MIGRATIONS = [
       `);
     },
   },
+
+  {
+    name: '032_brainstorm_research_reshape',
+    up(db) {
+      // PR5 — Reshape: brainstorm + research.
+      //
+      // Aligns these two creative-work workspaces with the FINAL canon schema
+      // (docs/CANON_SCHEMA_APPROVED.md):
+      //   - Rename `brainstorm` → `brainstorm_items` and `research` →
+      //     `research_items`. RENAME TO preserves rows, PK, and constraints.
+      //   - Add the draft_*/last_drafted_at trio to both, staging in-progress
+      //     edits for the upcoming Canon Review flow without touching the
+      //     committed title/body — same shape PR2/PR4 added elsewhere.
+      //   - research_items only: external_url TEXT NULL for an outbound link.
+      //
+      // ALTER TABLE only — no recreates. With legacy_alter_table off (the
+      // better-sqlite3 default), RENAME TO rewrites the table references inside
+      // the cross-workspace-attachment triggers automatically: the
+      // brainstorm_cwa_cascade / research_cwa_cascade triggers and the
+      // `FROM brainstorm` / `FROM research` lookups in
+      // cross_workspace_attachments_insert_validity all follow the rename. The
+      // `'brainstorm'` / `'research'` source_kind string literals are values,
+      // not table references, so they stay — the logical source kinds are
+      // unchanged. Every added column is nullable; existing rows get NULL.
+      db.exec(`
+        ALTER TABLE brainstorm RENAME TO brainstorm_items;
+        ALTER TABLE research   RENAME TO research_items;
+
+        ALTER TABLE brainstorm_items ADD COLUMN draft_title TEXT;
+        ALTER TABLE brainstorm_items ADD COLUMN draft_body TEXT;
+        ALTER TABLE brainstorm_items ADD COLUMN last_drafted_at TEXT;
+
+        ALTER TABLE research_items ADD COLUMN draft_title TEXT;
+        ALTER TABLE research_items ADD COLUMN draft_body TEXT;
+        ALTER TABLE research_items ADD COLUMN last_drafted_at TEXT;
+        ALTER TABLE research_items ADD COLUMN external_url TEXT;
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -1315,8 +1354,8 @@ const documents = makeEntryRepo('documents');
 const openQuestions = makeEntryRepo('open_questions');
 const conflicts = makeEntryRepo('conflicts');
 const decisions = makeEntryRepo('decisions');
-const brainstorm = makeEntryRepo('brainstorm');
-const research = makeEntryRepo('research');
+const brainstorm = makeEntryRepo('brainstorm_items');
+const research = makeEntryRepo('research_items');
 const characters = makeEntryRepo('characters');
 const episodes = makeEntryRepo('episodes');
 
@@ -1571,8 +1610,8 @@ const DASHBOARD_SECTIONS = [
   { key: 'open_questions',  label: 'Open Questions',  table: 'open_questions',  route: 'Open Questions' },
   { key: 'conflicts',       label: 'Conflicts',       table: 'conflicts',       route: 'Conflicts' },
   { key: 'decisions',       label: 'Decisions',       table: 'decisions',       route: 'Decisions' },
-  { key: 'brainstorm',      label: 'Brainstorm',      table: 'brainstorm',      route: 'Brainstorm' },
-  { key: 'research',        label: 'Research',        table: 'research',        route: 'Research' },
+  { key: 'brainstorm',      label: 'Brainstorm',      table: 'brainstorm_items', route: 'Brainstorm' },
+  { key: 'research',        label: 'Research',        table: 'research_items',  route: 'Research' },
   { key: 'characters',      label: 'Characters',      table: 'characters',      route: 'Characters' },
   { key: 'episodes',        label: 'Episodes',        table: 'episodes',        route: 'Episodes' },
   { key: 'chats',           label: 'Chats',           table: 'chats',           route: 'Chat' },
