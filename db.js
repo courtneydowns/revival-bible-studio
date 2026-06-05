@@ -1861,11 +1861,29 @@ const tags = {
     return tags.listFor(entityKind, eid);
   },
 
+  // Clear every tag from one entity. Only removes the taggable_tags links for
+  // this entity — the tags themselves and their links to other entities are
+  // untouched. Returns the now-empty tag list for symmetry with detach.
+  clearFor: (entityKind, entityId) => {
+    if (!entityKind) throw new Error('entity kind is required');
+    const eid = Number(entityId);
+    if (!Number.isFinite(eid)) throw new Error('entity id is required');
+    getDb()
+      .prepare(
+        `DELETE FROM taggable_tags
+          WHERE entity_kind = ? AND entity_id = ?`
+      )
+      .run(entityKind, eid);
+    return tags.listFor(entityKind, eid);
+  },
+
   // Create a user tag. Returns the existing row when the name is already
   // taken (case-insensitive) so the picker's "Add as new tag" flow degrades
   // to "select existing" without erroring on duplicates.
   create: ({ name, category } = {}) => {
-    const clean = String(name || '').trim();
+    // Normalize: lowercase + trim so `Canon`, `canon`, and `canon ` collapse
+    // to one tag. Matches the seed tags, which are all lowercase.
+    const clean = String(name || '').trim().toLowerCase();
     if (!clean) throw new Error('Tag name is required.');
     const cat = (category || '').trim() || null;
     const existing = getDb()

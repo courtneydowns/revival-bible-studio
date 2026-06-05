@@ -207,6 +207,9 @@ function registerIpc() {
   ipcMain.handle('tags:detach', (_event, kind, id, tagId) =>
     db.tags.detach(kind, id, tagId)
   );
+  ipcMain.handle('tags:clearFor', (_event, kind, id) =>
+    db.tags.clearFor(kind, id)
+  );
   ipcMain.handle('tags:create', (_event, payload) => db.tags.create(payload));
 
   ipcMain.handle('settings:getProjectRules', () => db.settings.getProjectRules());

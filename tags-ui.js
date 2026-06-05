@@ -117,6 +117,31 @@
       });
       chipRow.appendChild(addBtn);
 
+      // Clear all tags from this entry only. Unlinks every tag here; the tags
+      // themselves and their links to other entries are untouched.
+      if (currentTags.length > 1) {
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'tag-clear-btn';
+        clearBtn.textContent = 'Clear all';
+        clearBtn.title = 'Remove all tags from this entry (tags are not deleted)';
+        clearBtn.addEventListener('click', async () => {
+          clearBtn.disabled = true;
+          try {
+            if (pickerEl) {
+              pickerEl.remove();
+              pickerEl = null;
+            }
+            await api.clearFor(kind, Number(entityId));
+            if (typeof opts.onChange === 'function') opts.onChange();
+            await refresh();
+          } catch {
+            clearBtn.disabled = false;
+          }
+        });
+        chipRow.appendChild(clearBtn);
+      }
+
       wrap.appendChild(chipRow);
     }
 

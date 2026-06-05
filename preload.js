@@ -142,6 +142,7 @@ contextBridge.exposeInMainWorld('revival', {
       ipcRenderer.invoke('tags:attach', kind, id, tagId),
     detach: (kind, id, tagId) =>
       ipcRenderer.invoke('tags:detach', kind, id, tagId),
+    clearFor: (kind, id) => ipcRenderer.invoke('tags:clearFor', kind, id),
     create: (payload) => ipcRenderer.invoke('tags:create', payload),
   },
   settings: {
