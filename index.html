@@ -196,6 +196,10 @@
       #content .placeholder { color: var(--muted); font-size: 15px; }
 
       .ws-content { max-width: 720px; margin-top: 28px; }
+      /* Two-column workspaces (PUI1) need the full content width — the left
+         list + right detail panel together far exceed the 720px cap that suits
+         the single-column workspaces. */
+      .ws-content:has(.tc-layout) { max-width: 1200px; }
 
       .entry-form {
         display: flex;
@@ -434,6 +438,178 @@
       }
       .archived-section > summary:hover { color: var(--text); }
       .archived-section .entry-list { margin-top: 12px; }
+
+      /* --- Two-column workspace layout (PUI1) ----------------------------
+         Shared shell for every entry workspace: left = list of titles with a
+         "+ Add" button on top and a collapsed Archived section at the bottom;
+         right = detail panel (empty state, create form, view, or edit). The
+         panel widths are intentionally fixed-ish so titles stay readable as
+         the user scans the list. */
+      .tc-layout {
+        display: flex;
+        gap: 20px;
+        align-items: stretch;
+        min-height: 60vh;
+        margin-top: 8px;
+      }
+      .tc-left {
+        flex: 0 0 320px;
+        max-width: 320px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-width: 0;
+      }
+      .tc-right {
+        flex: 1;
+        min-width: 0;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 18px 20px;
+        overflow: auto;
+      }
+      .tc-add {
+        font: inherit;
+        font-weight: 600;
+        background: var(--accent);
+        color: #1a1a1a;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 14px;
+        cursor: pointer;
+        align-self: flex-start;
+      }
+      .tc-add:hover { filter: brightness(1.05); }
+      .tc-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        overflow-y: auto;
+      }
+      .tc-list-item {
+        text-align: left;
+        font: inherit;
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 9px 11px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .tc-list-item:hover { background: var(--hover); border-color: var(--accent); }
+      .tc-list-item.active {
+        background: var(--hover);
+        border-color: var(--accent);
+        box-shadow: inset 3px 0 0 var(--accent);
+      }
+      .tc-list-title {
+        font-size: 14px;
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .tc-list-preview {
+        font-size: 12px;
+        color: var(--muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .tc-list-badge {
+        display: inline-block;
+        font-size: 10px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 1px 8px;
+        margin-right: 6px;
+        vertical-align: middle;
+      }
+      .tc-list-badge.badge-archived { color: #888; border-color: #888; }
+      .tc-list-empty {
+        font-size: 13px;
+        color: var(--muted);
+        font-style: italic;
+        padding: 6px 0;
+      }
+      .tc-archived-section { margin-top: 4px; }
+      .tc-archived-section > summary {
+        cursor: pointer;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+        padding: 6px 0;
+        user-select: none;
+      }
+      .tc-archived-section > summary:hover { color: var(--text); }
+      .tc-archived-section .tc-list { margin-top: 6px; }
+      .tc-empty {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        min-height: 240px;
+        color: var(--muted);
+        text-align: center;
+      }
+      .tc-empty-title { font-size: 15px; }
+      .tc-empty-hint { font-size: 13px; }
+      .tc-detail-header {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 8px;
+        word-wrap: break-word;
+      }
+      .tc-detail-meta {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 14px;
+      }
+      .tc-detail-body {
+        font-size: 14px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        margin-bottom: 16px;
+      }
+      .tc-detail-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      .tc-detail-actions button {
+        font: inherit;
+        border-radius: 6px;
+        padding: 6px 14px;
+        cursor: pointer;
+      }
+      /* Conflicts accent in the list — borrow the existing red accent so the
+         two-column list still reads as distinctly conflict-y. */
+      .ws-conflicts .tc-list-item { border-left: 3px solid #e06c6c; }
+      .ws-conflicts .tc-list-title::before {
+        content: '⚠ ';
+        color: #e06c6c;
+      }
+      .ws-research .tc-list-item { border-left: 3px solid #5a8fd6; }
+      .ws-research .tc-list-title::before {
+        content: '🔎 ';
+        color: #5a8fd6;
+      }
+      .ws-characters .tc-list-item { border-left: 3px solid #9b7fd6; }
+      .ws-characters .tc-list-title::before {
+        content: '👤 ';
+        color: #9b7fd6;
+      }
+      .ws-episodes .tc-list-item { border-left: 3px solid #d6a14f; }
+      .ws-episodes .tc-list-title::before {
+        content: '🎬 ';
+        color: #d6a14f;
+      }
 
       /* --- Writing Lab (P28) ------------------------------------------- */
       .wl-intro { margin-bottom: 18px; }

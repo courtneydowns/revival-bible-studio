@@ -78,291 +78,420 @@ function setStatus(el, text) {
   el.style.display = text ? '' : 'none';
 }
 
-// --- Shared entry workspace (create + list + edit/delete/archive/restore) ---
-// Unsorted and Source Material share one lifecycle. `config` supplies the
-// IPC namespace, the draft localStorage prefix, and the add-button label.
+// --- Shared entry workspace (two-column: list left, detail right) ---
+// PUI1: every entry workspace renders this layout — left list of titles with a
+// "+ Add" button and a collapsed Archived section at the bottom; right panel
+// is the empty state, the create form, the read-only view, or the edit form
+// depending on what's selected.
 function makeEntryWorkspace(config) {
   const api = window.revival[config.apiName];
   const Drafts = makeDrafts(config.draftPrefix);
   const addLabel = config.addLabel;
   const finalizeHint = `Click “${addLabel}” to finalize.`;
 
+  function previewLine(item) {
+    const oneLine = String(item.body || '').replace(/\s+/g, ' ').trim();
+    return oneLine.length > 80 ? `${oneLine.slice(0, 80)}…` : oneLine;
+  }
+
   return function renderEntryWorkspace(section) {
   // Optional accent class lets a workspace look visibly distinct from the
   // others that share this template (e.g. Conflicts vs Open Questions).
   if (config.sectionClass) section.classList.add(config.sectionClass);
 
-  // Create form
-  const form = document.createElement('form');
-  form.className = 'entry-form';
+  // Two-column shell.
+  const layout = document.createElement('div');
+  layout.className = 'tc-layout';
+  const leftCol = document.createElement('div');
+  leftCol.className = 'tc-left';
+  const rightCol = document.createElement('div');
+  rightCol.className = 'tc-right';
+  layout.append(leftCol, rightCol);
+  section.appendChild(layout);
 
-  const titleInput = document.createElement('input');
-  titleInput.type = 'text';
-  titleInput.placeholder = config.titlePlaceholder || 'Title';
-  titleInput.maxLength = 200;
+  // selectedId: null = empty state; 'new' = create form; <id> = view/edit.
+  let selectedId = null;
+  let activeItems = [];
+  let archivedItems = [];
 
-  const bodyInput = document.createElement('textarea');
-  bodyInput.placeholder = config.bodyPlaceholder || 'Notes (optional)';
-  bodyInput.rows = 3;
-
-  const submit = document.createElement('button');
-  submit.type = 'submit';
-  submit.textContent = addLabel;
-  submit.disabled = true;
-
-  const error = document.createElement('p');
-  error.className = 'form-error';
-
-  const formStatus = document.createElement('p');
-  formStatus.className = 'draft-status';
-
-  // Restore an in-progress create draft preserved from a previous session.
-  const newDraft = Drafts.get('new');
-  if (newDraft) {
-    titleInput.value = newDraft.title || '';
-    bodyInput.value = newDraft.body || '';
-    submit.disabled = titleInput.value.trim() === '';
-    setStatus(formStatus, `Draft restored — not added yet. ${finalizeHint}`);
-  } else {
-    setStatus(formStatus, '');
-  }
-
-  // Autosave the in-progress draft (preservation only; never finalizes).
-  function saveNewDraft() {
-    if (titleInput.value.trim() === '' && bodyInput.value.trim() === '') {
-      Drafts.clear('new');
-      setStatus(formStatus, '');
-    } else {
-      Drafts.set('new', { title: titleInput.value, body: bodyInput.value });
-      setStatus(formStatus, `Draft saved — not added yet. ${finalizeHint}`);
-    }
-  }
-
-  titleInput.addEventListener('input', () => {
-    submit.disabled = titleInput.value.trim() === '';
-    error.textContent = '';
-    saveNewDraft();
+  // Left column: + Add button, active list, collapsed archived section.
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'tc-add';
+  addBtn.textContent = `+ ${addLabel}`;
+  addBtn.addEventListener('click', () => {
+    selectedId = 'new';
+    renderList();
+    renderDetail();
   });
-  bodyInput.addEventListener('input', saveNewDraft);
-
-  // Optional .txt upload (Source Material only). Reads the file in the renderer
-  // and fills the fields below — the user still reviews and clicks the add
-  // button to finalize, so nothing is stored without confirmation.
-  let uploadRow = null;
-  if (config.allowFileUpload) {
-    uploadRow = document.createElement('div');
-    uploadRow.className = 'upload-row';
-
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.txt,text/plain';
-    fileInput.style.display = 'none';
-
-    const uploadBtn = document.createElement('button');
-    uploadBtn.type = 'button';
-    uploadBtn.className = 'btn-secondary';
-    uploadBtn.textContent = 'Upload .txt file';
-    uploadBtn.addEventListener('click', () => fileInput.click());
-
-    const uploadHint = document.createElement('span');
-    uploadHint.className = 'upload-hint';
-    uploadHint.textContent = 'Fills the fields below — review, then add.';
-
-    fileInput.addEventListener('change', () => {
-      const file = fileInput.files && fileInput.files[0];
-      fileInput.value = ''; // allow re-selecting the same file later
-      if (!file) return;
-
-      const isText =
-        file.type === 'text/plain' || /\.txt$/i.test(file.name);
-      if (!isText) {
-        error.textContent = 'Only .txt files are supported for now.';
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onerror = () => {
-        error.textContent = 'Could not read that file.';
-      };
-      reader.onload = () => {
-        const text = String(reader.result || '');
-        if (titleInput.value.trim() === '') {
-          titleInput.value = file.name.replace(/\.txt$/i, '');
-        }
-        bodyInput.value =
-          bodyInput.value.trim() === ''
-            ? text
-            : `${bodyInput.value}\n\n${text}`;
-        submit.disabled = titleInput.value.trim() === '';
-        error.textContent = '';
-        saveNewDraft();
-        setStatus(
-          formStatus,
-          `Loaded “${file.name}” — review and click “${addLabel}” to finalize.`
-        );
-        titleInput.focus();
-      };
-      reader.readAsText(file);
-    });
-
-    uploadRow.append(uploadBtn, uploadHint, fileInput);
-  }
+  leftCol.appendChild(addBtn);
 
   const list = document.createElement('div');
-  list.className = 'entry-list';
+  list.className = 'tc-list';
+  leftCol.appendChild(list);
 
-  // Collapsed-by-default Archived section (no global Archive page).
   const archived = document.createElement('details');
-  archived.className = 'archived-section';
+  archived.className = 'tc-archived-section';
   const archivedSummary = document.createElement('summary');
   archived.appendChild(archivedSummary);
-  const archivedList = document.createElement('div');
-  archivedList.className = 'entry-list';
-  archived.appendChild(archivedList);
+  const archivedListEl = document.createElement('div');
+  archivedListEl.className = 'tc-list';
+  archived.appendChild(archivedListEl);
+  leftCol.appendChild(archived);
 
-  function buildViewCard(item) {
-    const card = document.createElement('div');
-    card.className = 'entry-card';
+  // If a "new" draft is sitting in localStorage from a previous session, start
+  // selected on it so the user sees their unfinalized work, not an empty state.
+  if (Drafts.get('new')) selectedId = 'new';
 
-    const t = document.createElement('div');
-    t.className = 'entry-title';
-    t.textContent = item.title;
-    card.appendChild(t);
+  function findItem(id) {
+    return (
+      activeItems.find((i) => i.id === id) ||
+      archivedItems.find((i) => i.id === id) ||
+      null
+    );
+  }
 
-    if (item.body) {
-      const b = document.createElement('div');
-      b.className = 'entry-body';
-      b.textContent = item.body;
-      card.appendChild(b);
+  function isArchived(item) {
+    return !!(item && item.archived_at);
+  }
+
+  function buildListItem(item, archivedFlag) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'tc-list-item';
+    if (selectedId === item.id) btn.classList.add('active');
+
+    const titleRow = document.createElement('div');
+    titleRow.className = 'tc-list-title';
+    if (archivedFlag) {
+      const badge = document.createElement('span');
+      badge.className = 'tc-list-badge badge-archived';
+      badge.textContent = 'Archived';
+      titleRow.appendChild(badge);
     }
+    if (!archivedFlag && Drafts.get(item.id)) {
+      const badge = document.createElement('span');
+      badge.className = 'tc-list-badge';
+      badge.textContent = 'Draft';
+      titleRow.appendChild(badge);
+    }
+    titleRow.appendChild(document.createTextNode(item.title));
+    btn.appendChild(titleRow);
+
+    const pv = previewLine(item);
+    if (pv) {
+      const p = document.createElement('div');
+      p.className = 'tc-list-preview';
+      p.textContent = pv;
+      btn.appendChild(p);
+    }
+
+    btn.addEventListener('click', () => {
+      selectedId = item.id;
+      renderList();
+      renderDetail();
+    });
+    return btn;
+  }
+
+  function renderList() {
+    list.innerHTML = '';
+    if (activeItems.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'tc-list-empty';
+      empty.textContent = 'No entries yet.';
+      list.appendChild(empty);
+    } else {
+      for (const item of activeItems) {
+        list.appendChild(buildListItem(item, false));
+      }
+    }
+
+    archivedListEl.innerHTML = '';
+    archivedSummary.textContent = `Archived (${archivedItems.length})`;
+    archived.style.display = archivedItems.length === 0 ? 'none' : '';
+    for (const item of archivedItems) {
+      archivedListEl.appendChild(buildListItem(item, true));
+    }
+  }
+
+  // --- Right panel: empty / create / view / edit -------------------------
+  function showEmpty() {
+    rightCol.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'tc-empty';
+    const t = document.createElement('div');
+    t.className = 'tc-empty-title';
+    t.textContent = 'Nothing selected';
+    const h = document.createElement('div');
+    h.className = 'tc-empty-hint';
+    h.textContent = activeItems.length === 0
+      ? `Click “+ ${addLabel}” to create your first entry.`
+      : 'Pick an entry on the left, or click + to add a new one.';
+    wrap.append(t, h);
+    rightCol.appendChild(wrap);
+  }
+
+  function showCreate() {
+    rightCol.innerHTML = '';
+
+    const form = document.createElement('form');
+    form.className = 'entry-form';
+
+    const titleInput = document.createElement('input');
+    titleInput.type = 'text';
+    titleInput.placeholder = config.titlePlaceholder || 'Title';
+    titleInput.maxLength = 200;
+
+    const bodyInput = document.createElement('textarea');
+    bodyInput.placeholder = config.bodyPlaceholder || 'Notes (optional)';
+    bodyInput.rows = 6;
+
+    const submit = document.createElement('button');
+    submit.type = 'submit';
+    submit.textContent = addLabel;
+    submit.disabled = true;
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'btn-secondary';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.style.alignSelf = 'flex-start';
+
+    const actionRow = document.createElement('div');
+    actionRow.className = 'entry-actions';
+    actionRow.append(submit, cancelBtn);
+
+    const error = document.createElement('p');
+    error.className = 'form-error';
+    const formStatus = document.createElement('p');
+    formStatus.className = 'draft-status';
+
+    // Restore an in-progress create draft preserved from a previous session.
+    const newDraft = Drafts.get('new');
+    if (newDraft) {
+      titleInput.value = newDraft.title || '';
+      bodyInput.value = newDraft.body || '';
+      submit.disabled = titleInput.value.trim() === '';
+      setStatus(formStatus, `Draft restored — not added yet. ${finalizeHint}`);
+    } else {
+      setStatus(formStatus, '');
+    }
+
+    function saveNewDraft() {
+      if (titleInput.value.trim() === '' && bodyInput.value.trim() === '') {
+        Drafts.clear('new');
+        setStatus(formStatus, '');
+      } else {
+        Drafts.set('new', { title: titleInput.value, body: bodyInput.value });
+        setStatus(formStatus, `Draft saved — not added yet. ${finalizeHint}`);
+      }
+    }
+
+    titleInput.addEventListener('input', () => {
+      submit.disabled = titleInput.value.trim() === '';
+      error.textContent = '';
+      saveNewDraft();
+    });
+    bodyInput.addEventListener('input', saveNewDraft);
+
+    // Source Material's optional .txt upload — fills the inputs, user still
+    // reviews and clicks the add button to finalize.
+    if (config.allowFileUpload) {
+      const uploadRow = document.createElement('div');
+      uploadRow.className = 'upload-row';
+
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = '.txt,text/plain';
+      fileInput.style.display = 'none';
+
+      const uploadBtn = document.createElement('button');
+      uploadBtn.type = 'button';
+      uploadBtn.className = 'btn-secondary';
+      uploadBtn.textContent = 'Upload .txt file';
+      uploadBtn.addEventListener('click', () => fileInput.click());
+
+      const uploadHint = document.createElement('span');
+      uploadHint.className = 'upload-hint';
+      uploadHint.textContent = 'Fills the fields below — review, then add.';
+
+      fileInput.addEventListener('change', () => {
+        const file = fileInput.files && fileInput.files[0];
+        fileInput.value = '';
+        if (!file) return;
+        const isText =
+          file.type === 'text/plain' || /\.txt$/i.test(file.name);
+        if (!isText) {
+          error.textContent = 'Only .txt files are supported for now.';
+          return;
+        }
+        const reader = new FileReader();
+        reader.onerror = () => {
+          error.textContent = 'Could not read that file.';
+        };
+        reader.onload = () => {
+          const text = String(reader.result || '');
+          if (titleInput.value.trim() === '') {
+            titleInput.value = file.name.replace(/\.txt$/i, '');
+          }
+          bodyInput.value =
+            bodyInput.value.trim() === ''
+              ? text
+              : `${bodyInput.value}\n\n${text}`;
+          submit.disabled = titleInput.value.trim() === '';
+          error.textContent = '';
+          saveNewDraft();
+          setStatus(
+            formStatus,
+            `Loaded “${file.name}” — review and click “${addLabel}” to finalize.`
+          );
+          titleInput.focus();
+        };
+        reader.readAsText(file);
+      });
+
+      uploadRow.append(uploadBtn, uploadHint, fileInput);
+      form.appendChild(uploadRow);
+    }
+
+    form.append(titleInput, bodyInput, actionRow, formStatus, error);
+    rightCol.appendChild(form);
+
+    cancelBtn.addEventListener('click', () => {
+      // Cancel discards the in-progress create draft and goes back to empty.
+      Drafts.clear('new');
+      selectedId = null;
+      renderDetail();
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (titleInput.value.trim() === '') return;
+      submit.disabled = true;
+      try {
+        const created = await api.create({
+          title: titleInput.value,
+          body: bodyInput.value,
+        });
+        Drafts.clear('new');
+        selectedId = created && created.id != null ? created.id : null;
+        await loadList();
+      } catch (err) {
+        error.textContent = err.message || 'Could not save entry.';
+        submit.disabled = titleInput.value.trim() === '';
+      }
+    });
+
+    titleInput.focus();
+  }
+
+  function showView(item) {
+    rightCol.innerHTML = '';
+    const archivedFlag = isArchived(item);
+
+    const h = document.createElement('h2');
+    h.className = 'tc-detail-header';
+    h.textContent = item.title;
+    rightCol.appendChild(h);
 
     const meta = document.createElement('div');
-    meta.className = 'entry-meta';
-    meta.textContent = `Added ${new Date(item.created_at).toLocaleString()}`;
-    if (item.updated_at && item.updated_at !== item.created_at) {
-      meta.textContent += ` · edited ${new Date(item.updated_at).toLocaleString()}`;
+    meta.className = 'tc-detail-meta';
+    if (archivedFlag) {
+      meta.textContent = `Archived ${new Date(item.archived_at).toLocaleString()}`;
+    } else {
+      meta.textContent = `Added ${new Date(item.created_at).toLocaleString()}`;
+      if (item.updated_at && item.updated_at !== item.created_at) {
+        meta.textContent += ` · edited ${new Date(item.updated_at).toLocaleString()}`;
+      }
     }
-    card.appendChild(meta);
+    rightCol.appendChild(meta);
 
-    // A preserved draft (e.g. quit mid-edit) is shown but not yet finalized.
-    const pendingDraft = Drafts.get(item.id);
+    if (item.body) {
+      const body = document.createElement('div');
+      body.className = 'tc-detail-body';
+      body.textContent = item.body;
+      rightCol.appendChild(body);
+    }
+
+    const pendingDraft = !archivedFlag && Drafts.get(item.id);
     if (pendingDraft) {
       const badge = document.createElement('div');
       badge.className = 'draft-badge';
       badge.textContent = 'Unsaved draft preserved — not finalized.';
-      card.appendChild(badge);
+      rightCol.appendChild(badge);
     }
 
     const actions = document.createElement('div');
-    actions.className = 'entry-actions';
+    actions.className = 'tc-detail-actions';
 
-    const editBtn = document.createElement('button');
-    editBtn.type = 'button';
-    editBtn.className = 'btn-secondary';
-    editBtn.textContent = pendingDraft ? 'Resume editing' : 'Edit';
-    editBtn.addEventListener('click', () => {
-      card.replaceWith(buildEditCard(item));
-    });
-
-    let discardBtn;
-    if (pendingDraft) {
-      discardBtn = document.createElement('button');
-      discardBtn.type = 'button';
-      discardBtn.className = 'btn-secondary';
-      discardBtn.textContent = 'Discard draft';
-      discardBtn.addEventListener('click', () => {
-        Drafts.clear(item.id);
-        card.replaceWith(buildViewCard(item));
+    if (archivedFlag) {
+      const restoreBtn = document.createElement('button');
+      restoreBtn.type = 'button';
+      restoreBtn.className = 'btn-primary';
+      restoreBtn.textContent = 'Restore';
+      restoreBtn.addEventListener('click', async () => {
+        restoreBtn.disabled = true;
+        try {
+          await api.restore(item.id);
+          await loadList();
+        } catch {
+          restoreBtn.disabled = false;
+        }
       });
-    }
+      actions.appendChild(restoreBtn);
+    } else {
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'btn-secondary';
+      editBtn.textContent = pendingDraft ? 'Resume editing' : 'Edit';
+      editBtn.addEventListener('click', () => showEdit(item));
+      actions.appendChild(editBtn);
 
-    const archiveBtn = document.createElement('button');
-    archiveBtn.type = 'button';
-    archiveBtn.className = 'btn-secondary';
-    archiveBtn.textContent = 'Archive';
-    archiveBtn.addEventListener('click', async () => {
-      archiveBtn.disabled = true;
-      try {
-        await api.archive(item.id);
-        await loadList();
-      } catch (e) {
-        archiveBtn.disabled = false;
+      if (pendingDraft) {
+        const discardBtn = document.createElement('button');
+        discardBtn.type = 'button';
+        discardBtn.className = 'btn-secondary';
+        discardBtn.textContent = 'Discard draft';
+        discardBtn.addEventListener('click', () => {
+          Drafts.clear(item.id);
+          renderList();
+          renderDetail();
+        });
+        actions.appendChild(discardBtn);
       }
-    });
+
+      const archiveBtn = document.createElement('button');
+      archiveBtn.type = 'button';
+      archiveBtn.className = 'btn-secondary';
+      archiveBtn.textContent = 'Archive';
+      archiveBtn.addEventListener('click', async () => {
+        archiveBtn.disabled = true;
+        try {
+          await api.archive(item.id);
+          await loadList();
+        } catch {
+          archiveBtn.disabled = false;
+        }
+      });
+      actions.appendChild(archiveBtn);
+    }
 
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'btn-danger';
     deleteBtn.textContent = 'Delete';
     deleteBtn.addEventListener('click', () => {
-      showDeleteConfirm(card, actions, item);
+      showDeleteConfirm(actions, item);
     });
+    actions.appendChild(deleteBtn);
 
-    actions.append(editBtn);
-    if (discardBtn) actions.append(discardBtn);
-    actions.append(archiveBtn, deleteBtn);
-    card.appendChild(actions);
-
-    return card;
+    rightCol.appendChild(actions);
   }
 
-  // Read-only card for the collapsed Archived section: Restore or Delete.
-  function buildArchivedCard(item) {
-    const card = document.createElement('div');
-    card.className = 'entry-card';
-
-    const t = document.createElement('div');
-    t.className = 'entry-title';
-    t.textContent = item.title;
-    card.appendChild(t);
-
-    if (item.body) {
-      const b = document.createElement('div');
-      b.className = 'entry-body';
-      b.textContent = item.body;
-      card.appendChild(b);
-    }
-
-    const meta = document.createElement('div');
-    meta.className = 'entry-meta';
-    meta.textContent = `Archived ${new Date(item.archived_at).toLocaleString()}`;
-    card.appendChild(meta);
-
-    const actions = document.createElement('div');
-    actions.className = 'entry-actions';
-
-    const restoreBtn = document.createElement('button');
-    restoreBtn.type = 'button';
-    restoreBtn.className = 'btn-primary';
-    restoreBtn.textContent = 'Restore';
-    restoreBtn.addEventListener('click', async () => {
-      restoreBtn.disabled = true;
-      try {
-        await api.restore(item.id);
-        await loadList();
-      } catch (e) {
-        restoreBtn.disabled = false;
-      }
-    });
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.type = 'button';
-    deleteBtn.className = 'btn-danger';
-    deleteBtn.textContent = 'Delete';
-    deleteBtn.addEventListener('click', () => {
-      showDeleteConfirm(card, actions, item);
-    });
-
-    actions.append(restoreBtn, deleteBtn);
-    card.appendChild(actions);
-
-    return card;
-  }
-
-  // Swap the card's action row for an inline "are you sure?" confirm.
-  function showDeleteConfirm(card, actions, item) {
+  function showDeleteConfirm(actions, item) {
     const confirmRow = document.createElement('div');
-    confirmRow.className = 'entry-actions confirm-row';
+    confirmRow.className = 'tc-detail-actions confirm-row';
 
     const prompt = document.createElement('span');
     prompt.className = 'confirm-text';
@@ -376,6 +505,8 @@ function makeEntryWorkspace(config) {
       yes.disabled = true;
       try {
         await api.delete(item.id);
+        Drafts.clear(item.id);
+        selectedId = null;
         await loadList();
       } catch (e) {
         prompt.textContent = e.message || 'Could not delete entry.';
@@ -387,17 +518,14 @@ function makeEntryWorkspace(config) {
     no.type = 'button';
     no.className = 'btn-secondary';
     no.textContent = 'Cancel';
-    no.addEventListener('click', () => {
-      confirmRow.replaceWith(actions);
-    });
+    no.addEventListener('click', () => confirmRow.replaceWith(actions));
 
     confirmRow.append(prompt, yes, no);
     actions.replaceWith(confirmRow);
   }
 
-  function buildEditCard(item) {
-    const card = document.createElement('div');
-    card.className = 'entry-card';
+  function showEdit(item) {
+    rightCol.innerHTML = '';
 
     // Prefer a preserved draft (e.g. quit mid-edit) over the saved values.
     const draft = Drafts.get(item.id);
@@ -405,21 +533,27 @@ function makeEntryWorkspace(config) {
 
     const titleEdit = document.createElement('input');
     titleEdit.type = 'text';
+    titleEdit.className = 'wl-title';
     titleEdit.maxLength = 200;
     titleEdit.value = initial.title;
 
     const bodyEdit = document.createElement('textarea');
-    bodyEdit.rows = 3;
+    bodyEdit.className = 'wl-body';
+    bodyEdit.style.minHeight = '40vh';
     bodyEdit.value = initial.body;
 
     const status = document.createElement('p');
     status.className = 'draft-status';
-
     const err = document.createElement('p');
     err.className = 'form-error';
 
+    setStatus(
+      status,
+      draft ? 'Unsaved draft restored — click Save to finalize.' : ''
+    );
+
     const actions = document.createElement('div');
-    actions.className = 'entry-actions';
+    actions.className = 'tc-detail-actions';
 
     const saveBtn = document.createElement('button');
     saveBtn.type = 'button';
@@ -431,18 +565,12 @@ function makeEntryWorkspace(config) {
     cancelBtn.className = 'btn-secondary';
     cancelBtn.textContent = 'Cancel';
 
-    // Autosave the in-progress edit (preservation only; never finalizes).
+    actions.append(saveBtn, cancelBtn);
+
     function saveEditDraft() {
       Drafts.set(item.id, { title: titleEdit.value, body: bodyEdit.value });
       setStatus(status, 'Draft autosaved — click Save to finalize.');
     }
-
-    setStatus(
-      status,
-      draft
-        ? 'Unsaved draft restored — click Save to finalize.'
-        : ''
-    );
 
     titleEdit.addEventListener('input', () => {
       saveBtn.disabled = titleEdit.value.trim() === '';
@@ -470,39 +598,37 @@ function makeEntryWorkspace(config) {
     cancelBtn.addEventListener('click', () => {
       // Cancel abandons the edit: discard the preserved draft too.
       Drafts.clear(item.id);
-      card.replaceWith(buildViewCard(item));
+      renderList();
+      renderDetail();
     });
 
-    actions.append(saveBtn, cancelBtn);
-    card.append(titleEdit, bodyEdit, status, err, actions);
+    rightCol.append(titleEdit, bodyEdit, status, err, actions);
     titleEdit.focus();
-    return card;
+  }
+
+  function renderDetail() {
+    if (selectedId === 'new') return showCreate();
+    if (selectedId == null) return showEmpty();
+    const item = findItem(selectedId);
+    if (!item) {
+      selectedId = null;
+      return showEmpty();
+    }
+    return showView(item);
   }
 
   async function loadList() {
-    const [items, archivedItems] = await Promise.all([
+    const [items, archs] = await Promise.all([
       api.list(),
       api.listArchived(),
     ]);
-
-    list.innerHTML = '';
-    if (items.length === 0) {
-      const empty = document.createElement('p');
-      empty.className = 'placeholder';
-      empty.textContent = 'No entries yet. Add one above.';
-      list.appendChild(empty);
-    } else {
-      for (const item of items) {
-        list.appendChild(buildViewCard(item));
-      }
+    activeItems = items;
+    archivedItems = archs;
+    if (selectedId !== null && selectedId !== 'new' && !findItem(selectedId)) {
+      selectedId = null;
     }
-
-    archivedList.innerHTML = '';
-    archivedSummary.textContent = `Archived (${archivedItems.length})`;
-    archived.style.display = archivedItems.length === 0 ? 'none' : '';
-    for (const item of archivedItems) {
-      archivedList.appendChild(buildArchivedCard(item));
-    }
+    renderList();
+    renderDetail();
 
     // Let a workspace react to its own changes elsewhere in the app. Source
     // Material uses this to refresh the Chat drawer's always-visible active
@@ -511,31 +637,6 @@ function makeEntryWorkspace(config) {
     if (config.onChange) config.onChange();
   }
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (titleInput.value.trim() === '') return;
-    submit.disabled = true;
-    try {
-      await api.create({
-        title: titleInput.value,
-        body: bodyInput.value,
-      });
-      titleInput.value = '';
-      bodyInput.value = '';
-      Drafts.clear('new');
-      setStatus(formStatus, '');
-      await loadList();
-    } catch (err) {
-      error.textContent = err.message || 'Could not save entry.';
-    } finally {
-      submit.disabled = titleInput.value.trim() === '';
-      titleInput.focus();
-    }
-  });
-
-  if (uploadRow) form.append(uploadRow);
-  form.append(titleInput, bodyInput, submit, formStatus, error);
-  section.append(form, list, archived);
   loadList();
   };
 }
@@ -1367,257 +1468,184 @@ function renderWritingLabPage(section) {
     'finalized, routed, or made canon unless you do it explicitly.';
   section.appendChild(intro);
 
-  const wrap = document.createElement('div');
-  wrap.className = 'wl-wrap';
-  section.appendChild(wrap);
+  // Two-column shell (PUI1).
+  const layout = document.createElement('div');
+  layout.className = 'tc-layout';
+  const leftCol = document.createElement('div');
+  leftCol.className = 'tc-left';
+  const rightCol = document.createElement('div');
+  rightCol.className = 'tc-right';
+  layout.append(leftCol, rightCol);
+  section.appendChild(layout);
 
-  // --- Drafts list view ----------------------------------------------------
-  async function showList() {
-    wrap.innerHTML = '';
-
-    const toolbar = document.createElement('div');
-    toolbar.className = 'wl-toolbar';
-    const newBtn = document.createElement('button');
-    newBtn.type = 'button';
-    newBtn.className = 'btn-primary';
-    newBtn.textContent = '+ New draft';
-    newBtn.addEventListener('click', () => openEditor(null));
-    toolbar.appendChild(newBtn);
-    wrap.appendChild(toolbar);
-
-    const list = document.createElement('div');
-    list.className = 'entry-list';
-    wrap.appendChild(list);
-
-    const archived = document.createElement('details');
-    archived.className = 'archived-section';
-    const archivedSummary = document.createElement('summary');
-    archived.appendChild(archivedSummary);
-    const archivedList = document.createElement('div');
-    archivedList.className = 'entry-list';
-    archived.appendChild(archivedList);
-    wrap.appendChild(archived);
-
-    let items, archivedItems;
-    try {
-      [items, archivedItems] = await Promise.all([api.list(), api.listArchived()]);
-    } catch (e) {
-      list.innerHTML = '';
-      const err = document.createElement('p');
-      err.className = 'placeholder';
-      err.textContent = `Could not load drafts: ${e.message || e}`;
-      list.appendChild(err);
-      return;
-    }
-
-    if (items.length === 0) {
-      const empty = document.createElement('p');
-      empty.className = 'placeholder';
-      empty.textContent = 'No drafts yet. Click “+ New draft” to start writing.';
-      list.appendChild(empty);
-    } else {
-      for (const item of items) list.appendChild(buildDraftCard(item));
-    }
-
-    archivedSummary.textContent = `Archived (${archivedItems.length})`;
-    archived.style.display = archivedItems.length === 0 ? 'none' : '';
-    for (const item of archivedItems) {
-      archivedList.appendChild(buildArchivedDraftCard(item));
-    }
-  }
+  // selectedId: null = empty state; 'new' = fresh editor; <id> = open existing.
+  let selectedId = null;
+  let activeItems = [];
+  let archivedItems = [];
+  // Active editor's flushNow, if any — so list/header actions can commit
+  // pending edits before switching away from the current draft.
+  let activeFlush = null;
 
   function snippet(body) {
     const oneLine = String(body || '').replace(/\s+/g, ' ').trim();
-    return oneLine.length > 140 ? `${oneLine.slice(0, 140)}…` : oneLine;
+    return oneLine.length > 80 ? `${oneLine.slice(0, 80)}…` : oneLine;
   }
 
-  function buildDraftCard(item) {
-    const card = document.createElement('div');
-    card.className = 'entry-card wl-card';
+  function findItem(id) {
+    return (
+      activeItems.find((i) => i.id === id) ||
+      archivedItems.find((i) => i.id === id) ||
+      null
+    );
+  }
 
-    const t = document.createElement('div');
-    t.className = 'entry-title';
-    t.textContent = item.title;
-    card.appendChild(t);
+  function isArchived(item) {
+    return !!(item && item.archived_at);
+  }
 
-    const body = snippet(item.body);
-    if (body) {
-      const b = document.createElement('div');
-      b.className = 'entry-body';
-      b.textContent = body;
-      card.appendChild(b);
+  // Left column: + New draft, list, archived collapsed.
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'tc-add';
+  addBtn.textContent = '+ New draft';
+  addBtn.addEventListener('click', async () => {
+    if (selectedId === 'new') return;
+    if (activeFlush) await activeFlush();
+    selectedId = 'new';
+    renderList();
+    renderDetail();
+  });
+  leftCol.appendChild(addBtn);
+
+  const list = document.createElement('div');
+  list.className = 'tc-list';
+  leftCol.appendChild(list);
+
+  const archived = document.createElement('details');
+  archived.className = 'tc-archived-section';
+  const archivedSummary = document.createElement('summary');
+  archived.appendChild(archivedSummary);
+  const archivedListEl = document.createElement('div');
+  archivedListEl.className = 'tc-list';
+  archived.appendChild(archivedListEl);
+  leftCol.appendChild(archived);
+
+  function buildListItem(item, archivedFlag) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'tc-list-item';
+    if (selectedId === item.id) btn.classList.add('active');
+
+    const titleRow = document.createElement('div');
+    titleRow.className = 'tc-list-title';
+    if (archivedFlag) {
+      const badge = document.createElement('span');
+      badge.className = 'tc-list-badge badge-archived';
+      badge.textContent = 'Archived';
+      titleRow.appendChild(badge);
+    }
+    titleRow.appendChild(
+      document.createTextNode(item.title || 'Untitled draft')
+    );
+    btn.appendChild(titleRow);
+
+    const previewText = snippet(item.body);
+    if (previewText) {
+      const pv = document.createElement('div');
+      pv.className = 'tc-list-preview';
+      pv.textContent = previewText;
+      btn.appendChild(pv);
     }
 
-    const meta = document.createElement('div');
-    meta.className = 'entry-meta';
-    meta.textContent =
-      `${wordCount(item.body)} word(s) · edited ` +
-      new Date(item.updated_at).toLocaleString();
-    card.appendChild(meta);
+    const wc = document.createElement('div');
+    wc.className = 'tc-list-preview';
+    wc.textContent = `${wordCount(item.body)} word(s)`;
+    btn.appendChild(wc);
 
-    const actions = document.createElement('div');
-    actions.className = 'entry-actions';
-
-    const openBtn = document.createElement('button');
-    openBtn.type = 'button';
-    openBtn.className = 'btn-primary';
-    openBtn.textContent = 'Open';
-    openBtn.addEventListener('click', () => openEditor(item));
-
-    const archiveBtn = document.createElement('button');
-    archiveBtn.type = 'button';
-    archiveBtn.className = 'btn-secondary';
-    archiveBtn.textContent = 'Archive';
-    archiveBtn.addEventListener('click', async () => {
-      archiveBtn.disabled = true;
-      try {
-        await api.archive(item.id);
-        await showList();
-      } catch {
-        archiveBtn.disabled = false;
-      }
+    btn.addEventListener('click', async () => {
+      if (selectedId === item.id) return;
+      if (activeFlush) await activeFlush();
+      selectedId = item.id;
+      renderList();
+      renderDetail();
     });
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.type = 'button';
-    deleteBtn.className = 'btn-danger';
-    deleteBtn.textContent = 'Delete';
-    deleteBtn.addEventListener('click', () =>
-      showDraftDeleteConfirm(card, actions, item)
-    );
-
-    // Whole-card click also opens, except when a button was the target.
-    card.addEventListener('click', (e) => {
-      if (e.target.closest('button')) return;
-      openEditor(item);
-    });
-
-    actions.append(openBtn, archiveBtn, deleteBtn);
-    card.appendChild(actions);
-    return card;
+    return btn;
   }
 
-  function buildArchivedDraftCard(item) {
-    const card = document.createElement('div');
-    card.className = 'entry-card wl-card';
+  function renderList() {
+    list.innerHTML = '';
+    if (activeItems.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'tc-list-empty';
+      empty.textContent = 'No drafts yet.';
+      list.appendChild(empty);
+    } else {
+      for (const item of activeItems) {
+        list.appendChild(buildListItem(item, false));
+      }
+    }
 
+    archivedListEl.innerHTML = '';
+    archivedSummary.textContent = `Archived (${archivedItems.length})`;
+    archived.style.display = archivedItems.length === 0 ? 'none' : '';
+    for (const item of archivedItems) {
+      archivedListEl.appendChild(buildListItem(item, true));
+    }
+  }
+
+  function showEmpty() {
+    activeFlush = null;
+    rightCol.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'tc-empty';
     const t = document.createElement('div');
-    t.className = 'entry-title';
-    t.textContent = item.title;
-    card.appendChild(t);
-
-    const meta = document.createElement('div');
-    meta.className = 'entry-meta';
-    meta.textContent =
-      `${wordCount(item.body)} word(s) · archived ` +
-      new Date(item.archived_at).toLocaleString();
-    card.appendChild(meta);
-
-    const actions = document.createElement('div');
-    actions.className = 'entry-actions';
-
-    const restoreBtn = document.createElement('button');
-    restoreBtn.type = 'button';
-    restoreBtn.className = 'btn-primary';
-    restoreBtn.textContent = 'Restore';
-    restoreBtn.addEventListener('click', async () => {
-      restoreBtn.disabled = true;
-      try {
-        await api.restore(item.id);
-        await showList();
-      } catch {
-        restoreBtn.disabled = false;
-      }
-    });
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.type = 'button';
-    deleteBtn.className = 'btn-danger';
-    deleteBtn.textContent = 'Delete';
-    deleteBtn.addEventListener('click', () =>
-      showDraftDeleteConfirm(card, actions, item)
-    );
-
-    actions.append(restoreBtn, deleteBtn);
-    card.appendChild(actions);
-    return card;
+    t.className = 'tc-empty-title';
+    t.textContent = 'Nothing open';
+    const h = document.createElement('div');
+    h.className = 'tc-empty-hint';
+    h.textContent = activeItems.length === 0
+      ? 'Click “+ New draft” to start writing.'
+      : 'Pick a draft on the left, or click + to start a new one.';
+    wrap.append(t, h);
+    rightCol.appendChild(wrap);
   }
 
-  function showDraftDeleteConfirm(card, actions, item) {
-    const confirmRow = document.createElement('div');
-    confirmRow.className = 'entry-actions confirm-row';
-
-    const prompt = document.createElement('span');
-    prompt.className = 'confirm-text';
-    prompt.textContent = 'Delete this draft? This cannot be undone.';
-
-    const yes = document.createElement('button');
-    yes.type = 'button';
-    yes.className = 'btn-danger';
-    yes.textContent = 'Delete';
-    yes.addEventListener('click', async () => {
-      yes.disabled = true;
-      try {
-        await api.delete(item.id);
-        await showList();
-      } catch (e) {
-        prompt.textContent = e.message || 'Could not delete draft.';
-        yes.disabled = false;
-      }
-    });
-
-    const no = document.createElement('button');
-    no.type = 'button';
-    no.className = 'btn-secondary';
-    no.textContent = 'Cancel';
-    no.addEventListener('click', () => confirmRow.replaceWith(actions));
-
-    confirmRow.append(prompt, yes, no);
-    actions.replaceWith(confirmRow);
-  }
-
-  // --- Single-draft editor view --------------------------------------------
-  // Continuous autosave: edits are debounced and written straight to SQLite. A
-  // brand-new draft has no row until the first non-empty autosave creates one,
-  // so opening "+ New draft" and leaving without typing never clutters the list.
+  // Mount the single-draft editor inside the right column. Continuous autosave:
+  // edits are debounced and written straight to SQLite. A brand-new draft has
+  // no row until the first non-empty autosave creates one, so opening
+  // "+ New draft" and leaving without typing never clutters the list.
   function openEditor(item) {
-    wrap.innerHTML = '';
+    rightCol.innerHTML = '';
+    activeFlush = null;
 
-    // Local editor state. `currentId` is null until a new draft's first save.
     let currentId = item ? item.id : null;
     let saveTimer = null;
     let saving = false;
     let savedTitle = item ? item.title : '';
     let savedBody = item ? item.body || '' : '';
+    const archivedAtStart = isArchived(item);
 
     const bar = document.createElement('div');
     bar.className = 'wl-editor-bar';
 
-    const backBtn = document.createElement('button');
-    backBtn.type = 'button';
-    backBtn.className = 'btn-secondary';
-    backBtn.textContent = '← All drafts';
-
     const status = document.createElement('span');
     status.className = 'draft-status wl-status';
-
     const counter = document.createElement('span');
     counter.className = 'wl-counter';
-
     const spacer = document.createElement('span');
     spacer.className = 'wl-bar-spacer';
 
     const archiveBtn = document.createElement('button');
     archiveBtn.type = 'button';
     archiveBtn.className = 'btn-secondary';
-    archiveBtn.textContent = 'Archive';
+    archiveBtn.textContent = archivedAtStart ? 'Restore' : 'Archive';
 
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'btn-danger';
     deleteBtn.textContent = 'Delete';
 
-    bar.append(backBtn, status, counter, spacer, archiveBtn, deleteBtn);
+    bar.append(status, counter, spacer, archiveBtn, deleteBtn);
 
     const titleInput = document.createElement('input');
     titleInput.type = 'text';
@@ -1631,15 +1659,26 @@ function renderWritingLabPage(section) {
     bodyInput.placeholder = 'Start writing… your work saves automatically.';
     bodyInput.value = item ? item.body || '' : '';
 
-    wrap.append(bar, titleInput, bodyInput);
+    if (archivedAtStart) {
+      titleInput.readOnly = true;
+      bodyInput.readOnly = true;
+    }
+
+    rightCol.append(bar, titleInput, bodyInput);
 
     function updateCounter() {
       counter.textContent = `${wordCount(bodyInput.value)} word(s)`;
     }
     updateCounter();
-    setStatus(status, item ? 'Saved.' : 'New draft — autosaves as you type.');
+    setStatus(
+      status,
+      archivedAtStart
+        ? 'Archived — restore to edit.'
+        : item
+        ? 'Saved.'
+        : 'New draft — autosaves as you type.'
+    );
 
-    // Archive/Delete are meaningless until the draft actually exists.
     function syncDraftActions() {
       const exists = currentId != null;
       archiveBtn.disabled = !exists;
@@ -1647,26 +1686,28 @@ function renderWritingLabPage(section) {
     }
     syncDraftActions();
 
-    // Write the current title/body to SQLite. Creates the row on first save of a
-    // new draft; updates thereafter. Returns the persisted record (or null when
-    // there is genuinely nothing to save yet).
     async function flush() {
+      if (archivedAtStart) return null;
       const title = titleInput.value;
       const body = bodyInput.value;
       if (title === savedTitle && body === savedBody && currentId != null) {
-        return null; // nothing changed
+        return null;
       }
       if (currentId == null && title.trim() === '' && body.trim() === '') {
-        return null; // empty new draft — don't create a row
+        return null;
       }
       saving = true;
       setStatus(status, 'Saving…');
       try {
         let rec;
-        if (currentId == null) {
+        const wasNew = currentId == null;
+        if (wasNew) {
           rec = await api.create({ title, body });
           currentId = rec.id;
           syncDraftActions();
+          // The freshly-created row becomes the active selection so the list
+          // can highlight it and subsequent navigation stays sane.
+          selectedId = currentId;
         } else {
           rec = await api.update(currentId, { title, body });
         }
@@ -1676,6 +1717,19 @@ function renderWritingLabPage(section) {
           status,
           `Saved · ${new Date(rec.updated_at).toLocaleTimeString()}`
         );
+        // Refresh the list to reflect the new/updated row, but don't touch the
+        // detail panel — the editor stays mounted so focus is preserved.
+        try {
+          const [items, archs] = await Promise.all([
+            api.list(),
+            api.listArchived(),
+          ]);
+          activeItems = items;
+          archivedItems = archs;
+          renderList();
+        } catch {
+          /* non-fatal — the save itself succeeded */
+        }
         return rec;
       } catch (e) {
         setStatus(status, `Save failed: ${e.message || e}`);
@@ -1685,8 +1739,8 @@ function renderWritingLabPage(section) {
       }
     }
 
-    // Debounced autosave on every keystroke (preservation, not finalization).
     function scheduleSave() {
+      if (archivedAtStart) return;
       if (saveTimer) clearTimeout(saveTimer);
       setStatus(status, 'Editing…');
       saveTimer = setTimeout(() => {
@@ -1703,6 +1757,8 @@ function renderWritingLabPage(section) {
       return flush();
     }
 
+    activeFlush = flushNow;
+
     titleInput.addEventListener('input', scheduleSave);
     bodyInput.addEventListener('input', () => {
       updateCounter();
@@ -1713,18 +1769,17 @@ function renderWritingLabPage(section) {
     titleInput.addEventListener('blur', flushNow);
     bodyInput.addEventListener('blur', flushNow);
 
-    backBtn.addEventListener('click', async () => {
-      await flushNow();
-      await showList();
-    });
-
     archiveBtn.addEventListener('click', async () => {
       if (currentId == null) return;
       archiveBtn.disabled = true;
       await flushNow();
       try {
-        await api.archive(currentId);
-        await showList();
+        if (archivedAtStart) {
+          await api.restore(currentId);
+        } else {
+          await api.archive(currentId);
+        }
+        await loadList();
       } catch {
         archiveBtn.disabled = false;
       }
@@ -1736,6 +1791,9 @@ function renderWritingLabPage(section) {
         clearTimeout(saveTimer);
         saveTimer = null;
       }
+      const existing = rightCol.querySelector('.wl-delete-confirm');
+      if (existing) existing.remove();
+
       const row = document.createElement('div');
       row.className = 'entry-actions confirm-row wl-delete-confirm';
       const prompt = document.createElement('span');
@@ -1749,7 +1807,8 @@ function renderWritingLabPage(section) {
         yes.disabled = true;
         try {
           await api.delete(currentId);
-          await showList();
+          selectedId = null;
+          await loadList();
         } catch (e) {
           prompt.textContent = e.message || 'Could not delete draft.';
           yes.disabled = false;
@@ -1764,11 +1823,52 @@ function renderWritingLabPage(section) {
       bodyInput.insertAdjacentElement('afterend', row);
     });
 
-    titleInput.focus();
-    if (item) bodyInput.focus();
+    if (item && !archivedAtStart) bodyInput.focus();
+    else titleInput.focus();
   }
 
-  showList();
+  function renderDetail() {
+    if (selectedId === 'new') return openEditor(null);
+    if (selectedId == null) return showEmpty();
+    const item = findItem(selectedId);
+    if (!item) {
+      selectedId = null;
+      return showEmpty();
+    }
+    return openEditor(item);
+  }
+
+  async function loadList() {
+    try {
+      const [items, archs] = await Promise.all([
+        api.list(),
+        api.listArchived(),
+      ]);
+      activeItems = items;
+      archivedItems = archs;
+    } catch (e) {
+      activeItems = [];
+      archivedItems = [];
+      list.innerHTML = '';
+      const err = document.createElement('p');
+      err.className = 'placeholder';
+      err.textContent = `Could not load drafts: ${e.message || e}`;
+      list.appendChild(err);
+      showEmpty();
+      return;
+    }
+    if (
+      selectedId !== null &&
+      selectedId !== 'new' &&
+      !findItem(selectedId)
+    ) {
+      selectedId = null;
+    }
+    renderList();
+    renderDetail();
+  }
+
+  loadList();
 }
 
 const CONTENT_RENDERERS = {
