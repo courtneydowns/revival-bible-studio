@@ -167,7 +167,7 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 ## Canon Bible — schema first, then build
 
 ### P30 — Canon schema design (CHECKPOINT, no code)
-- Move to claude.ai (Opus). Inspect finalized project knowledge files. Propose schema covering: categories, tables/entities, relationships, edit/lock/archive/supersede behavior, source provenance, **cross-workspace attachments (Characters/Episodes ↔ Decisions/Open Questions/Conflicts/Brainstorm/Research)**, future change handling.
+- Move to claude.ai (Opus). Inspect audited worldbuilding knowledge files (which will keep evolving inside this app — not frozen). Propose schema covering: categories, tables/entities, relationships, edit/lock/archive/supersede behavior, source provenance, **cross-workspace attachments (Characters/Episodes ↔ Decisions/Open Questions/Conflicts/Brainstorm/Research)**, future change handling.
 - **Gate:** User explicitly approves schema in writing before P31 starts.
 
 ### P31 — Canon tables + read view

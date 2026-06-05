@@ -132,7 +132,7 @@ Do not invent new top-level workspaces.
 
 - SQLite. Local only.
 - **Do not invent the Canon Bible schema yet.**
-- At the schema phase: inspect the finalized project knowledge files and propose a schema covering categories, tables/entities, relationships, edit/lock/archive/supersede behavior, source provenance, cross-workspace attachments (Characters/Episodes ↔ Decisions/Open Questions/Conflicts/Brainstorm/Research), and future change handling.
+- At the schema phase: inspect the audited worldbuilding knowledge files (which will keep evolving inside this app — they are not frozen) and propose a schema covering categories, tables/entities, relationships, edit/lock/archive/supersede behavior, source provenance, cross-workspace attachments (Characters/Episodes ↔ Decisions/Open Questions/Conflicts/Brainstorm/Research), and future change handling.
 - **Stop for a schema approval checkpoint before implementing.**
 
 ---
