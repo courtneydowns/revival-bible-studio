@@ -1,5 +1,6 @@
 // SQLite setup + migration runner (main process only). Local file, no network.
 // Migrations are applied in order; each runs once, tracked in schema_migrations.
+const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
 
@@ -432,9 +433,63 @@ const settings = {
   },
 };
 
+// --- Panic Export (P21) ----------------------------------------------------
+// One-shot safety dump of EVERYTHING into a folder the user chose. This only
+// copies — nothing is deleted, archived, or finalized (per CLAUDE.md: Panic
+// Export is preservation). Writes three things into destFolder:
+//   1. revival.sqlite      — a clean binary copy of the whole DB (safe under WAL
+//                            via better-sqlite3's online backup).
+//   2. database.json       — a human-readable dump of every table.
+//   3. sources/*.txt       — each Source Material entry (active + archived) as
+//                            its own text file, since uploaded source content
+//                            lives in source_material.body, not on disk.
+// Returns counts so the UI can confirm what was written.
+async function exportAll(destFolder) {
+  const db = getDb();
+
+  // 1. Clean binary copy of the whole DB.
+  await db.backup(path.join(destFolder, DB_FILENAME));
+
+  // 2. Human-readable JSON dump of every user table. Table names come from
+  // sqlite_master (trusted), never user input, so interpolation is safe.
+  const tables = db
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+    )
+    .all();
+  const dump = {};
+  for (const { name } of tables) {
+    dump[name] = db.prepare(`SELECT * FROM ${name}`).all();
+  }
+  fs.writeFileSync(
+    path.join(destFolder, 'database.json'),
+    JSON.stringify(dump, null, 2),
+    'utf8'
+  );
+
+  // 3. Each Source Material entry as its own .txt (active + archived).
+  const sourcesDir = path.join(destFolder, 'sources');
+  fs.mkdirSync(sourcesDir, { recursive: true });
+  const sources = db
+    .prepare('SELECT id, title, body FROM source_material ORDER BY id ASC')
+    .all();
+  for (const s of sources) {
+    const safeTitle =
+      String(s.title || 'untitled')
+        .replace(/[^a-z0-9-_ ]/gi, '_')
+        .trim()
+        .slice(0, 80) || 'untitled';
+    const fname = `${String(s.id).padStart(4, '0')}_${safeTitle}.txt`;
+    fs.writeFileSync(path.join(sourcesDir, fname), s.body || '', 'utf8');
+  }
+
+  return { db: DB_FILENAME, tables: tables.length, sources: sources.length };
+}
+
 module.exports = {
   initDatabase,
   getDb,
+  exportAll,
   settings,
   getDbPath,
   DB_FILENAME,

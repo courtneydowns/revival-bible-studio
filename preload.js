@@ -50,4 +50,7 @@ contextBridge.exposeInMainWorld('revival', {
     setProjectRules: (text) =>
       ipcRenderer.invoke('settings:setProjectRules', text),
   },
+  panic: {
+    export: () => ipcRenderer.invoke('panic:export'),
+  },
 });

@@ -1,6 +1,17 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const fs = require('fs');
 const path = require('path');
 const db = require('./db');
+
+// Filesystem-safe timestamp for the export folder name, e.g. 2026-06-04_14-30-05.
+function timestampSlug() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`
+  );
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -56,6 +67,24 @@ function registerIpc() {
   ipcMain.handle('chatSources:detach', (_event, chatId, sourceId) =>
     db.chatSources.detach(chatId, sourceId)
   );
+
+  // Panic Export (P21): always saves to a fixed, predictable location —
+  // ~/Documents/revival-bible-studio/panic_exports/<timestamp>/ — so the user
+  // never has to choose and always knows where to look. Dumps the whole DB +
+  // every Source Material entry, then reveals the folder. Copy-only — nothing
+  // in the app is mutated.
+  ipcMain.handle('panic:export', async () => {
+    const folder = path.join(
+      app.getPath('documents'),
+      'revival-bible-studio',
+      'panic_exports',
+      `revival-export-${timestampSlug()}`
+    );
+    fs.mkdirSync(folder, { recursive: true });
+    const counts = await db.exportAll(folder);
+    shell.openPath(folder);
+    return { canceled: false, folder, ...counts };
+  });
 
   ipcMain.handle('settings:getProjectRules', () => db.settings.getProjectRules());
   ipcMain.handle('settings:setProjectRules', (_event, text) =>

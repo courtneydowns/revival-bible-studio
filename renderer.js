@@ -731,6 +731,58 @@ function renderSettingsPage(section) {
     textarea.disabled = false;
     refreshDirty();
   })();
+
+  renderPanicExport(section);
+}
+
+// --- Panic Export (P21) ----------------------------------------------------
+// One click saves a complete copy of everything — the full database plus every
+// Source Material entry as a text file — into a timestamped folder the user
+// chooses. Copy-only: nothing in the app is deleted, archived, or finalized.
+function renderPanicExport(section) {
+  const block = document.createElement('div');
+  block.className = 'entry-form settings-block';
+
+  const heading = document.createElement('h2');
+  heading.className = 'settings-heading';
+  heading.textContent = 'Panic Export';
+
+  const desc = document.createElement('p');
+  desc.className = 'settings-desc';
+  desc.textContent =
+    'Save a complete copy of everything — the full database plus every Source ' +
+    'Material entry as a text file — into a timestamped folder under ' +
+    'Documents/revival-bible-studio/panic_exports. This only copies: nothing ' +
+    'here is deleted or changed.';
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = 'Run Panic Export…';
+
+  const status = document.createElement('p');
+  status.className = 'draft-status';
+
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    setStatus(status, 'Exporting…');
+    try {
+      const res = await window.revival.panic.export();
+      if (res.canceled) {
+        setStatus(status, 'Export canceled — nothing was written.');
+      } else {
+        setStatus(
+          status,
+          `Exported the database + ${res.sources} source file(s) to: ${res.folder}`
+        );
+      }
+    } catch (err) {
+      setStatus(status, `Export failed: ${err.message || err}`);
+    }
+    btn.disabled = false;
+  });
+
+  block.append(heading, desc, btn, status);
+  section.appendChild(block);
 }
 
 const CONTENT_RENDERERS = {
@@ -769,7 +821,12 @@ const THEME_KEY = 'revival.theme';
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   if (themeToggle) {
-    themeToggle.textContent = theme === 'dark' ? '☾  Dark' : '☀  Light';
+    // Show the current mode's emoji: moon in dark, sun in light.
+    const dark = theme === 'dark';
+    themeToggle.textContent = dark ? '🌙' : '☀️';
+    const tip = dark ? 'Dark mode — click for light' : 'Light mode — click for dark';
+    themeToggle.title = tip;
+    themeToggle.setAttribute('aria-label', tip);
   }
 }
 
@@ -804,7 +861,10 @@ for (const name of WORKSPACES) {
   nav.appendChild(btn);
 }
 
-nav.appendChild(themeToggle);
+// Mount on body (not nav): inside #nav the broad `#nav button` rule would win
+// on specificity and stretch this to full width. As a fixed corner icon it
+// belongs alongside the Panic Export bolt, not in the nav flow.
+document.body.appendChild(themeToggle);
 
 // --- Global Chat drawer (shell only; no AI yet) -----------------------------
 // The toggle is fixed and outside #content, so the drawer opens/closes from
@@ -1270,5 +1330,24 @@ chatArchiveBtn.addEventListener('click', async () => {
 
 setChatExpanded(localStorage.getItem(CHAT_EXPANDED_KEY) === '1');
 loadChats();
+
+// Sticky Panic Export button (P21): same action as the Settings button. Gives
+// brief in-button feedback; the main process opens the export folder in Finder.
+const panicBtn = document.getElementById('panic-export');
+panicBtn.addEventListener('click', async () => {
+  panicBtn.disabled = true;
+  panicBtn.textContent = '…';
+  try {
+    const res = await window.revival.panic.export();
+    panicBtn.textContent = res.canceled ? '⚡' : '✓';
+  } catch (err) {
+    panicBtn.textContent = '✕';
+    console.error('Panic Export failed:', err);
+  }
+  setTimeout(() => {
+    panicBtn.textContent = '⚡';
+    panicBtn.disabled = false;
+  }, 1600);
+});
 
 route('Home');
