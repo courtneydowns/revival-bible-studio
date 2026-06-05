@@ -1005,6 +1005,49 @@ const MIGRATIONS = [
       db.exec('DROP TABLE app_meta;');
     },
   },
+
+  {
+    name: '029_unsorted_documents_source_material_reshape',
+    up(db) {
+      // PR2 — Reshape: unsorted + documents + source_material.
+      //
+      // Aligns these three workspace tables with the FINAL canon schema
+      // (docs/CANON_SCHEMA_APPROVED.md):
+      //   - Rename `unsorted` → `unsorted_items` (canon_entries.origin_kind
+      //     already names 'unsorted_items'; no FK; no data migration needed).
+      //   - Add the draft_*/last_drafted_at trio so the upcoming Canon Review
+      //     flow can stage in-progress edits per workspace entry without
+      //     touching the committed title/body.
+      //   - Add file_kind + file_path on source_material so future P11
+      //     uploads can record the on-disk artifact alongside the textual body.
+      //
+      // ALTER TABLE only — no recreates. SQLite 3.25+ allows ADD COLUMN with a
+      // self-referencing CHECK constraint, which file_kind needs. draft_* and
+      // file_path are simple nullable TEXT, so ADD COLUMN handles them
+      // directly. Existing rows get NULL for the draft fields and 'text' for
+      // file_kind (the schema default).
+      db.exec(`
+        ALTER TABLE unsorted RENAME TO unsorted_items;
+
+        ALTER TABLE unsorted_items ADD COLUMN draft_title TEXT;
+        ALTER TABLE unsorted_items ADD COLUMN draft_body TEXT;
+        ALTER TABLE unsorted_items ADD COLUMN last_drafted_at TEXT;
+
+        ALTER TABLE documents ADD COLUMN draft_title TEXT;
+        ALTER TABLE documents ADD COLUMN draft_body TEXT;
+        ALTER TABLE documents ADD COLUMN last_drafted_at TEXT;
+
+        ALTER TABLE source_material ADD COLUMN draft_title TEXT;
+        ALTER TABLE source_material ADD COLUMN draft_body TEXT;
+        ALTER TABLE source_material ADD COLUMN last_drafted_at TEXT;
+
+        ALTER TABLE source_material
+          ADD COLUMN file_kind TEXT NOT NULL DEFAULT 'text'
+            CHECK(file_kind IN ('text','pdf','image','other'));
+        ALTER TABLE source_material ADD COLUMN file_path TEXT;
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -1057,10 +1100,13 @@ function initDatabase(userDataPath) {
 }
 
 // --- Unsorted repository ---------------------------------------------------
+// Backed by `unsorted_items` (renamed from `unsorted` in migration 029 to
+// match the FINAL canon schema). The exported helpers keep their original
+// names so callers (main.js IPC, exports list) don't need to change.
 function listUnsorted() {
   return getDb()
     .prepare(
-      'SELECT * FROM unsorted WHERE archived_at IS NULL ORDER BY created_at DESC, id DESC'
+      'SELECT * FROM unsorted_items WHERE archived_at IS NULL ORDER BY created_at DESC, id DESC'
     )
     .all();
 }
@@ -1068,13 +1114,13 @@ function listUnsorted() {
 function listArchivedUnsorted() {
   return getDb()
     .prepare(
-      'SELECT * FROM unsorted WHERE archived_at IS NOT NULL ORDER BY archived_at DESC, id DESC'
+      'SELECT * FROM unsorted_items WHERE archived_at IS NOT NULL ORDER BY archived_at DESC, id DESC'
     )
     .all();
 }
 
 function getUnsorted(id) {
-  return getDb().prepare('SELECT * FROM unsorted WHERE id = ?').get(id);
+  return getDb().prepare('SELECT * FROM unsorted_items WHERE id = ?').get(id);
 }
 
 function createUnsorted({ title, body } = {}) {
@@ -1083,7 +1129,7 @@ function createUnsorted({ title, body } = {}) {
   const now = new Date().toISOString();
   const info = getDb()
     .prepare(
-      'INSERT INTO unsorted (title, body, created_at, updated_at) VALUES (?, ?, ?, ?)'
+      'INSERT INTO unsorted_items (title, body, created_at, updated_at) VALUES (?, ?, ?, ?)'
     )
     .run(cleanTitle, (body || '').trim(), now, now);
   return getUnsorted(info.lastInsertRowid);
@@ -1096,14 +1142,14 @@ function updateUnsorted(id, { title, body } = {}) {
   if (!cleanTitle) throw new Error('Title is required.');
   getDb()
     .prepare(
-      'UPDATE unsorted SET title = ?, body = ?, updated_at = ? WHERE id = ?'
+      'UPDATE unsorted_items SET title = ?, body = ?, updated_at = ? WHERE id = ?'
     )
     .run(cleanTitle, (body || '').trim(), new Date().toISOString(), id);
   return getUnsorted(id);
 }
 
 function deleteUnsorted(id) {
-  const info = getDb().prepare('DELETE FROM unsorted WHERE id = ?').run(id);
+  const info = getDb().prepare('DELETE FROM unsorted_items WHERE id = ?').run(id);
   return { deleted: info.changes > 0 };
 }
 
@@ -1111,7 +1157,7 @@ function archiveUnsorted(id) {
   const existing = getUnsorted(id);
   if (!existing) throw new Error('Entry not found.');
   getDb()
-    .prepare('UPDATE unsorted SET archived_at = ? WHERE id = ?')
+    .prepare('UPDATE unsorted_items SET archived_at = ? WHERE id = ?')
     .run(new Date().toISOString(), id);
   return getUnsorted(id);
 }
@@ -1120,7 +1166,7 @@ function restoreUnsorted(id) {
   const existing = getUnsorted(id);
   if (!existing) throw new Error('Entry not found.');
   getDb()
-    .prepare('UPDATE unsorted SET archived_at = NULL WHERE id = ?')
+    .prepare('UPDATE unsorted_items SET archived_at = NULL WHERE id = ?')
     .run(id);
   return getUnsorted(id);
 }
@@ -1445,7 +1491,7 @@ async function exportAll(destFolder) {
 // tables yet and are intentionally omitted.
 const DASHBOARD_SECTIONS = [
   { key: 'writing_lab',     label: 'Writing Lab',     table: 'writing_lab',     route: 'Writing Lab' },
-  { key: 'unsorted',        label: 'Unsorted',        table: 'unsorted',        route: 'Unsorted' },
+  { key: 'unsorted',        label: 'Unsorted',        table: 'unsorted_items',  route: 'Unsorted' },
   { key: 'source_material', label: 'Source Material', table: 'source_material', route: 'Source Material' },
   { key: 'documents',       label: 'Documents',       table: 'documents',       route: 'Documents' },
   { key: 'open_questions',  label: 'Open Questions',  table: 'open_questions',  route: 'Open Questions' },
