@@ -371,6 +371,45 @@
       .archived-section > summary:hover { color: var(--text); }
       .archived-section .entry-list { margin-top: 12px; }
 
+      /* --- Writing Lab (P28) ------------------------------------------- */
+      .wl-intro { margin-bottom: 18px; }
+      .wl-toolbar { margin-bottom: 4px; }
+      .wl-toolbar .btn-primary {
+        font-weight: 600; border-radius: 6px; padding: 8px 16px; cursor: pointer;
+      }
+      .wl-card { cursor: pointer; }
+      .wl-card:hover { border-color: var(--accent); }
+      /* A clicked button inside the card shouldn't inherit the card's pointer. */
+      .wl-card button { cursor: pointer; }
+
+      .wl-editor-bar {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        margin-bottom: 12px;
+      }
+      .wl-editor-bar button {
+        font: inherit; border-radius: 6px; padding: 6px 14px; cursor: pointer;
+      }
+      .wl-bar-spacer { flex: 1; }
+      .wl-status { font-style: italic; }
+      .wl-counter { font-size: 12px; color: var(--muted); }
+
+      .wl-title {
+        font: inherit; font-size: 19px; font-weight: 600; width: 100%;
+        background: var(--bg); color: var(--text);
+        border: 1px solid var(--border); border-radius: 6px;
+        padding: 10px 12px; margin-bottom: 10px;
+      }
+      .wl-title:focus { outline: none; border-color: var(--accent); }
+      .wl-body {
+        font: inherit; font-size: 15px; line-height: 1.6; width: 100%;
+        min-height: 60vh; resize: vertical;
+        background: var(--bg); color: var(--text);
+        border: 1px solid var(--border); border-radius: 6px;
+        padding: 14px 16px;
+      }
+      .wl-body:focus { outline: none; border-color: var(--accent); }
+      .wl-delete-confirm { margin-top: 10px; align-items: center; flex-wrap: wrap; }
+
       /* --- Home dashboard (P27) --------------------------------------- */
       .home-section-label {
         font-size: 12px;

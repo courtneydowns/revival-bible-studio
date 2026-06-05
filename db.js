@@ -252,6 +252,27 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '015_writing_lab',
+    up(db) {
+      // Writing Lab (P28): the long-form drafting surface. Shares the standard
+      // entry shape (title + body + timestamps + reversible archive), but body
+      // here holds long-form prose and is written by continuous autosave rather
+      // than an explicit Save click — preservation, not finalization (per
+      // CLAUDE.md). Drafts stay in Writing Lab; nothing flows to canon or any
+      // other workspace without the user doing it explicitly in a later phase.
+      db.exec(`
+        CREATE TABLE writing_lab (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          title       TEXT NOT NULL,
+          body        TEXT NOT NULL DEFAULT '',
+          created_at  TEXT NOT NULL,
+          updated_at  TEXT NOT NULL,
+          archived_at TEXT
+        );
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -447,6 +468,66 @@ const research = makeEntryRepo('research');
 const characters = makeEntryRepo('characters');
 const episodes = makeEntryRepo('episodes');
 
+// --- Writing Lab repository ------------------------------------------------
+// Long-form drafting (P28). Same shape as the entry workspaces, but bespoke
+// because it is written by continuous autosave: a title is never required
+// (untitled drafts get a placeholder name) and the body is stored verbatim —
+// NOT trimmed — so prose whitespace and trailing newlines are preserved exactly
+// as the user typed them. This is draft preservation, not finalization.
+const writingLab = {
+  list: () =>
+    getDb()
+      .prepare(
+        'SELECT * FROM writing_lab WHERE archived_at IS NULL ORDER BY updated_at DESC, id DESC'
+      )
+      .all(),
+  listArchived: () =>
+    getDb()
+      .prepare(
+        'SELECT * FROM writing_lab WHERE archived_at IS NOT NULL ORDER BY archived_at DESC, id DESC'
+      )
+      .all(),
+  get: (id) => getDb().prepare('SELECT * FROM writing_lab WHERE id = ?').get(id),
+  create: ({ title, body } = {}) => {
+    const cleanTitle = (title || '').trim() || 'Untitled draft';
+    const now = new Date().toISOString();
+    const info = getDb()
+      .prepare(
+        'INSERT INTO writing_lab (title, body, created_at, updated_at) VALUES (?, ?, ?, ?)'
+      )
+      .run(cleanTitle, body || '', now, now);
+    return writingLab.get(info.lastInsertRowid);
+  },
+  update: (id, { title, body } = {}) => {
+    if (!writingLab.get(id)) throw new Error('Draft not found.');
+    const cleanTitle = (title || '').trim() || 'Untitled draft';
+    getDb()
+      .prepare(
+        'UPDATE writing_lab SET title = ?, body = ?, updated_at = ? WHERE id = ?'
+      )
+      .run(cleanTitle, body || '', new Date().toISOString(), id);
+    return writingLab.get(id);
+  },
+  delete: (id) => {
+    const info = getDb().prepare('DELETE FROM writing_lab WHERE id = ?').run(id);
+    return { deleted: info.changes > 0 };
+  },
+  archive: (id) => {
+    if (!writingLab.get(id)) throw new Error('Draft not found.');
+    getDb()
+      .prepare('UPDATE writing_lab SET archived_at = ? WHERE id = ?')
+      .run(new Date().toISOString(), id);
+    return writingLab.get(id);
+  },
+  restore: (id) => {
+    if (!writingLab.get(id)) throw new Error('Draft not found.');
+    getDb()
+      .prepare('UPDATE writing_lab SET archived_at = NULL WHERE id = ?')
+      .run(id);
+    return writingLab.get(id);
+  },
+};
+
 // --- Chats repository ------------------------------------------------------
 // Chats are conversation containers for the global Chat drawer. Bespoke (no
 // body field). P16 adds rename + archive + restore on top of P15's create/list.
@@ -630,9 +711,10 @@ async function exportAll(destFolder) {
 // here mutates anything — Home only summarizes what lives elsewhere (per
 // CLAUDE.md). The section list is a trusted constant (table/label/route are
 // never user input), so interpolating them into the count + UNION queries is
-// safe. Only workspaces with real storage appear; Canon Bible/Review and
-// Writing Lab have no tables yet and are intentionally omitted.
+// safe. Only workspaces with real storage appear; Canon Bible/Review have no
+// tables yet and are intentionally omitted.
 const DASHBOARD_SECTIONS = [
+  { key: 'writing_lab',     label: 'Writing Lab',     table: 'writing_lab',     route: 'Writing Lab' },
   { key: 'unsorted',        label: 'Unsorted',        table: 'unsorted',        route: 'Unsorted' },
   { key: 'source_material', label: 'Source Material', table: 'source_material', route: 'Source Material' },
   { key: 'documents',       label: 'Documents',       table: 'documents',       route: 'Documents' },
@@ -699,6 +781,7 @@ module.exports = {
   research,
   characters,
   episodes,
+  writingLab,
   chats,
   chatSources,
   listUnsorted,

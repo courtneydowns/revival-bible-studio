@@ -109,6 +109,14 @@ function registerIpc() {
   ipcMain.handle('episodes:archive', (_event, id) => db.episodes.archive(id));
   ipcMain.handle('episodes:restore', (_event, id) => db.episodes.restore(id));
 
+  ipcMain.handle('writingLab:list', () => db.writingLab.list());
+  ipcMain.handle('writingLab:listArchived', () => db.writingLab.listArchived());
+  ipcMain.handle('writingLab:create', (_event, entry) => db.writingLab.create(entry));
+  ipcMain.handle('writingLab:update', (_event, id, entry) => db.writingLab.update(id, entry));
+  ipcMain.handle('writingLab:delete', (_event, id) => db.writingLab.delete(id));
+  ipcMain.handle('writingLab:archive', (_event, id) => db.writingLab.archive(id));
+  ipcMain.handle('writingLab:restore', (_event, id) => db.writingLab.restore(id));
+
   ipcMain.handle('chats:list', () => db.chats.list());
   ipcMain.handle('chats:listArchived', () => db.chats.listArchived());
   ipcMain.handle('chats:create', (_event, chat) => db.chats.create(chat));

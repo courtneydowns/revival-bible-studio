@@ -619,6 +619,9 @@ function buildSuggestions(countsByKey) {
   }
 
   // Getting-started nudges (only while a workspace is still empty).
+  if (n('writing_lab') === 0) {
+    list.push({ id: 'start-draft', text: 'Start a long-form draft in the Writing Lab.', route: 'Writing Lab' });
+  }
   if (n('source_material') === 0) {
     list.push({
       id: 'add-source',
@@ -1120,8 +1123,437 @@ function renderPanicExport(section) {
   section.appendChild(block);
 }
 
+// --- Writing Lab (P28) ------------------------------------------------------
+// The long-form drafting surface. Unlike the entry workspaces (explicit "Add"/
+// "Save" to finalize), Writing Lab autosaves continuously to SQLite as you
+// type — so quitting mid-sentence and reopening restores the draft intact. That
+// is draft preservation, not finalization (per CLAUDE.md): drafts simply live
+// here; nothing leaves Writing Lab or becomes canon without an explicit action
+// in a later phase. The page swaps between a drafts LIST and a single-draft
+// EDITOR, both mounted in `wrap` so navigation stays inside the one page.
+function wordCount(text) {
+  const m = String(text || '').trim().match(/\S+/g);
+  return m ? m.length : 0;
+}
+
+function renderWritingLabPage(section) {
+  const api = window.revival.writingLab;
+
+  const intro = document.createElement('p');
+  intro.className = 'settings-desc wl-intro';
+  intro.textContent =
+    'Long-form drafting. Write freely — your work autosaves as you type and is ' +
+    'preserved across restarts. Drafts stay here in Writing Lab; nothing is ' +
+    'finalized, routed, or made canon unless you do it explicitly.';
+  section.appendChild(intro);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'wl-wrap';
+  section.appendChild(wrap);
+
+  // --- Drafts list view ----------------------------------------------------
+  async function showList() {
+    wrap.innerHTML = '';
+
+    const toolbar = document.createElement('div');
+    toolbar.className = 'wl-toolbar';
+    const newBtn = document.createElement('button');
+    newBtn.type = 'button';
+    newBtn.className = 'btn-primary';
+    newBtn.textContent = '+ New draft';
+    newBtn.addEventListener('click', () => openEditor(null));
+    toolbar.appendChild(newBtn);
+    wrap.appendChild(toolbar);
+
+    const list = document.createElement('div');
+    list.className = 'entry-list';
+    wrap.appendChild(list);
+
+    const archived = document.createElement('details');
+    archived.className = 'archived-section';
+    const archivedSummary = document.createElement('summary');
+    archived.appendChild(archivedSummary);
+    const archivedList = document.createElement('div');
+    archivedList.className = 'entry-list';
+    archived.appendChild(archivedList);
+    wrap.appendChild(archived);
+
+    let items, archivedItems;
+    try {
+      [items, archivedItems] = await Promise.all([api.list(), api.listArchived()]);
+    } catch (e) {
+      list.innerHTML = '';
+      const err = document.createElement('p');
+      err.className = 'placeholder';
+      err.textContent = `Could not load drafts: ${e.message || e}`;
+      list.appendChild(err);
+      return;
+    }
+
+    if (items.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'placeholder';
+      empty.textContent = 'No drafts yet. Click “+ New draft” to start writing.';
+      list.appendChild(empty);
+    } else {
+      for (const item of items) list.appendChild(buildDraftCard(item));
+    }
+
+    archivedSummary.textContent = `Archived (${archivedItems.length})`;
+    archived.style.display = archivedItems.length === 0 ? 'none' : '';
+    for (const item of archivedItems) {
+      archivedList.appendChild(buildArchivedDraftCard(item));
+    }
+  }
+
+  function snippet(body) {
+    const oneLine = String(body || '').replace(/\s+/g, ' ').trim();
+    return oneLine.length > 140 ? `${oneLine.slice(0, 140)}…` : oneLine;
+  }
+
+  function buildDraftCard(item) {
+    const card = document.createElement('div');
+    card.className = 'entry-card wl-card';
+
+    const t = document.createElement('div');
+    t.className = 'entry-title';
+    t.textContent = item.title;
+    card.appendChild(t);
+
+    const body = snippet(item.body);
+    if (body) {
+      const b = document.createElement('div');
+      b.className = 'entry-body';
+      b.textContent = body;
+      card.appendChild(b);
+    }
+
+    const meta = document.createElement('div');
+    meta.className = 'entry-meta';
+    meta.textContent =
+      `${wordCount(item.body)} word(s) · edited ` +
+      new Date(item.updated_at).toLocaleString();
+    card.appendChild(meta);
+
+    const actions = document.createElement('div');
+    actions.className = 'entry-actions';
+
+    const openBtn = document.createElement('button');
+    openBtn.type = 'button';
+    openBtn.className = 'btn-primary';
+    openBtn.textContent = 'Open';
+    openBtn.addEventListener('click', () => openEditor(item));
+
+    const archiveBtn = document.createElement('button');
+    archiveBtn.type = 'button';
+    archiveBtn.className = 'btn-secondary';
+    archiveBtn.textContent = 'Archive';
+    archiveBtn.addEventListener('click', async () => {
+      archiveBtn.disabled = true;
+      try {
+        await api.archive(item.id);
+        await showList();
+      } catch {
+        archiveBtn.disabled = false;
+      }
+    });
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn-danger';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', () =>
+      showDraftDeleteConfirm(card, actions, item)
+    );
+
+    // Whole-card click also opens, except when a button was the target.
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      openEditor(item);
+    });
+
+    actions.append(openBtn, archiveBtn, deleteBtn);
+    card.appendChild(actions);
+    return card;
+  }
+
+  function buildArchivedDraftCard(item) {
+    const card = document.createElement('div');
+    card.className = 'entry-card wl-card';
+
+    const t = document.createElement('div');
+    t.className = 'entry-title';
+    t.textContent = item.title;
+    card.appendChild(t);
+
+    const meta = document.createElement('div');
+    meta.className = 'entry-meta';
+    meta.textContent =
+      `${wordCount(item.body)} word(s) · archived ` +
+      new Date(item.archived_at).toLocaleString();
+    card.appendChild(meta);
+
+    const actions = document.createElement('div');
+    actions.className = 'entry-actions';
+
+    const restoreBtn = document.createElement('button');
+    restoreBtn.type = 'button';
+    restoreBtn.className = 'btn-primary';
+    restoreBtn.textContent = 'Restore';
+    restoreBtn.addEventListener('click', async () => {
+      restoreBtn.disabled = true;
+      try {
+        await api.restore(item.id);
+        await showList();
+      } catch {
+        restoreBtn.disabled = false;
+      }
+    });
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn-danger';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', () =>
+      showDraftDeleteConfirm(card, actions, item)
+    );
+
+    actions.append(restoreBtn, deleteBtn);
+    card.appendChild(actions);
+    return card;
+  }
+
+  function showDraftDeleteConfirm(card, actions, item) {
+    const confirmRow = document.createElement('div');
+    confirmRow.className = 'entry-actions confirm-row';
+
+    const prompt = document.createElement('span');
+    prompt.className = 'confirm-text';
+    prompt.textContent = 'Delete this draft? This cannot be undone.';
+
+    const yes = document.createElement('button');
+    yes.type = 'button';
+    yes.className = 'btn-danger';
+    yes.textContent = 'Delete';
+    yes.addEventListener('click', async () => {
+      yes.disabled = true;
+      try {
+        await api.delete(item.id);
+        await showList();
+      } catch (e) {
+        prompt.textContent = e.message || 'Could not delete draft.';
+        yes.disabled = false;
+      }
+    });
+
+    const no = document.createElement('button');
+    no.type = 'button';
+    no.className = 'btn-secondary';
+    no.textContent = 'Cancel';
+    no.addEventListener('click', () => confirmRow.replaceWith(actions));
+
+    confirmRow.append(prompt, yes, no);
+    actions.replaceWith(confirmRow);
+  }
+
+  // --- Single-draft editor view --------------------------------------------
+  // Continuous autosave: edits are debounced and written straight to SQLite. A
+  // brand-new draft has no row until the first non-empty autosave creates one,
+  // so opening "+ New draft" and leaving without typing never clutters the list.
+  function openEditor(item) {
+    wrap.innerHTML = '';
+
+    // Local editor state. `currentId` is null until a new draft's first save.
+    let currentId = item ? item.id : null;
+    let saveTimer = null;
+    let saving = false;
+    let savedTitle = item ? item.title : '';
+    let savedBody = item ? item.body || '' : '';
+
+    const bar = document.createElement('div');
+    bar.className = 'wl-editor-bar';
+
+    const backBtn = document.createElement('button');
+    backBtn.type = 'button';
+    backBtn.className = 'btn-secondary';
+    backBtn.textContent = '← All drafts';
+
+    const status = document.createElement('span');
+    status.className = 'draft-status wl-status';
+
+    const counter = document.createElement('span');
+    counter.className = 'wl-counter';
+
+    const spacer = document.createElement('span');
+    spacer.className = 'wl-bar-spacer';
+
+    const archiveBtn = document.createElement('button');
+    archiveBtn.type = 'button';
+    archiveBtn.className = 'btn-secondary';
+    archiveBtn.textContent = 'Archive';
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn-danger';
+    deleteBtn.textContent = 'Delete';
+
+    bar.append(backBtn, status, counter, spacer, archiveBtn, deleteBtn);
+
+    const titleInput = document.createElement('input');
+    titleInput.type = 'text';
+    titleInput.className = 'wl-title';
+    titleInput.maxLength = 200;
+    titleInput.placeholder = 'Untitled draft';
+    titleInput.value = item ? item.title : '';
+
+    const bodyInput = document.createElement('textarea');
+    bodyInput.className = 'wl-body';
+    bodyInput.placeholder = 'Start writing… your work saves automatically.';
+    bodyInput.value = item ? item.body || '' : '';
+
+    wrap.append(bar, titleInput, bodyInput);
+
+    function updateCounter() {
+      counter.textContent = `${wordCount(bodyInput.value)} word(s)`;
+    }
+    updateCounter();
+    setStatus(status, item ? 'Saved.' : 'New draft — autosaves as you type.');
+
+    // Archive/Delete are meaningless until the draft actually exists.
+    function syncDraftActions() {
+      const exists = currentId != null;
+      archiveBtn.disabled = !exists;
+      deleteBtn.disabled = !exists;
+    }
+    syncDraftActions();
+
+    // Write the current title/body to SQLite. Creates the row on first save of a
+    // new draft; updates thereafter. Returns the persisted record (or null when
+    // there is genuinely nothing to save yet).
+    async function flush() {
+      const title = titleInput.value;
+      const body = bodyInput.value;
+      if (title === savedTitle && body === savedBody && currentId != null) {
+        return null; // nothing changed
+      }
+      if (currentId == null && title.trim() === '' && body.trim() === '') {
+        return null; // empty new draft — don't create a row
+      }
+      saving = true;
+      setStatus(status, 'Saving…');
+      try {
+        let rec;
+        if (currentId == null) {
+          rec = await api.create({ title, body });
+          currentId = rec.id;
+          syncDraftActions();
+        } else {
+          rec = await api.update(currentId, { title, body });
+        }
+        savedTitle = title;
+        savedBody = body;
+        setStatus(
+          status,
+          `Saved · ${new Date(rec.updated_at).toLocaleTimeString()}`
+        );
+        return rec;
+      } catch (e) {
+        setStatus(status, `Save failed: ${e.message || e}`);
+        return null;
+      } finally {
+        saving = false;
+      }
+    }
+
+    // Debounced autosave on every keystroke (preservation, not finalization).
+    function scheduleSave() {
+      if (saveTimer) clearTimeout(saveTimer);
+      setStatus(status, 'Editing…');
+      saveTimer = setTimeout(() => {
+        saveTimer = null;
+        flush();
+      }, 500);
+    }
+
+    function flushNow() {
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
+      return flush();
+    }
+
+    titleInput.addEventListener('input', scheduleSave);
+    bodyInput.addEventListener('input', () => {
+      updateCounter();
+      scheduleSave();
+    });
+    // Belt-and-suspenders: commit on blur so a pending edit isn't lost if focus
+    // leaves and the window closes before the debounce fires.
+    titleInput.addEventListener('blur', flushNow);
+    bodyInput.addEventListener('blur', flushNow);
+
+    backBtn.addEventListener('click', async () => {
+      await flushNow();
+      await showList();
+    });
+
+    archiveBtn.addEventListener('click', async () => {
+      if (currentId == null) return;
+      archiveBtn.disabled = true;
+      await flushNow();
+      try {
+        await api.archive(currentId);
+        await showList();
+      } catch {
+        archiveBtn.disabled = false;
+      }
+    });
+
+    deleteBtn.addEventListener('click', () => {
+      if (currentId == null) return;
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
+      const row = document.createElement('div');
+      row.className = 'entry-actions confirm-row wl-delete-confirm';
+      const prompt = document.createElement('span');
+      prompt.className = 'confirm-text';
+      prompt.textContent = 'Delete this draft? This cannot be undone.';
+      const yes = document.createElement('button');
+      yes.type = 'button';
+      yes.className = 'btn-danger';
+      yes.textContent = 'Delete';
+      yes.addEventListener('click', async () => {
+        yes.disabled = true;
+        try {
+          await api.delete(currentId);
+          await showList();
+        } catch (e) {
+          prompt.textContent = e.message || 'Could not delete draft.';
+          yes.disabled = false;
+        }
+      });
+      const no = document.createElement('button');
+      no.type = 'button';
+      no.className = 'btn-secondary';
+      no.textContent = 'Cancel';
+      no.addEventListener('click', () => row.remove());
+      row.append(prompt, yes, no);
+      bodyInput.insertAdjacentElement('afterend', row);
+    });
+
+    titleInput.focus();
+    if (item) bodyInput.focus();
+  }
+
+  showList();
+}
+
 const CONTENT_RENDERERS = {
   'Home': renderHomePage,
+  'Writing Lab': renderWritingLabPage,
   'Chat': renderChatPage,
   'Settings': renderSettingsPage,
   'Unsorted': makeEntryWorkspace({
