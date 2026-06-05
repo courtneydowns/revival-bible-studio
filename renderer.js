@@ -835,6 +835,13 @@ const CONTENT_RENDERERS = {
     titlePlaceholder: 'What was decided?',
     bodyPlaceholder: 'The decision, and why it was settled this way (optional)',
   }),
+  'Brainstorm': makeEntryWorkspace({
+    apiName: 'brainstorm',
+    draftPrefix: 'brainstorm',
+    addLabel: 'Add Idea',
+    titlePlaceholder: 'What is the idea?',
+    bodyPlaceholder: 'Where it might go, what sparked it (optional)',
+  }),
 };
 
 const nav = document.getElementById('nav');

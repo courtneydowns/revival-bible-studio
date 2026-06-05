@@ -57,6 +57,15 @@ contextBridge.exposeInMainWorld('revival', {
     archive: (id) => ipcRenderer.invoke('decisions:archive', id),
     restore: (id) => ipcRenderer.invoke('decisions:restore', id),
   },
+  brainstorm: {
+    list: () => ipcRenderer.invoke('brainstorm:list'),
+    listArchived: () => ipcRenderer.invoke('brainstorm:listArchived'),
+    create: (entry) => ipcRenderer.invoke('brainstorm:create', entry),
+    update: (id, entry) => ipcRenderer.invoke('brainstorm:update', id, entry),
+    delete: (id) => ipcRenderer.invoke('brainstorm:delete', id),
+    archive: (id) => ipcRenderer.invoke('brainstorm:archive', id),
+    restore: (id) => ipcRenderer.invoke('brainstorm:restore', id),
+  },
   chats: {
     list: () => ipcRenderer.invoke('chats:list'),
     listArchived: () => ipcRenderer.invoke('chats:listArchived'),
