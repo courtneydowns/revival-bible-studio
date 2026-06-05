@@ -9,6 +9,7 @@ const WORKSPACES = [
   'Documents',
   'Canon Bible',
   'Characters',
+  'Episodes',
   'Unsorted',
   'Canon Review',
   'Open Questions',
@@ -640,6 +641,9 @@ function buildSuggestions(countsByKey) {
   if (n('characters') === 0) {
     list.push({ id: 'add-character', text: 'Add a Character to start developing them.', route: 'Characters' });
   }
+  if (n('episodes') === 0) {
+    list.push({ id: 'add-episode', text: 'Outline an Episode to start drafting it.', route: 'Episodes' });
+  }
   if (n('chats') === 0) {
     list.push({ id: 'start-chat', text: 'Start a chat to think through Revival.', route: 'Chat' });
   }
@@ -1191,6 +1195,18 @@ const CONTENT_RENDERERS = {
     sectionClass: 'ws-characters',
     titlePlaceholder: 'Character name',
     bodyPlaceholder: 'Who they are — role, traits, arc, open threads (optional)',
+  }),
+  // Episodes (P27): basic create/edit/delete/archive/restore on episode entries
+  // (name + outline/scene list/beats/draft notes). Attachments and canon flow
+  // are later phases. Amber accent so the drafting surface reads distinctly from
+  // Characters and the queue workspaces.
+  'Episodes': makeEntryWorkspace({
+    apiName: 'episodes',
+    draftPrefix: 'episodes',
+    addLabel: 'Add Episode',
+    sectionClass: 'ws-episodes',
+    titlePlaceholder: 'Episode title',
+    bodyPlaceholder: 'Outline, scene list, beats, draft notes (optional)',
   }),
 };
 

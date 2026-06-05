@@ -231,6 +231,27 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '014_episodes',
+    up(db) {
+      // Episodes (P27): the working surface for episode drafting and outlining
+      // (title = episode name, body = outline/scene list/beats/draft notes). It
+      // shares the standard entry shape and the same reversible-archive
+      // lifecycle. Cross-workspace attachments and canon flow are explicitly
+      // later phases — own table now so that wiring has a home to grow into. No
+      // direct writes to Canon Bible (per CLAUDE.md).
+      db.exec(`
+        CREATE TABLE episodes (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          title       TEXT NOT NULL,
+          body        TEXT NOT NULL DEFAULT '',
+          created_at  TEXT NOT NULL,
+          updated_at  TEXT NOT NULL,
+          archived_at TEXT
+        );
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -424,6 +445,7 @@ const decisions = makeEntryRepo('decisions');
 const brainstorm = makeEntryRepo('brainstorm');
 const research = makeEntryRepo('research');
 const characters = makeEntryRepo('characters');
+const episodes = makeEntryRepo('episodes');
 
 // --- Chats repository ------------------------------------------------------
 // Chats are conversation containers for the global Chat drawer. Bespoke (no
@@ -620,6 +642,7 @@ const DASHBOARD_SECTIONS = [
   { key: 'brainstorm',      label: 'Brainstorm',      table: 'brainstorm',      route: 'Brainstorm' },
   { key: 'research',        label: 'Research',        table: 'research',        route: 'Research' },
   { key: 'characters',      label: 'Characters',      table: 'characters',      route: 'Characters' },
+  { key: 'episodes',        label: 'Episodes',        table: 'episodes',        route: 'Episodes' },
   { key: 'chats',           label: 'Chats',           table: 'chats',           route: 'Chat' },
 ];
 
@@ -675,6 +698,7 @@ module.exports = {
   brainstorm,
   research,
   characters,
+  episodes,
   chats,
   chatSources,
   listUnsorted,
