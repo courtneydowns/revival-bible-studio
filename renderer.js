@@ -430,6 +430,16 @@ function makeEntryWorkspace(config) {
       body.className = 'tc-detail-body';
       body.textContent = item.body;
       rightCol.appendChild(body);
+      // PUI3: selecting text inside the body opens the extract-and-route menu.
+      // Source attribution carries the originating workspace + entry title so
+      // the routed entry remembers where the snippet came from.
+      if (window.RevivalExtract && workspaceName) {
+        window.RevivalExtract.attach(body, {
+          workspace: workspaceName,
+          id: item.id,
+          title: item.title,
+        });
+      }
     }
 
     const pendingDraft = !archivedFlag && Drafts.get(item.id);

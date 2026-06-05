@@ -127,11 +127,12 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - popout:changed broadcast keeps main window's list in sync after each commit; popout shows "no longer available" if the entry is deleted from elsewhere
 - **Smoke passed.**
 
-### PUI3 — Highlight + extract + route
+### PUI3 — Highlight + extract + route ✅
 - Select any text in a detail panel or popout → extract menu appears
 - Route extracted text to: Unsorted, Brainstorm, Open Questions, Decisions, Conflicts, Research, Canon Review
 - Creates a new entry in the target workspace pre-filled with the selection and a source attribution
-- **Smoke:** Highlight text in a Source Material entry, route to Brainstorm, confirm new entry exists with attribution
+- Canon Review staging via canon_proposals (pending new_entry) so the future P35 queue can hydrate the snippet with attribution intact
+- **Smoke passed.**
 
 ---
 

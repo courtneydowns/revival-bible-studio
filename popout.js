@@ -191,6 +191,14 @@ function renderView(card, mode, item) {
     body.className = 'tc-detail-body';
     body.textContent = item.body;
     card.appendChild(body);
+    // PUI3: same extract-and-route flow as the main window detail panel.
+    if (window.RevivalExtract) {
+      window.RevivalExtract.attach(body, {
+        workspace: workspaceName,
+        id: item.id,
+        title: item.title,
+      });
+    }
   }
 
   const actions = document.createElement('div');

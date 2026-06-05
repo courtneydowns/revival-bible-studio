@@ -126,6 +126,12 @@ contextBridge.exposeInMainWorld('revival', {
     count: () => ipcRenderer.invoke('canon:count'),
     devSeed: () => ipcRenderer.invoke('canon:devSeed'),
   },
+  // PUI3: extract-and-route lands new Canon Review proposals here. Full
+  // review queue UI comes in P35; this is the staging write only.
+  canonProposals: {
+    createFromExtract: (payload) =>
+      ipcRenderer.invoke('canonProposals:createFromExtract', payload),
+  },
   settings: {
     getProjectRules: () => ipcRenderer.invoke('settings:getProjectRules'),
     setProjectRules: (text) =>

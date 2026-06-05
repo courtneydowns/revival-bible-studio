@@ -186,6 +186,14 @@ function registerIpc() {
   ipcMain.handle('canon:count', () => db.canon.count());
   ipcMain.handle('canon:devSeed', () => db.canon.devSeed());
 
+  // PUI3: Canon Review's only write path for now — accept an extracted
+  // snippet and stage it as a pending proposal. The full review UI lands in
+  // P35; this just records the proposal so the snippet isn't lost between
+  // phases.
+  ipcMain.handle('canonProposals:createFromExtract', (_event, payload) =>
+    db.canonProposals.createFromExtract(payload)
+  );
+
   ipcMain.handle('settings:getProjectRules', () => db.settings.getProjectRules());
   ipcMain.handle('settings:setProjectRules', (_event, text) =>
     db.settings.setProjectRules(text)

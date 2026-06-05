@@ -1770,6 +1770,53 @@ const CANON_LIST_COLUMNS = `
   s.label AS origin_session_label, s.session_date AS origin_session_date
 `;
 
+// PUI3: Canon Review is one of the route targets for the highlight + extract
+// flow. The full Canon Review queue UI arrives in P35; here we only need a
+// minimal write path so an extracted snippet can land as a pending new_entry
+// proposal with source attribution. proposed_fields_json carries the snippet
+// title + body so the future P35 UI can hydrate the proposal without losing
+// the original wording. source_kind is left free-form (workspace name) to
+// match how extract callers identify themselves; tighten in P35.
+const canonProposals = {
+  createFromExtract: ({
+    title,
+    body,
+    source_kind,
+    source_entry_id,
+    proposer_note,
+  } = {}) => {
+    const cleanTitle = (title || '').trim();
+    if (!cleanTitle) throw new Error('Title is required.');
+    const now = new Date().toISOString();
+    const proposed = JSON.stringify({
+      title: cleanTitle,
+      body: (body || '').trim(),
+    });
+    const info = getDb()
+      .prepare(
+        `INSERT INTO canon_proposals
+           (created_at, updated_at, proposal_intent, proposed_fields_json,
+            source_kind, source_entry_id, proposer_note, status)
+         VALUES (?, ?, 'new_entry', ?, ?, ?, ?, 'pending')`
+      )
+      .run(
+        now,
+        now,
+        proposed,
+        source_kind || null,
+        source_entry_id == null ? null : Number(source_entry_id),
+        (proposer_note || '').trim() || null
+      );
+    return getDb()
+      .prepare('SELECT * FROM canon_proposals WHERE id = ?')
+      .get(info.lastInsertRowid);
+  },
+  pendingCount: () =>
+    getDb()
+      .prepare(`SELECT COUNT(*) AS n FROM canon_proposals WHERE status = 'pending'`)
+      .get().n,
+};
+
 const canon = {
   // Active = not retired. Newest first so just-added entries are visible.
   list: () => {
@@ -1943,6 +1990,7 @@ module.exports = {
   settings,
   dashboard,
   canon,
+  canonProposals,
   getDbPath,
   DB_FILENAME,
   MIGRATIONS,
