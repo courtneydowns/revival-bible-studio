@@ -1048,6 +1048,29 @@ const MIGRATIONS = [
       `);
     },
   },
+
+  {
+    name: '030_chats_chat_source_attachments_reshape',
+    up(db) {
+      // PR3 — Reshape: chats + chat_source_attachments.
+      //
+      // Aligns the chat tables with the FINAL canon schema
+      // (docs/CANON_SCHEMA_APPROVED.md):
+      //   - Rename `chat_sources` → `chat_source_attachments` (link table; no
+      //     data migration needed — the rename preserves rows, PK, and FKs).
+      //   - Add draft_title on chats so the upcoming Canon Review flow can stage
+      //     an in-progress chat title without touching the committed one.
+      //
+      // ALTER TABLE only — no recreates. RENAME TO carries the existing rows and
+      // constraints; draft_title is a simple nullable TEXT, so ADD COLUMN
+      // handles it directly. Existing chats get NULL for draft_title.
+      db.exec(`
+        ALTER TABLE chat_sources RENAME TO chat_source_attachments;
+
+        ALTER TABLE chats ADD COLUMN draft_title TEXT;
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -1371,7 +1394,7 @@ const chatSources = {
       .prepare(
         `SELECT s.id, s.title, s.body, s.archived_at,
                 cs.created_at AS attached_at
-           FROM chat_sources cs
+           FROM chat_source_attachments cs
            JOIN source_material s ON s.id = cs.source_id
           WHERE cs.chat_id = ?
           ORDER BY cs.created_at ASC, s.id ASC`
@@ -1387,7 +1410,7 @@ const chatSources = {
     // attaching an already-active source is a harmless no-op.
     getDb()
       .prepare(
-        'INSERT OR IGNORE INTO chat_sources (chat_id, source_id, created_at) VALUES (?, ?, ?)'
+        'INSERT OR IGNORE INTO chat_source_attachments (chat_id, source_id, created_at) VALUES (?, ?, ?)'
       )
       .run(chatId, sourceId, new Date().toISOString());
     return chatSources.list(chatId);
@@ -1397,7 +1420,7 @@ const chatSources = {
   // the drawer re-renders from the source of truth.
   detach: (chatId, sourceId) => {
     getDb()
-      .prepare('DELETE FROM chat_sources WHERE chat_id = ? AND source_id = ?')
+      .prepare('DELETE FROM chat_source_attachments WHERE chat_id = ? AND source_id = ?')
       .run(chatId, sourceId);
     return chatSources.list(chatId);
   },
