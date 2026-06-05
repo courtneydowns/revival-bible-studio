@@ -809,6 +809,11 @@ const CONTENT_RENDERERS = {
     draftPrefix: 'documents',
     addLabel: 'Add Document',
   }),
+  'Open Questions': makeEntryWorkspace({
+    apiName: 'openQuestions',
+    draftPrefix: 'open_questions',
+    addLabel: 'Add Question',
+  }),
 };
 
 const nav = document.getElementById('nav');

@@ -5,6 +5,16 @@ Local-first creative/editorial workspace for the **Revival project only**. Not a
 
 ---
 
+## Before starting any phase — required
+
+- When the user references a phase (e.g. "P22", "phase 22", "start P5"), **read `docs/BUILD_PLAN.md` first** and locate that phase entry.
+- The phase entry defines scope and the smoke test. Do not start work without it.
+- If the phase number is not in `docs/BUILD_PLAN.md`, stop and ask.
+- Do not infer phase scope from memory or from this file. `docs/BUILD_PLAN.md` is the source of truth for phase scope.
+- One phase per session. Do not bundle phases. Do not skip the smoke test gate.
+
+---
+
 ## Hard rules — never violate
 
 - **No OpenAI / ChatGPT integration. Ever.** No OpenAI provider code, no model pickers, no OpenAI API key fields, no generic provider routing scaffolding.

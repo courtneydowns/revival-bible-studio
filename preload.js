@@ -30,6 +30,15 @@ contextBridge.exposeInMainWorld('revival', {
     archive: (id) => ipcRenderer.invoke('documents:archive', id),
     restore: (id) => ipcRenderer.invoke('documents:restore', id),
   },
+  openQuestions: {
+    list: () => ipcRenderer.invoke('openQuestions:list'),
+    listArchived: () => ipcRenderer.invoke('openQuestions:listArchived'),
+    create: (entry) => ipcRenderer.invoke('openQuestions:create', entry),
+    update: (id, entry) => ipcRenderer.invoke('openQuestions:update', id, entry),
+    delete: (id) => ipcRenderer.invoke('openQuestions:delete', id),
+    archive: (id) => ipcRenderer.invoke('openQuestions:archive', id),
+    restore: (id) => ipcRenderer.invoke('openQuestions:restore', id),
+  },
   chats: {
     list: () => ipcRenderer.invoke('chats:list'),
     listArchived: () => ipcRenderer.invoke('chats:listArchived'),

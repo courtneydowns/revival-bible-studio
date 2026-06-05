@@ -121,6 +121,24 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '008_open_questions',
+    up(db) {
+      // Open Questions: unresolved questions about the project. Same lifecycle/
+      // shape as the other entry workspaces; its own table keeps it visibly
+      // separate from Conflicts (per CLAUDE.md — the two must not be blended).
+      db.exec(`
+        CREATE TABLE open_questions (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          title       TEXT NOT NULL,
+          body        TEXT NOT NULL DEFAULT '',
+          created_at  TEXT NOT NULL,
+          updated_at  TEXT NOT NULL,
+          archived_at TEXT
+        );
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -308,6 +326,7 @@ function makeEntryRepo(table) {
 
 const sourceMaterial = makeEntryRepo('source_material');
 const documents = makeEntryRepo('documents');
+const openQuestions = makeEntryRepo('open_questions');
 
 // --- Chats repository ------------------------------------------------------
 // Chats are conversation containers for the global Chat drawer. Bespoke (no
@@ -496,6 +515,7 @@ module.exports = {
   MIGRATIONS,
   sourceMaterial,
   documents,
+  openQuestions,
   chats,
   chatSources,
   listUnsorted,
