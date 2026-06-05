@@ -828,6 +828,13 @@ const CONTENT_RENDERERS = {
     titlePlaceholder: 'What contradicts what?',
     bodyPlaceholder: 'The two sides in tension, and where each comes from (optional)',
   }),
+  'Decisions': makeEntryWorkspace({
+    apiName: 'decisions',
+    draftPrefix: 'decisions',
+    addLabel: 'Record Decision',
+    titlePlaceholder: 'What was decided?',
+    bodyPlaceholder: 'The decision, and why it was settled this way (optional)',
+  }),
 };
 
 const nav = document.getElementById('nav');

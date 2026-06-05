@@ -158,6 +158,23 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '010_decisions',
+    up(db) {
+      // Decisions: settled decisions for the Revival project. Same
+      // lifecycle/shape as the other entry workspaces, own table.
+      db.exec(`
+        CREATE TABLE decisions (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          title       TEXT NOT NULL,
+          body        TEXT NOT NULL DEFAULT '',
+          created_at  TEXT NOT NULL,
+          updated_at  TEXT NOT NULL,
+          archived_at TEXT
+        );
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -347,6 +364,7 @@ const sourceMaterial = makeEntryRepo('source_material');
 const documents = makeEntryRepo('documents');
 const openQuestions = makeEntryRepo('open_questions');
 const conflicts = makeEntryRepo('conflicts');
+const decisions = makeEntryRepo('decisions');
 
 // --- Chats repository ------------------------------------------------------
 // Chats are conversation containers for the global Chat drawer. Bespoke (no
@@ -537,6 +555,7 @@ module.exports = {
   documents,
   openQuestions,
   conflicts,
+  decisions,
   chats,
   chatSources,
   listUnsorted,

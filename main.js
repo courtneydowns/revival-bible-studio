@@ -69,6 +69,14 @@ function registerIpc() {
   ipcMain.handle('conflicts:archive', (_event, id) => db.conflicts.archive(id));
   ipcMain.handle('conflicts:restore', (_event, id) => db.conflicts.restore(id));
 
+  ipcMain.handle('decisions:list', () => db.decisions.list());
+  ipcMain.handle('decisions:listArchived', () => db.decisions.listArchived());
+  ipcMain.handle('decisions:create', (_event, entry) => db.decisions.create(entry));
+  ipcMain.handle('decisions:update', (_event, id, entry) => db.decisions.update(id, entry));
+  ipcMain.handle('decisions:delete', (_event, id) => db.decisions.delete(id));
+  ipcMain.handle('decisions:archive', (_event, id) => db.decisions.archive(id));
+  ipcMain.handle('decisions:restore', (_event, id) => db.decisions.restore(id));
+
   ipcMain.handle('chats:list', () => db.chats.list());
   ipcMain.handle('chats:listArchived', () => db.chats.listArchived());
   ipcMain.handle('chats:create', (_event, chat) => db.chats.create(chat));

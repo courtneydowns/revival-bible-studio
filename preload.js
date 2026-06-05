@@ -48,6 +48,15 @@ contextBridge.exposeInMainWorld('revival', {
     archive: (id) => ipcRenderer.invoke('conflicts:archive', id),
     restore: (id) => ipcRenderer.invoke('conflicts:restore', id),
   },
+  decisions: {
+    list: () => ipcRenderer.invoke('decisions:list'),
+    listArchived: () => ipcRenderer.invoke('decisions:listArchived'),
+    create: (entry) => ipcRenderer.invoke('decisions:create', entry),
+    update: (id, entry) => ipcRenderer.invoke('decisions:update', id, entry),
+    delete: (id) => ipcRenderer.invoke('decisions:delete', id),
+    archive: (id) => ipcRenderer.invoke('decisions:archive', id),
+    restore: (id) => ipcRenderer.invoke('decisions:restore', id),
+  },
   chats: {
     list: () => ipcRenderer.invoke('chats:list'),
     listArchived: () => ipcRenderer.invoke('chats:listArchived'),
