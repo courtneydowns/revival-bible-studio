@@ -8,171 +8,151 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Foundation
 
-### P0 — Git connect
-- `git init` in `~/Documents/revival-bible-studio`, remote to GitHub repo, `.gitignore`, first commit (CLAUDE.md + docs)
-- **Smoke:** `git status` clean, push succeeds, repo on GitHub shows the files
-
-### P1 — Electron window
-- Minimal `package.json`, Electron, `main.js`, blank `index.html`
-- **Smoke:** `npm run dev` opens a window titled "Revival Studio"
-
-### P2 — Left nav placeholders
-- Nav lists all 16 workspaces, clicking routes to a blank page per workspace
-- **Smoke:** All 16 nav items clickable, active state visible
-
-### P3 — UI principle template
-- One reusable component answering the 5 UI questions, dropped into every placeholder page
-- **Smoke:** Every workspace shows the 5 answers
+### P0 — Git connect ✅
+### P1 — Electron window ✅
+### P2 — Left nav placeholders ✅
+### P3 — UI principle template ✅
 
 ---
 
 ## Data layer
 
-### P4 — SQLite + migrations
-- DB file in app data dir, migration runner, no UI changes
-- **Smoke:** App boots, DB file exists in expected path
+### P4 — SQLite + migrations ✅
 
 ---
 
 ## Unsorted (the pattern workspace)
 
-### P5 — Unsorted: create + list
-- One table, create entry, list entries
-- **Smoke:** Add entry, restart app, entry persists
-
-### P6 — Unsorted: edit
-- Edit existing entries, save
-- **Smoke:** Edit + save survives restart
-
-### P7 — Unsorted: delete
-- Delete with confirm prompt
-- **Smoke:** Delete an entry, confirm prompt appears, entry gone
-
-### P8 — Unsorted: archive + restore
-- Collapsed "Archived" section at bottom of same page (no global Archive)
-- **Smoke:** Archive an entry, see it under collapsed section, restore it
-
-### P9 — Autosave system
-- Drafts preserved on edit; preservation only, not finalization
-- **Smoke:** Quit mid-edit, reopen, draft intact; "save" still required to finalize
+### P5 — Unsorted: create + list ✅
+### P6 — Unsorted: edit ✅
+### P7 — Unsorted: delete ✅
+### P8 — Unsorted: archive + restore ✅
+### P9 — Autosave system ✅
 
 ---
 
 ## Source Material + Documents
 
-### P10 — Source Material CRUD
-- Same lifecycle as Unsorted
-- **Smoke:** Add, edit, delete, archive, restore on a Source entry
-
-### P11 — Source Material file upload
-- Text files first (other types deferred)
-- **Smoke:** Upload a .txt file, view contents in entry
-
-### P12 — Documents CRUD
-- Same lifecycle as Unsorted; visibly separate from Source Material
-- **Smoke:** Create a Document, edit, archive, restore; Source and Documents are not blended
+### P10 — Source Material CRUD ✅
+### P11 — Source Material file upload ✅
+### P12 — Documents CRUD ✅
 
 ---
 
 ## Chat shell (no AI)
 
-### P13 — Chat drawer shell
-- Global drawer, opens/closes from any workspace, one default chat
-- **Smoke:** Open drawer from 3 different workspaces
-
-### P14 — Multiple chats + title dropdown
-- Create, switch, title dropdown lists them
-- **Smoke:** Create 3 chats, switch between them via dropdown
-
-### P15 — Rename + archive + restore chats
-- **Smoke:** Rename one chat, archive one, restore it
-
-### P16 — Chat expand mode
-- Larger view, not full-screen takeover; rest of app still reachable
-- **Smoke:** Expand chat, confirm other workspaces still clickable
+### P13 — Chat drawer shell ✅
+### P14 — Multiple chats + title dropdown ✅
+### P15 — Rename + archive + restore chats ✅
+### P16 — Chat expand mode ✅
 
 ---
 
 ## Chat ↔ Source attachments (still no AI)
 
-### P17 — Attach Source: keep active mode
-- Picker shows Source Material only (no other types, no Context Packets), active sources listed in chat
-- **Smoke:** Attach a source, send a message, source still listed
-
-### P18 — Attach Source: next message only + manual remove
-- Second mode; active sources removable in one click
-- **Smoke:** Attach "next message only," send, source disappears; manually remove a "keep active" source
+### P17 — Attach Source: keep active mode ✅
+### P18 — Attach Source: next message only + manual remove ✅
 
 ---
 
 ## Settings + Safety
 
-### P19 — Settings: Project Rules editor
-- Always-on visible Project Rules text in Settings (no hidden Project Memory)
-- **Smoke:** Edit a rule, save, value persists across restart
-
-### P20 — Panic Export v1
-- Dump entire DB + uploaded source files to a timestamped folder
-- **Smoke:** Run Panic Export, output folder contains DB dump + sources
+### P19 — Settings: Project Rules editor ✅
+### P20 — Panic Export v1 ✅
 
 ---
 
-## Remaining queue/decision workspaces (one per phase)
+## Remaining queue/decision workspaces
 
-### P21 — Open Questions
-- **Smoke:** Full lifecycle on one entry
-
-### P22 — Conflicts
-- Visibly distinct from Open Questions
-- **Smoke:** Full lifecycle; UI clearly differentiates from Open Questions
-
-### P23 — Decisions
-- **Smoke:** Full lifecycle on one entry
-
-### P24 — Brainstorm
-- **Smoke:** Full lifecycle on one entry
-
-### P25 — Research
-- Not blended with Brainstorm
-- **Smoke:** Full lifecycle; UI clearly differentiates from Brainstorm
+### P21 — Open Questions ✅
+### P22 — Conflicts ✅
+### P23 — Decisions ✅
+### P24 — Brainstorm ✅
+### P25 — Research ✅
 
 ---
 
-## Characters + Episodes (basic lifecycle only — relational view and attachments come later)
+## Characters + Episodes
 
-### P26 — Characters: CRUD lifecycle
-- Same lifecycle as Unsorted (create, edit, delete, archive, restore)
-- No relational view yet, no attachments yet, no canon flow yet
-- **Smoke:** Full lifecycle on one character entry
-
-### P27 — Episodes: CRUD lifecycle
-- Same lifecycle as Unsorted
-- No attachments yet, no canon flow yet
-- **Smoke:** Full lifecycle on one episode entry
+### P26 — Characters: CRUD lifecycle ✅
+### P27 — Episodes: CRUD lifecycle ✅
 
 ---
 
 ## Home + Writing Lab
 
-### P28 — Home dashboard
-- Counts per workspace, recent activity, dismissible Next Step Suggestions
-- **Smoke:** Counts match reality, dismissed suggestions stay dismissed
-
-### P29 — Writing Lab
-- Long-form drafting with autosave
-- **Smoke:** Draft 500 words, quit, reopen, content intact
+### P28 — Home dashboard ✅
+### P29 — Writing Lab ✅
 
 ---
 
 ## Canon Bible — schema first, then build
 
-### P30 — Canon schema design (CHECKPOINT, no code)
-- Move to claude.ai (Opus). Inspect audited worldbuilding knowledge files (which will keep evolving inside this app — not frozen). Propose schema covering: categories, tables/entities, relationships, edit/lock/archive/supersede behavior, source provenance, **cross-workspace attachments (Characters/Episodes ↔ Decisions/Open Questions/Conflicts/Brainstorm/Research)**, future change handling.
-- **Gate:** User explicitly approves schema in writing before P31 starts.
+### P30 — Canon schema design (CHECKPOINT, no code) ✅
+- Completed in claude.ai (Opus). Approved schema saved as `docs/CANON_SCHEMA_APPROVED.md`.
 
-### P31 — Canon tables + read view
-- Migration creates approved tables, read-only list view
-- **Smoke:** Seed a few entries, list view shows them with provenance fields visible
+### P31 — Canon tables + read view ✅
+- 27 migrations (016–027) applied cleanly. 42 tables + 9 triggers. Dev seed button on Canon Bible page.
+- **Smoke passed.**
+
+---
+
+## Workspace reshape — align existing tables to FINAL schema
+
+These phases run before Canon UI. Each ALTERs existing workspace tables to match
+`docs/CANON_SCHEMA_APPROVED.md` (add `draft_*` columns, renames, new FKs).
+No new features. No CRUD rewrites unless a rename breaks existing code — fix only what breaks.
+
+**Why now:** Canon UI (P32+) references workspace table names and `draft_*` columns.
+Building on the old names creates patching debt across every canon phase.
+
+### PR1 — Reshape: settings
+- Rename `app_meta` → `settings`
+- Add columns: `project_rules TEXT NOT NULL DEFAULT ''`, `claude_api_key TEXT NULL`, `home_dismissed_suggestions_json TEXT NOT NULL DEFAULT '[]'`
+- Recreate with `CHECK(id = 1)` single-row constraint (requires table recreate in SQLite)
+- Update all references from `app_meta` to `settings` in renderer + main process
+- **Smoke:** App boots, Project Rules still visible and editable, value persists across restart
+
+### PR2 — Reshape: unsorted + documents + source_material
+- Rename `unsorted` → `unsorted_items`
+- Add to `unsorted_items`, `documents`, `source_material`: `draft_title TEXT NULL`, `draft_body TEXT NULL`, `last_drafted_at TEXT NULL`
+- Add to `source_material`: `file_kind TEXT NOT NULL DEFAULT 'text' CHECK(file_kind IN ('text','pdf','image','other'))`, `file_path TEXT NULL`
+- Update all `unsorted` table references to `unsorted_items` in renderer + CRUD code
+- **Smoke:** All three workspaces load, existing entries visible, create/edit/archive/restore still works
+
+### PR3 — Reshape: chats + chat_source_attachments
+- Rename `chat_sources` → `chat_source_attachments`
+- Add to `chats`: `draft_title TEXT NULL`
+- Update all `chat_sources` references to `chat_source_attachments`
+- **Smoke:** Chat drawer opens, existing chats visible, source attach/detach still works
+
+### PR4 — Reshape: open_questions + conflicts + decisions
+- Add to `open_questions`: `draft_title TEXT NULL`, `draft_body TEXT NULL`, `last_drafted_at TEXT NULL`, `tier INTEGER NULL CHECK(tier IN (1,2,3))`, `category TEXT NULL`, `canon_promoted_entry_id INTEGER NULL`, `resolved_by_decision_id INTEGER NULL`
+- Add to `conflicts`: `draft_title TEXT NULL`, `draft_body TEXT NULL`, `last_drafted_at TEXT NULL`
+- Add to `decisions`: `draft_title TEXT NULL`, `draft_body TEXT NULL`, `last_drafted_at TEXT NULL`, `decided_at TEXT NULL`
+- **Smoke:** All three workspaces load, existing entries visible, full lifecycle still works on each
+
+### PR5 — Reshape: brainstorm + research
+- Rename `brainstorm` → `brainstorm_items`
+- Rename `research` → `research_items`
+- Add to both: `draft_title TEXT NULL`, `draft_body TEXT NULL`, `last_drafted_at TEXT NULL`
+- Add to `research_items`: `external_url TEXT NULL`
+- Update all table name references in renderer + CRUD code
+- **Smoke:** Both workspaces load, existing entries visible, full lifecycle still works
+
+### PR6 — Reshape: characters + episodes + writing_lab
+- Rename `characters` → `characters_workspace`
+- Rename `episodes` → `episodes_workspace`
+- Rename `writing_lab` → `writing_lab_drafts`
+- Add to `characters_workspace`: `draft_title TEXT NULL`, `draft_body TEXT NULL`, `last_drafted_at TEXT NULL`, `short_description TEXT NULL`, `canon_character_id INTEGER NULL`
+- Add to `episodes_workspace`: `draft_title TEXT NULL`, `draft_body TEXT NULL`, `last_drafted_at TEXT NULL`, `canon_episode_id INTEGER NULL`
+- Add to `writing_lab_drafts`: `draft_title TEXT NULL`, `draft_body TEXT NULL`, `last_drafted_at TEXT NULL` (if not already present)
+- Update all table name references
+- **Smoke:** All three workspaces load, existing entries visible, full lifecycle still works on each
+
+---
+
+## Canon Bible UI
 
 ### P32 — Canon entries: create + edit
 - **Smoke:** Add an entry, edit it, changes persist
@@ -202,7 +182,6 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ### P37 — Characters: relational view
 - Visual showing how characters connect (relationships, factions, arcs, conflicts)
-- Schema for relationships decided at P30
 - **Smoke:** Define a relationship between two characters, see it in the relational view
 
 ### P38 — Characters/Episodes → Canon Review (manual propose, still no AI)
