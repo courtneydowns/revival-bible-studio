@@ -43,7 +43,11 @@ function registerIpc() {
   ipcMain.handle('documents:restore', (_event, id) => db.documents.restore(id));
 
   ipcMain.handle('chats:list', () => db.chats.list());
+  ipcMain.handle('chats:listArchived', () => db.chats.listArchived());
   ipcMain.handle('chats:create', (_event, chat) => db.chats.create(chat));
+  ipcMain.handle('chats:rename', (_event, id, chat) => db.chats.rename(id, chat));
+  ipcMain.handle('chats:archive', (_event, id) => db.chats.archive(id));
+  ipcMain.handle('chats:restore', (_event, id) => db.chats.restore(id));
 }
 
 app.whenReady().then(() => {

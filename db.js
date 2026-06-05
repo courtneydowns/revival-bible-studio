@@ -287,13 +287,21 @@ const sourceMaterial = makeEntryRepo('source_material');
 const documents = makeEntryRepo('documents');
 
 // --- Chats repository ------------------------------------------------------
-// Chats are conversation containers for the global Chat drawer. P15 covers
-// create + list (active) only; rename/archive/restore arrive in a later phase.
+// Chats are conversation containers for the global Chat drawer. Bespoke (no
+// body field). P16 adds rename + archive + restore on top of P15's create/list.
+// Archive is reversible: non-null archived_at hides a chat from the active
+// dropdown and shows it in the collapsed "Archived chats" section.
 const chats = {
   list: () =>
     getDb()
       .prepare(
         'SELECT * FROM chats WHERE archived_at IS NULL ORDER BY created_at ASC, id ASC'
+      )
+      .all(),
+  listArchived: () =>
+    getDb()
+      .prepare(
+        'SELECT * FROM chats WHERE archived_at IS NOT NULL ORDER BY archived_at DESC, id DESC'
       )
       .all(),
   get: (id) => getDb().prepare('SELECT * FROM chats WHERE id = ?').get(id),
@@ -306,6 +314,27 @@ const chats = {
       )
       .run(cleanTitle, now, now);
     return chats.get(info.lastInsertRowid);
+  },
+  rename: (id, { title } = {}) => {
+    if (!chats.get(id)) throw new Error('Chat not found.');
+    const cleanTitle = (title || '').trim();
+    if (!cleanTitle) throw new Error('Title is required.');
+    getDb()
+      .prepare('UPDATE chats SET title = ?, updated_at = ? WHERE id = ?')
+      .run(cleanTitle, new Date().toISOString(), id);
+    return chats.get(id);
+  },
+  archive: (id) => {
+    if (!chats.get(id)) throw new Error('Chat not found.');
+    getDb()
+      .prepare('UPDATE chats SET archived_at = ? WHERE id = ?')
+      .run(new Date().toISOString(), id);
+    return chats.get(id);
+  },
+  restore: (id) => {
+    if (!chats.get(id)) throw new Error('Chat not found.');
+    getDb().prepare('UPDATE chats SET archived_at = NULL WHERE id = ?').run(id);
+    return chats.get(id);
   },
 };
 

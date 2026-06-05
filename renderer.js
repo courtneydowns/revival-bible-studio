@@ -33,7 +33,7 @@ const WORKSPACE_INFO = {
   },
   'Chat': {
     purpose: 'Talk through the Revival project with Claude. (Becomes a global drawer in a later phase.)',
-    next: 'Open the chat drawer (💬 Chat, bottom-right of any workspace), click “+ New chat” to create chats, and switch between them with the dropdown. Attaching Source Material comes in a later phase.',
+    next: 'Open the chat drawer (💬 Chat, bottom-right of any workspace), click “+ New chat” to create chats, and switch between them with the dropdown. Rename or archive the active chat with the buttons below the title; archived chats restore from the collapsed section. Attaching Source Material comes in a later phase.',
     savedTo: 'Chats are kept in this Chat workspace. Attachments come from Source Material only.',
     lifecycle: 'Chats can be renamed, archived, and restored. Nothing is finalized without your confirmation.',
   },
@@ -731,9 +731,18 @@ const chatClose = document.getElementById('chat-close');
 const chatSelect = document.getElementById('chat-select');
 const chatNewBtn = document.getElementById('chat-new');
 const chatMessages = document.getElementById('chat-messages');
+const chatTools = document.getElementById('chat-tools');
+const chatRenameBtn = document.getElementById('chat-rename');
+const chatArchiveBtn = document.getElementById('chat-archive');
+const chatRenameRow = document.getElementById('chat-rename-row');
+const chatRenameInput = document.getElementById('chat-rename-input');
+const chatRenameCancel = document.getElementById('chat-rename-cancel');
+const chatArchived = document.getElementById('chat-archived');
+const chatArchivedList = document.getElementById('chat-archived-list');
 
 const ACTIVE_CHAT_KEY = 'revival.chat.active';
 let chatList = [];
+let archivedChats = [];
 let activeChatId = null;
 
 function setChatOpen(open) {
@@ -779,6 +788,50 @@ function renderChatSelect() {
   chatSelect.value = String(activeChatId);
 }
 
+// Rename/Archive act on the active chat, so disable them when there is none.
+function renderChatTools() {
+  const hasActive = activeChatId != null;
+  chatRenameBtn.disabled = !hasActive;
+  chatArchiveBtn.disabled = !hasActive;
+}
+
+// Collapsed "Archived chats" list; each row restores back to the active list.
+function renderArchivedChats() {
+  chatArchivedList.innerHTML = '';
+  if (archivedChats.length === 0) {
+    chatArchived.hidden = true;
+    return;
+  }
+  chatArchived.hidden = false;
+  for (const chat of archivedChats) {
+    const row = document.createElement('div');
+    row.className = 'chat-archived-item';
+
+    const title = document.createElement('span');
+    title.className = 'archived-title';
+    title.textContent = chat.title;
+
+    const restore = document.createElement('button');
+    restore.className = 'btn-tool';
+    restore.type = 'button';
+    restore.textContent = 'Restore';
+    restore.addEventListener('click', async () => {
+      restore.disabled = true;
+      try {
+        await window.revival.chats.restore(chat.id);
+        await loadChats();
+        setActiveChat(chat.id);
+      } catch (err) {
+        restore.disabled = false;
+      }
+    });
+
+    row.appendChild(title);
+    row.appendChild(restore);
+    chatArchivedList.appendChild(row);
+  }
+}
+
 function setActiveChat(id) {
   activeChatId = id;
   if (id == null) {
@@ -786,18 +839,40 @@ function setActiveChat(id) {
   } else {
     localStorage.setItem(ACTIVE_CHAT_KEY, String(id));
   }
+  hideRename();
   renderChatSelect();
+  renderChatTools();
   renderChatBody();
 }
 
 async function loadChats() {
-  chatList = await window.revival.chats.list();
+  [chatList, archivedChats] = await Promise.all([
+    window.revival.chats.list(),
+    window.revival.chats.listArchived(),
+  ]);
+  renderArchivedChats();
   // Restore the previously active chat if it still exists; else fall back to
   // the first chat, or none when the list is empty.
   const saved = Number(localStorage.getItem(ACTIVE_CHAT_KEY));
   const stillExists = chatList.some((c) => c.id === saved);
   const next = stillExists ? saved : chatList.length ? chatList[0].id : null;
   setActiveChat(next);
+}
+
+// --- Inline rename ---------------------------------------------------------
+function showRename() {
+  const active = chatList.find((c) => c.id === activeChatId);
+  if (!active) return;
+  chatRenameInput.value = active.title;
+  chatRenameRow.hidden = false;
+  chatTools.hidden = true;
+  chatRenameInput.focus();
+  chatRenameInput.select();
+}
+
+function hideRename() {
+  chatRenameRow.hidden = true;
+  chatTools.hidden = false;
 }
 
 chatToggle.addEventListener('click', () =>
@@ -817,7 +892,6 @@ chatSelect.addEventListener('change', () => {
 chatNewBtn.addEventListener('click', async () => {
   chatNewBtn.disabled = true;
   try {
-    // Default name is just a sequential label; rename arrives in a later phase.
     const created = await window.revival.chats.create({
       title: `Chat ${chatList.length + 1}`,
     });
@@ -825,6 +899,37 @@ chatNewBtn.addEventListener('click', async () => {
     setActiveChat(created.id);
   } finally {
     chatNewBtn.disabled = false;
+  }
+});
+
+chatRenameBtn.addEventListener('click', showRename);
+chatRenameCancel.addEventListener('click', hideRename);
+
+chatRenameRow.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const title = chatRenameInput.value.trim();
+  if (!title || activeChatId == null) return;
+  const updated = await window.revival.chats.rename(activeChatId, { title });
+  const idx = chatList.findIndex((c) => c.id === activeChatId);
+  if (idx !== -1) chatList[idx] = updated;
+  hideRename();
+  renderChatSelect();
+  renderChatBody();
+});
+
+chatRenameInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') hideRename();
+});
+
+chatArchiveBtn.addEventListener('click', async () => {
+  if (activeChatId == null) return;
+  chatArchiveBtn.disabled = true;
+  try {
+    await window.revival.chats.archive(activeChatId);
+    // Reload rebuilds both lists and reselects a remaining active chat (or none).
+    await loadChats();
+  } finally {
+    renderChatTools();
   }
 });
 
