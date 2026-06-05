@@ -45,4 +45,9 @@ contextBridge.exposeInMainWorld('revival', {
     detach: (chatId, sourceId) =>
       ipcRenderer.invoke('chatSources:detach', chatId, sourceId),
   },
+  settings: {
+    getProjectRules: () => ipcRenderer.invoke('settings:getProjectRules'),
+    setProjectRules: (text) =>
+      ipcRenderer.invoke('settings:setProjectRules', text),
+  },
 });

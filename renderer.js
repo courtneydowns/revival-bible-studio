@@ -658,8 +658,84 @@ function renderChatPage(section) {
   section.appendChild(btn);
 }
 
+// --- Settings: Project Rules (P20) -----------------------------------------
+// Always-on, always-visible guidance Claude receives. Stored in SQLite (via the
+// settings IPC) so it survives restarts — there is no hidden project memory.
+// The textarea always shows the saved value verbatim; nothing persists until
+// the user clicks Save, and "Unsaved changes" makes the draft/saved distinction
+// explicit (autosave principle: preservation, not silent finalization).
+function renderSettingsPage(section) {
+  const api = window.revival.settings;
+
+  const block = document.createElement('div');
+  block.className = 'entry-form settings-block';
+
+  const heading = document.createElement('h2');
+  heading.className = 'settings-heading';
+  heading.textContent = 'Project Rules';
+
+  const desc = document.createElement('p');
+  desc.className = 'settings-desc';
+  desc.textContent =
+    'Always-on guidance Claude receives with every request. Always visible here — there is no hidden project memory.';
+
+  const textarea = document.createElement('textarea');
+  textarea.rows = 16;
+  textarea.placeholder =
+    'Write the always-on rules Claude should follow for this project…';
+  textarea.disabled = true;
+
+  const save = document.createElement('button');
+  save.type = 'button';
+  save.textContent = 'Save Project Rules';
+  save.disabled = true;
+
+  const status = document.createElement('p');
+  status.className = 'draft-status';
+
+  let savedValue = '';
+
+  function refreshDirty() {
+    const dirty = textarea.value !== savedValue;
+    save.disabled = !dirty;
+    if (dirty) {
+      setStatus(status, 'Unsaved changes — click “Save Project Rules”.');
+    }
+  }
+
+  textarea.addEventListener('input', refreshDirty);
+
+  save.addEventListener('click', async () => {
+    save.disabled = true;
+    try {
+      await api.setProjectRules(textarea.value);
+      savedValue = textarea.value;
+      setStatus(status, 'Saved. These rules persist across restarts.');
+    } catch (err) {
+      setStatus(status, `Could not save: ${err.message || err}`);
+    }
+    refreshDirty();
+  });
+
+  block.append(heading, desc, textarea, save, status);
+  section.appendChild(block);
+
+  (async () => {
+    try {
+      savedValue = (await api.getProjectRules()) || '';
+      textarea.value = savedValue;
+      setStatus(status, savedValue ? 'Loaded saved rules.' : 'No rules saved yet.');
+    } catch (err) {
+      setStatus(status, `Could not load rules: ${err.message || err}`);
+    }
+    textarea.disabled = false;
+    refreshDirty();
+  })();
+}
+
 const CONTENT_RENDERERS = {
   'Chat': renderChatPage,
+  'Settings': renderSettingsPage,
   'Unsorted': makeEntryWorkspace({
     apiName: 'unsorted',
     draftPrefix: 'unsorted',

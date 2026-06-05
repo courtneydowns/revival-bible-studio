@@ -405,9 +405,37 @@ const chatSources = {
   },
 };
 
+// --- App settings (key/value) ----------------------------------------------
+// Backed by the app_meta table (migration 001). Project Rules (P20) are the
+// first real consumer: always-on, visible guidance Claude receives. Stored
+// here so they persist across restarts. No hidden memory — the renderer always
+// shows the stored value verbatim, and nothing else reads/writes this without
+// the user clicking Save.
+const PROJECT_RULES_KEY = 'project_rules';
+
+const settings = {
+  getProjectRules: () => {
+    const row = getDb()
+      .prepare('SELECT value FROM app_meta WHERE key = ?')
+      .get(PROJECT_RULES_KEY);
+    return row ? row.value : '';
+  },
+  setProjectRules: (text) => {
+    const value = typeof text === 'string' ? text : '';
+    getDb()
+      .prepare(
+        `INSERT INTO app_meta (key, value) VALUES (?, ?)
+           ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+      )
+      .run(PROJECT_RULES_KEY, value);
+    return { value };
+  },
+};
+
 module.exports = {
   initDatabase,
   getDb,
+  settings,
   getDbPath,
   DB_FILENAME,
   MIGRATIONS,

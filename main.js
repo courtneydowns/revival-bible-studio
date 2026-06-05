@@ -56,6 +56,11 @@ function registerIpc() {
   ipcMain.handle('chatSources:detach', (_event, chatId, sourceId) =>
     db.chatSources.detach(chatId, sourceId)
   );
+
+  ipcMain.handle('settings:getProjectRules', () => db.settings.getProjectRules());
+  ipcMain.handle('settings:setProjectRules', (_event, text) =>
+    db.settings.setProjectRules(text)
+  );
 }
 
 app.whenReady().then(() => {
