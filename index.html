@@ -242,6 +242,20 @@
         color: #e06c6c;
       }
 
+      /* Research: visibly distinct from Brainstorm (a blue source accent on
+         each card + the new-research form). */
+      .ws-research .entry-card {
+        border-left: 3px solid #5a8fd6;
+      }
+      .ws-research .entry-form {
+        border-left: 3px solid #5a8fd6;
+        padding-left: 12px;
+      }
+      .ws-research .entry-title::before {
+        content: '🔎 ';
+        color: #5a8fd6;
+      }
+
       .entry-card input,
       .entry-card textarea {
         font: inherit;

@@ -85,6 +85,14 @@ function registerIpc() {
   ipcMain.handle('brainstorm:archive', (_event, id) => db.brainstorm.archive(id));
   ipcMain.handle('brainstorm:restore', (_event, id) => db.brainstorm.restore(id));
 
+  ipcMain.handle('research:list', () => db.research.list());
+  ipcMain.handle('research:listArchived', () => db.research.listArchived());
+  ipcMain.handle('research:create', (_event, entry) => db.research.create(entry));
+  ipcMain.handle('research:update', (_event, id, entry) => db.research.update(id, entry));
+  ipcMain.handle('research:delete', (_event, id) => db.research.delete(id));
+  ipcMain.handle('research:archive', (_event, id) => db.research.archive(id));
+  ipcMain.handle('research:restore', (_event, id) => db.research.restore(id));
+
   ipcMain.handle('chats:list', () => db.chats.list());
   ipcMain.handle('chats:listArchived', () => db.chats.listArchived());
   ipcMain.handle('chats:create', (_event, chat) => db.chats.create(chat));

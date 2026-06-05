@@ -842,6 +842,16 @@ const CONTENT_RENDERERS = {
     titlePlaceholder: 'What is the idea?',
     bodyPlaceholder: 'Where it might go, what sparked it (optional)',
   }),
+  // Research shares the lifecycle but is styled distinctly (blue source accent +
+  // tailored labels) so it never reads like Brainstorm's open ideation.
+  'Research': makeEntryWorkspace({
+    apiName: 'research',
+    draftPrefix: 'research',
+    addLabel: 'Add Research',
+    sectionClass: 'ws-research',
+    titlePlaceholder: 'What was researched?',
+    bodyPlaceholder: 'Findings, and where they came from — source/link (optional)',
+  }),
 };
 
 const nav = document.getElementById('nav');

@@ -192,6 +192,24 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '012_research',
+    up(db) {
+      // Research: background and external research, kept separate from
+      // Brainstorm. Same lifecycle/shape as the other entry workspaces, own
+      // table.
+      db.exec(`
+        CREATE TABLE research (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          title       TEXT NOT NULL,
+          body        TEXT NOT NULL DEFAULT '',
+          created_at  TEXT NOT NULL,
+          updated_at  TEXT NOT NULL,
+          archived_at TEXT
+        );
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -383,6 +401,7 @@ const openQuestions = makeEntryRepo('open_questions');
 const conflicts = makeEntryRepo('conflicts');
 const decisions = makeEntryRepo('decisions');
 const brainstorm = makeEntryRepo('brainstorm');
+const research = makeEntryRepo('research');
 
 // --- Chats repository ------------------------------------------------------
 // Chats are conversation containers for the global Chat drawer. Bespoke (no
@@ -575,6 +594,7 @@ module.exports = {
   conflicts,
   decisions,
   brainstorm,
+  research,
   chats,
   chatSources,
   listUnsorted,
