@@ -959,6 +959,52 @@ const MIGRATIONS = [
       }
     },
   },
+
+  // -------------------------------------------------------------------------
+  // Workspace reshape (PR1–PR6) — bring existing workspace tables in line with
+  // the approved FINAL canon schema (docs/CANON_SCHEMA_APPROVED.md). No new
+  // features; renames/columns only, plus the SQLite-table-recreate cases
+  // (CHECK constraints, etc.) that ALTER TABLE can't express.
+  // -------------------------------------------------------------------------
+
+  {
+    name: '028_settings_reshape',
+    up(db) {
+      // PR1 — Reshape: app_meta → settings.
+      //
+      // The old key/value store had a single key ('project_rules') and no other
+      // consumers. The FINAL schema replaces it with a single-row config table:
+      // explicit columns for project_rules, claude_api_key (P39, local only),
+      // and home_dismissed_suggestions_json (SQ-11), plus a CHECK(id = 1)
+      // singleton constraint. SQLite can't add a CHECK to an existing table, so
+      // this migration creates the new shape, copies the one value that
+      // existed, and drops app_meta.
+      const existing = db
+        .prepare("SELECT value FROM app_meta WHERE key = 'project_rules'")
+        .get();
+      const projectRules = existing && existing.value != null ? existing.value : '';
+
+      const now = new Date().toISOString();
+
+      db.exec(`
+        CREATE TABLE settings (
+          id                              INTEGER PRIMARY KEY CHECK(id = 1),
+          project_rules                   TEXT NOT NULL DEFAULT '',
+          claude_api_key                  TEXT NULL,
+          home_dismissed_suggestions_json TEXT NOT NULL DEFAULT '[]',
+          created_at                      TEXT NOT NULL,
+          updated_at                      TEXT NOT NULL
+        );
+      `);
+
+      db.prepare(
+        `INSERT INTO settings (id, project_rules, created_at, updated_at)
+         VALUES (1, ?, ?, ?)`
+      ).run(projectRules, now, now);
+
+      db.exec('DROP TABLE app_meta;');
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -1311,29 +1357,27 @@ const chatSources = {
   },
 };
 
-// --- App settings (key/value) ----------------------------------------------
-// Backed by the app_meta table (migration 001). Project Rules (P20) are the
-// first real consumer: always-on, visible guidance Claude receives. Stored
-// here so they persist across restarts. No hidden memory — the renderer always
-// shows the stored value verbatim, and nothing else reads/writes this without
-// the user clicking Save.
-const PROJECT_RULES_KEY = 'project_rules';
-
+// --- App settings ----------------------------------------------------------
+// Backed by the single-row `settings` table (migration 028). Project Rules
+// (P20) are the first real consumer: always-on, visible guidance Claude
+// receives. Stored here so they persist across restarts. No hidden memory —
+// the renderer always shows the stored value verbatim, and nothing else
+// reads/writes this without the user clicking Save. Migration 028 guarantees
+// the singleton row (id = 1) exists, so reads/writes never have to upsert.
 const settings = {
   getProjectRules: () => {
     const row = getDb()
-      .prepare('SELECT value FROM app_meta WHERE key = ?')
-      .get(PROJECT_RULES_KEY);
-    return row ? row.value : '';
+      .prepare('SELECT project_rules FROM settings WHERE id = 1')
+      .get();
+    return row ? row.project_rules : '';
   },
   setProjectRules: (text) => {
     const value = typeof text === 'string' ? text : '';
     getDb()
       .prepare(
-        `INSERT INTO app_meta (key, value) VALUES (?, ?)
-           ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+        'UPDATE settings SET project_rules = ?, updated_at = ? WHERE id = 1'
       )
-      .run(PROJECT_RULES_KEY, value);
+      .run(value, new Date().toISOString());
     return { value };
   },
 };
