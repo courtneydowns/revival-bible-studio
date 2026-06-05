@@ -1161,6 +1161,64 @@ const MIGRATIONS = [
       `);
     },
   },
+
+  {
+    name: '033_characters_episodes_writing_lab_reshape',
+    up(db) {
+      // PR6 — Reshape: characters + episodes + writing_lab.
+      //
+      // Aligns the three working-surface tables with the FINAL canon schema
+      // (docs/CANON_SCHEMA_APPROVED.md):
+      //   - Rename `characters` → `characters_workspace`,
+      //     `episodes`   → `episodes_workspace`,
+      //     `writing_lab`→ `writing_lab_drafts`.
+      //     RENAME TO preserves rows, PK, constraints, and (with
+      //     legacy_alter_table off — the better-sqlite3 default) rewrites the
+      //     table references inside the cross-workspace-attachment triggers
+      //     `characters_cwa_cascade` / `episodes_cwa_cascade` and the
+      //     `FROM characters` / `FROM episodes` lookups in
+      //     `cross_workspace_attachments_insert_validity` automatically. The
+      //     `'characters'` / `'episodes'` host_kind string literals are values,
+      //     not table references, so they stay — the logical host kinds are
+      //     unchanged. (Same approach PR5 used for brainstorm/research.)
+      //   - Add the draft_*/last_drafted_at trio to all three so the upcoming
+      //     Canon Review flow can stage in-progress edits without touching the
+      //     committed title/body. Same shape PR2/PR4/PR5 added elsewhere.
+      //   - characters_workspace only:
+      //       short_description TEXT NULL    — quick blurb shown in the list
+      //         view alongside the title.
+      //       canon_character_id INTEGER NULL — populated once a workspace
+      //         character is promoted to a canon entry. Plain INTEGER (no FK)
+      //         per the reshape rule: link wiring lands in a later phase, this
+      //         migration only carves out the column.
+      //   - episodes_workspace only:
+      //       canon_episode_id INTEGER NULL  — same shape as
+      //         canon_character_id; populated on canon promotion, no FK yet.
+      //
+      // ALTER TABLE only — no recreates. Every added column is nullable;
+      // existing rows get NULL.
+      db.exec(`
+        ALTER TABLE characters  RENAME TO characters_workspace;
+        ALTER TABLE episodes    RENAME TO episodes_workspace;
+        ALTER TABLE writing_lab RENAME TO writing_lab_drafts;
+
+        ALTER TABLE characters_workspace ADD COLUMN draft_title TEXT;
+        ALTER TABLE characters_workspace ADD COLUMN draft_body TEXT;
+        ALTER TABLE characters_workspace ADD COLUMN last_drafted_at TEXT;
+        ALTER TABLE characters_workspace ADD COLUMN short_description TEXT;
+        ALTER TABLE characters_workspace ADD COLUMN canon_character_id INTEGER;
+
+        ALTER TABLE episodes_workspace ADD COLUMN draft_title TEXT;
+        ALTER TABLE episodes_workspace ADD COLUMN draft_body TEXT;
+        ALTER TABLE episodes_workspace ADD COLUMN last_drafted_at TEXT;
+        ALTER TABLE episodes_workspace ADD COLUMN canon_episode_id INTEGER;
+
+        ALTER TABLE writing_lab_drafts ADD COLUMN draft_title TEXT;
+        ALTER TABLE writing_lab_drafts ADD COLUMN draft_body TEXT;
+        ALTER TABLE writing_lab_drafts ADD COLUMN last_drafted_at TEXT;
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -1356,8 +1414,14 @@ const conflicts = makeEntryRepo('conflicts');
 const decisions = makeEntryRepo('decisions');
 const brainstorm = makeEntryRepo('brainstorm_items');
 const research = makeEntryRepo('research_items');
-const characters = makeEntryRepo('characters');
-const episodes = makeEntryRepo('episodes');
+// Backed by `characters_workspace` / `episodes_workspace` (renamed from
+// `characters` / `episodes` in migration 033 to match the FINAL canon schema).
+// Repo variable names — and the IPC channel prefixes that consume them — are
+// intentionally left as `characters` / `episodes` so renderer wiring doesn't
+// need to change for a table rename. (Same pattern PR5 used for brainstorm /
+// research → brainstorm_items / research_items.)
+const characters = makeEntryRepo('characters_workspace');
+const episodes = makeEntryRepo('episodes_workspace');
 
 // --- Writing Lab repository ------------------------------------------------
 // Long-form drafting (P28). Same shape as the entry workspaces, but bespoke
@@ -1365,26 +1429,32 @@ const episodes = makeEntryRepo('episodes');
 // (untitled drafts get a placeholder name) and the body is stored verbatim —
 // NOT trimmed — so prose whitespace and trailing newlines are preserved exactly
 // as the user typed them. This is draft preservation, not finalization.
+//
+// Backed by `writing_lab_drafts` (renamed from `writing_lab` in migration 033
+// to match the FINAL canon schema). The exported `writingLab` repo and its
+// IPC channel prefix (`writingLab:*`) are intentionally unchanged so renderer
+// wiring doesn't need to move for a table rename.
 const writingLab = {
   list: () =>
     getDb()
       .prepare(
-        'SELECT * FROM writing_lab WHERE archived_at IS NULL ORDER BY updated_at DESC, id DESC'
+        'SELECT * FROM writing_lab_drafts WHERE archived_at IS NULL ORDER BY updated_at DESC, id DESC'
       )
       .all(),
   listArchived: () =>
     getDb()
       .prepare(
-        'SELECT * FROM writing_lab WHERE archived_at IS NOT NULL ORDER BY archived_at DESC, id DESC'
+        'SELECT * FROM writing_lab_drafts WHERE archived_at IS NOT NULL ORDER BY archived_at DESC, id DESC'
       )
       .all(),
-  get: (id) => getDb().prepare('SELECT * FROM writing_lab WHERE id = ?').get(id),
+  get: (id) =>
+    getDb().prepare('SELECT * FROM writing_lab_drafts WHERE id = ?').get(id),
   create: ({ title, body } = {}) => {
     const cleanTitle = (title || '').trim() || 'Untitled draft';
     const now = new Date().toISOString();
     const info = getDb()
       .prepare(
-        'INSERT INTO writing_lab (title, body, created_at, updated_at) VALUES (?, ?, ?, ?)'
+        'INSERT INTO writing_lab_drafts (title, body, created_at, updated_at) VALUES (?, ?, ?, ?)'
       )
       .run(cleanTitle, body || '', now, now);
     return writingLab.get(info.lastInsertRowid);
@@ -1394,26 +1464,28 @@ const writingLab = {
     const cleanTitle = (title || '').trim() || 'Untitled draft';
     getDb()
       .prepare(
-        'UPDATE writing_lab SET title = ?, body = ?, updated_at = ? WHERE id = ?'
+        'UPDATE writing_lab_drafts SET title = ?, body = ?, updated_at = ? WHERE id = ?'
       )
       .run(cleanTitle, body || '', new Date().toISOString(), id);
     return writingLab.get(id);
   },
   delete: (id) => {
-    const info = getDb().prepare('DELETE FROM writing_lab WHERE id = ?').run(id);
+    const info = getDb()
+      .prepare('DELETE FROM writing_lab_drafts WHERE id = ?')
+      .run(id);
     return { deleted: info.changes > 0 };
   },
   archive: (id) => {
     if (!writingLab.get(id)) throw new Error('Draft not found.');
     getDb()
-      .prepare('UPDATE writing_lab SET archived_at = ? WHERE id = ?')
+      .prepare('UPDATE writing_lab_drafts SET archived_at = ? WHERE id = ?')
       .run(new Date().toISOString(), id);
     return writingLab.get(id);
   },
   restore: (id) => {
     if (!writingLab.get(id)) throw new Error('Draft not found.');
     getDb()
-      .prepare('UPDATE writing_lab SET archived_at = NULL WHERE id = ?')
+      .prepare('UPDATE writing_lab_drafts SET archived_at = NULL WHERE id = ?')
       .run(id);
     return writingLab.get(id);
   },
@@ -1603,18 +1675,18 @@ async function exportAll(destFolder) {
 // safe. Only workspaces with real storage appear; Canon Bible/Review have no
 // tables yet and are intentionally omitted.
 const DASHBOARD_SECTIONS = [
-  { key: 'writing_lab',     label: 'Writing Lab',     table: 'writing_lab',     route: 'Writing Lab' },
-  { key: 'unsorted',        label: 'Unsorted',        table: 'unsorted_items',  route: 'Unsorted' },
-  { key: 'source_material', label: 'Source Material', table: 'source_material', route: 'Source Material' },
-  { key: 'documents',       label: 'Documents',       table: 'documents',       route: 'Documents' },
-  { key: 'open_questions',  label: 'Open Questions',  table: 'open_questions',  route: 'Open Questions' },
-  { key: 'conflicts',       label: 'Conflicts',       table: 'conflicts',       route: 'Conflicts' },
-  { key: 'decisions',       label: 'Decisions',       table: 'decisions',       route: 'Decisions' },
-  { key: 'brainstorm',      label: 'Brainstorm',      table: 'brainstorm_items', route: 'Brainstorm' },
-  { key: 'research',        label: 'Research',        table: 'research_items',  route: 'Research' },
-  { key: 'characters',      label: 'Characters',      table: 'characters',      route: 'Characters' },
-  { key: 'episodes',        label: 'Episodes',        table: 'episodes',        route: 'Episodes' },
-  { key: 'chats',           label: 'Chats',           table: 'chats',           route: 'Chat' },
+  { key: 'writing_lab',     label: 'Writing Lab',     table: 'writing_lab_drafts',   route: 'Writing Lab' },
+  { key: 'unsorted',        label: 'Unsorted',        table: 'unsorted_items',       route: 'Unsorted' },
+  { key: 'source_material', label: 'Source Material', table: 'source_material',      route: 'Source Material' },
+  { key: 'documents',       label: 'Documents',       table: 'documents',            route: 'Documents' },
+  { key: 'open_questions',  label: 'Open Questions',  table: 'open_questions',       route: 'Open Questions' },
+  { key: 'conflicts',       label: 'Conflicts',       table: 'conflicts',            route: 'Conflicts' },
+  { key: 'decisions',       label: 'Decisions',       table: 'decisions',            route: 'Decisions' },
+  { key: 'brainstorm',      label: 'Brainstorm',      table: 'brainstorm_items',     route: 'Brainstorm' },
+  { key: 'research',        label: 'Research',        table: 'research_items',       route: 'Research' },
+  { key: 'characters',      label: 'Characters',      table: 'characters_workspace', route: 'Characters' },
+  { key: 'episodes',        label: 'Episodes',        table: 'episodes_workspace',   route: 'Episodes' },
+  { key: 'chats',           label: 'Chats',           table: 'chats',                route: 'Chat' },
 ];
 
 const dashboard = {
