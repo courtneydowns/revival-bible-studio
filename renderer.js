@@ -1252,13 +1252,67 @@ function route(name) {
   content.appendChild(renderWorkspacePage(name));
 }
 
+// Per-workspace nav icons. These are the only glyphs shown when the nav is
+// collapsed to its icon rail, so each one stands in for its workspace; the
+// button's title attribute carries the full name as a hover tooltip.
+const NAV_ICONS = {
+  'Home': '🏠',
+  'Chat': '💬',
+  'Writing Lab': '✍️',
+  'Source Material': '📚',
+  'Documents': '📄',
+  'Canon Bible': '📖',
+  'Characters': '👤',
+  'Episodes': '🎬',
+  'Unsorted': '📥',
+  'Canon Review': '✅',
+  'Open Questions': '❓',
+  'Conflicts': '⚔️',
+  'Decisions': '⚖️',
+  'Brainstorm': '💡',
+  'Research': '🔎',
+  'Settings': '⚙️',
+};
+
 for (const name of WORKSPACES) {
   const btn = document.createElement('button');
-  btn.textContent = name;
+  // title doubles as the collapsed-rail tooltip; harmless when expanded.
+  btn.title = name;
+  const icon = document.createElement('span');
+  icon.className = 'nav-icon';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.textContent = NAV_ICONS[name] || '•';
+  const label = document.createElement('span');
+  label.className = 'nav-label';
+  label.textContent = name;
+  btn.append(icon, label);
   btn.addEventListener('click', () => route(name));
   buttons[name] = btn;
   nav.appendChild(btn);
 }
+
+// --- Collapsible nav --------------------------------------------------------
+// Collapsed = icon-only rail; expanded = full labels. The choice persists
+// across restarts (same pattern as the theme toggle).
+const NAV_KEY = 'revival.nav';
+const navToggle = document.getElementById('nav-toggle');
+
+function applyNavState(collapsed) {
+  nav.classList.toggle('collapsed', collapsed);
+  navToggle.textContent = collapsed ? '»' : '«';
+  const tip = collapsed ? 'Expand menu' : 'Collapse menu';
+  navToggle.title = tip;
+  navToggle.setAttribute('aria-label', tip);
+}
+
+let navCollapsed = localStorage.getItem(NAV_KEY) === 'collapsed';
+applyNavState(navCollapsed);
+
+navToggle.addEventListener('click', () => {
+  navCollapsed = !navCollapsed;
+  localStorage.setItem(NAV_KEY, navCollapsed ? 'collapsed' : 'expanded');
+  applyNavState(navCollapsed);
+});
 
 // Mount on body (not nav): inside #nav the broad `#nav button` rule would win
 // on specificity and stretch this to full width. As a fixed corner icon it

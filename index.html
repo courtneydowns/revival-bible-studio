@@ -41,8 +41,10 @@
         background: var(--panel);
         border-right: 1px solid var(--border);
         overflow-y: auto;
+        overflow-x: hidden;
         /* Extra top padding clears the small fixed Panic Export icon (top-left). */
         padding: 44px 0 12px;
+        transition: flex-basis 0.14s ease, width 0.14s ease;
       }
 
       /* --- Panic Export sticky button (P21) --------------------------------
@@ -74,15 +76,45 @@
         border-color: var(--accent);
       }
       #panic-export:disabled { cursor: default; }
+      /* Nav header: brand label + the collapse/expand toggle, side by side. */
+      .nav-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 4px 12px 14px 18px;
+      }
       #nav .brand {
         font-size: 13px;
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--muted);
-        padding: 4px 18px 14px;
+        white-space: nowrap;
+        overflow: hidden;
       }
+      /* Two ids so this wins over the broad `#nav button` rule below. */
+      #nav #nav-toggle {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        font-size: 14px;
+        line-height: 1;
+        background: var(--panel);
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #nav #nav-toggle:hover { color: var(--text); border-color: var(--accent); }
+
       #nav button {
-        display: block;
+        display: flex;
+        align-items: center;
+        gap: 12px;
         width: 100%;
         text-align: left;
         background: none;
@@ -93,12 +125,38 @@
         padding: 9px 18px;
         cursor: pointer;
       }
+      .nav-icon {
+        flex: 0 0 20px;
+        text-align: center;
+        font-size: 15px;
+        line-height: 1;
+      }
+      .nav-label { white-space: nowrap; overflow: hidden; }
       #nav button:hover { background: var(--hover); }
       #nav button.active {
         background: var(--hover);
         color: var(--accent);
         box-shadow: inset 3px 0 0 var(--accent);
         font-weight: 600;
+      }
+
+      /* Collapsed nav (icons only): a narrow rail. Labels + brand text hide,
+         icons center, and each button's title attribute supplies the hover
+         tooltip. The toggle stays visible to expand back to full width. */
+      #nav.collapsed {
+        width: 56px;
+        flex: 0 0 56px;
+      }
+      #nav.collapsed .brand { display: none; }
+      #nav.collapsed .nav-label { display: none; }
+      #nav.collapsed .nav-header {
+        justify-content: center;
+        padding: 4px 0 14px;
+      }
+      #nav.collapsed button {
+        justify-content: center;
+        gap: 0;
+        padding: 9px 0;
       }
 
       /* Theme toggle (P4): a small sun/moon icon sitting just to the right of
@@ -471,26 +529,35 @@
       .recent-meta { font-size: 11px; color: var(--muted); }
 
       /* --- Global Chat drawer (P14) ----------------------------------- */
-      /* Fixed toggle, always visible so the drawer is reachable from any
-         workspace. The drawer overlays the right edge without taking over
-         the app — the rest stays clickable. */
+      /* Fixed toggle in the top-right corner — a chat bubble icon that mirrors
+         the Panic Export bolt and theme toggle (same 28px faded circle) so the
+         three read as a consistent corner cluster. Hover shows "Chat". It hides
+         while the drawer is open; the drawer's own ✕ closes it from there. */
       #chat-toggle {
         position: fixed;
-        right: 22px;
-        bottom: 22px;
-        z-index: 30;
-        font: inherit;
+        top: 8px;
+        right: 8px;
+        z-index: 60;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         font-size: 14px;
-        font-weight: 600;
-        background: var(--accent);
-        color: #1a1a1a;
-        border: none;
+        line-height: 1;
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
         border-radius: 999px;
-        padding: 11px 18px;
         cursor: pointer;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+        opacity: 0.7;
+        transition: opacity 0.12s ease, border-color 0.12s ease;
       }
-      #chat-toggle:hover { filter: brightness(1.06); }
+      #chat-toggle:hover {
+        opacity: 1;
+        border-color: var(--accent);
+      }
+      #chat-toggle[aria-expanded="true"] { display: none; }
 
       #chat-drawer {
         position: fixed;
@@ -790,15 +857,20 @@
             aria-label="Panic Export — save a full backup now"
             title="Panic Export — save a full backup now">⚡</button>
     <div id="app">
-      <nav id="nav"><div class="brand">Revival Studio</div></nav>
+      <nav id="nav">
+        <div class="nav-header">
+          <span class="brand">Revival Studio</span>
+          <button id="nav-toggle" type="button"
+                  aria-label="Collapse menu" title="Collapse menu">«</button>
+        </div>
+      </nav>
       <main id="content"></main>
     </div>
 
     <!-- Global Chat drawer (P14): reachable from every workspace. Shell only —
          AI send/receive is wired up in a later phase. -->
-    <button id="chat-toggle" aria-expanded="false" aria-controls="chat-drawer">
-      💬 Chat
-    </button>
+    <button id="chat-toggle" aria-expanded="false" aria-controls="chat-drawer"
+            aria-label="Chat" title="Chat">💬</button>
     <aside id="chat-drawer" aria-hidden="true" aria-label="Chat">
       <header class="chat-header">
         <div class="chat-heading">
