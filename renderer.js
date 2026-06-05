@@ -3181,4 +3181,464 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+// --- PSEARCH — global search bar + result overlay -------------------------
+// Always-on top bar (index.html #topbar). Cmd/Ctrl+Shift+F focuses the input
+// from anywhere; Escape closes the overlay. Filters narrow results without
+// re-querying every keystroke — the input is debounced. Hits dispatch by
+// source kind: entry workspaces open the popout, Canon Bible / Writing Lab
+// route to the workspace, Chats open the chat drawer and switch the active
+// chat, and Tag hits apply themselves as the tag filter instead of routing
+// (tags aren't entries — they're a way of narrowing the search).
+const SEARCH_PER_GROUP_LIMIT = 25;
+
+const SEARCH_CANON_ENTRY_TYPES = [
+  'character', 'season', 'episode', 'locked_scene', 'locked_line',
+  'locked_decision', 'knowledge_state', 'timeline_event',
+  'viral_phase', 'virus_rule', 'institution', 'location',
+  'motif', 'theme', 'production_rule', 'principle', 'rewatch_beat',
+  'relationship',
+];
+const SEARCH_CANON_STATUSES = [
+  'draft', 'speculative', 'implied', 'provisional',
+  'confirmed', 'retired', 'struck',
+];
+// Each option is {value, label}. value matches the db.search source kind,
+// so the filter is passed straight through to the IPC call.
+const SEARCH_WORKSPACE_FILTER_OPTIONS = [
+  { value: 'unsorted',        label: 'Unsorted' },
+  { value: 'source_material', label: 'Source Material' },
+  { value: 'documents',       label: 'Documents' },
+  { value: 'open_questions',  label: 'Open Questions' },
+  { value: 'conflicts',       label: 'Conflicts' },
+  { value: 'decisions',       label: 'Decisions' },
+  { value: 'brainstorm',      label: 'Brainstorm' },
+  { value: 'research',        label: 'Research' },
+  { value: 'characters',      label: 'Characters' },
+  { value: 'episodes',        label: 'Episodes' },
+  { value: 'writing_lab',     label: 'Writing Lab' },
+  { value: 'canon_entries',   label: 'Canon Bible' },
+  { value: 'chats',           label: 'Chats' },
+  { value: 'tags',            label: 'Tags' },
+];
+const SEARCH_KIND_TO_WORKSPACE = {
+  unsorted: 'Unsorted',
+  source_material: 'Source Material',
+  documents: 'Documents',
+  open_questions: 'Open Questions',
+  conflicts: 'Conflicts',
+  decisions: 'Decisions',
+  brainstorm: 'Brainstorm',
+  research: 'Research',
+  characters: 'Characters',
+  episodes: 'Episodes',
+  writing_lab: 'Writing Lab',
+  canon_entries: 'Canon Bible',
+  chats: 'Chat',
+};
+// Workspaces wired into PUI2's popout. Other kinds route() instead.
+const SEARCH_POPOUT_KINDS = new Set([
+  'unsorted', 'source_material', 'documents', 'open_questions',
+  'conflicts', 'decisions', 'brainstorm', 'research',
+  'characters', 'episodes',
+]);
+
+const searchInput = document.getElementById('search-input');
+const searchClear = document.getElementById('search-clear');
+const searchResults = document.getElementById('search-results');
+const searchFilterWorkspace = document.getElementById('search-filter-workspace');
+const searchFilterType = document.getElementById('search-filter-type');
+const searchFilterCanonStatus = document.getElementById('search-filter-canon-status');
+const searchFilterLock = document.getElementById('search-filter-lock');
+const searchFilterTagCombo = document.getElementById('search-filter-tag-combo');
+const searchFilterTagTrigger = document.getElementById('search-filter-tag-trigger');
+const searchFilterTagPopover = document.getElementById('search-filter-tag-popover');
+const searchFilterTagSearch = document.getElementById('search-filter-tag-search');
+const searchFilterTagList = document.getElementById('search-filter-tag-list');
+
+// Tag filter state. searchTagLibrary is the full list from db.tags.listAll;
+// searchTagSelectedId is the currently applied tag (null = "any tag").
+// The combobox renders the library, filtered by searchFilterTagSearch's value.
+let searchTagLibrary = [];
+let searchTagSelectedId = null;
+
+function fillSearchFilter(select, options, allLabel) {
+  select.innerHTML = '';
+  const head = document.createElement('option');
+  head.value = '';
+  head.textContent = allLabel;
+  select.appendChild(head);
+  for (const opt of options) {
+    const o = document.createElement('option');
+    o.value = opt.value;
+    o.textContent = opt.label;
+    select.appendChild(o);
+  }
+}
+
+fillSearchFilter(searchFilterWorkspace, SEARCH_WORKSPACE_FILTER_OPTIONS, 'All sources');
+fillSearchFilter(
+  searchFilterType,
+  SEARCH_CANON_ENTRY_TYPES.map((t) => ({ value: t, label: t.replace(/_/g, ' ') })),
+  'Any type'
+);
+fillSearchFilter(
+  searchFilterCanonStatus,
+  SEARCH_CANON_STATUSES.map((s) => ({ value: s, label: s })),
+  'Any canon status'
+);
+fillSearchFilter(
+  searchFilterLock,
+  [{ value: 'locked', label: 'Locked' }, { value: 'unlocked', label: 'Unlocked' }],
+  'Any lock state'
+);
+
+async function loadSearchTagFilter() {
+  try {
+    searchTagLibrary = await window.revival.tags.listAll();
+  } catch {
+    searchTagLibrary = [];
+  }
+  // Drop the selection if the tag was deleted elsewhere.
+  if (
+    searchTagSelectedId != null &&
+    !searchTagLibrary.some((t) => t.id === searchTagSelectedId)
+  ) {
+    searchTagSelectedId = null;
+  }
+  renderSearchTagTrigger();
+  if (!searchFilterTagPopover.hidden) renderSearchTagOptions();
+}
+
+function selectedSearchTag() {
+  if (searchTagSelectedId == null) return null;
+  return searchTagLibrary.find((t) => t.id === searchTagSelectedId) || null;
+}
+
+function renderSearchTagTrigger() {
+  const sel = selectedSearchTag();
+  searchFilterTagTrigger.textContent = sel ? sel.name : 'Any tag';
+  searchFilterTagTrigger.title = sel ? `Filtering by tag: ${sel.name}` : 'Filter by tag';
+}
+
+function renderSearchTagOptions() {
+  const q = searchFilterTagSearch.value.trim().toLowerCase();
+  const matches = q
+    ? searchTagLibrary.filter((t) => t.name.toLowerCase().includes(q))
+    : searchTagLibrary.slice();
+
+  searchFilterTagList.innerHTML = '';
+
+  // "Any tag" entry is always shown at the top so the user can clear the
+  // selection without leaving the popover. Highlighted when nothing is set.
+  const anyBtn = document.createElement('button');
+  anyBtn.type = 'button';
+  anyBtn.className = 'search-filter-option';
+  if (searchTagSelectedId == null) anyBtn.classList.add('active');
+  anyBtn.textContent = 'Any tag';
+  anyBtn.addEventListener('click', () => {
+    searchTagSelectedId = null;
+    closeSearchTagPopover();
+    renderSearchTagTrigger();
+    if (searchInput.value.trim()) runSearchNow();
+  });
+  searchFilterTagList.appendChild(anyBtn);
+
+  if (matches.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'search-filter-popover-empty';
+    empty.textContent = 'No tags match.';
+    searchFilterTagList.appendChild(empty);
+    return;
+  }
+
+  for (const tag of matches) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'search-filter-option';
+    btn.setAttribute('role', 'option');
+    if (tag.id === searchTagSelectedId) btn.classList.add('active');
+    const name = document.createElement('span');
+    name.textContent = tag.name;
+    btn.appendChild(name);
+    if (tag.category) {
+      const cat = document.createElement('span');
+      cat.className = 'search-filter-option-cat';
+      cat.textContent = tag.category;
+      btn.appendChild(cat);
+    }
+    btn.addEventListener('click', () => {
+      searchTagSelectedId = tag.id;
+      closeSearchTagPopover();
+      renderSearchTagTrigger();
+      if (searchInput.value.trim()) runSearchNow();
+    });
+    searchFilterTagList.appendChild(btn);
+  }
+}
+
+function openSearchTagPopover() {
+  if (!searchFilterTagPopover.hidden) return;
+  searchFilterTagPopover.hidden = false;
+  searchFilterTagTrigger.setAttribute('aria-expanded', 'true');
+  searchFilterTagSearch.value = '';
+  renderSearchTagOptions();
+  searchFilterTagSearch.focus();
+}
+
+function closeSearchTagPopover() {
+  if (searchFilterTagPopover.hidden) return;
+  searchFilterTagPopover.hidden = true;
+  searchFilterTagTrigger.setAttribute('aria-expanded', 'false');
+}
+
+searchFilterTagTrigger.addEventListener('click', () => {
+  if (searchFilterTagPopover.hidden) openSearchTagPopover();
+  else closeSearchTagPopover();
+});
+searchFilterTagSearch.addEventListener('input', renderSearchTagOptions);
+searchFilterTagSearch.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    closeSearchTagPopover();
+    searchFilterTagTrigger.focus();
+  }
+});
+
+loadSearchTagFilter();
+
+let searchDebounce = null;
+// Monotonic token so a slow in-flight query can't overwrite a fresher one.
+let searchToken = 0;
+
+function currentSearchParams() {
+  return {
+    q: searchInput.value,
+    workspace: searchFilterWorkspace.value || null,
+    tagId: searchTagSelectedId,
+    entryType: searchFilterType.value || null,
+    canonStatus: searchFilterCanonStatus.value || null,
+    lockStatus: searchFilterLock.value || null,
+  };
+}
+
+function closeSearchResults() {
+  searchResults.hidden = true;
+  searchResults.innerHTML = '';
+}
+
+async function runSearchNow() {
+  const params = currentSearchParams();
+  searchClear.hidden = !params.q;
+  if (!params.q.trim()) {
+    closeSearchResults();
+    return;
+  }
+  const token = ++searchToken;
+  let res;
+  try {
+    res = await window.revival.search.run(params);
+  } catch (err) {
+    if (token !== searchToken) return;
+    searchResults.innerHTML = '';
+    const p = document.createElement('div');
+    p.className = 'search-empty';
+    p.textContent = 'Search failed: ' + ((err && err.message) || String(err));
+    searchResults.appendChild(p);
+    searchResults.hidden = false;
+    return;
+  }
+  if (token !== searchToken) return;
+  renderSearchResults(res);
+}
+
+function scheduleSearch() {
+  if (searchDebounce) clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(runSearchNow, 160);
+}
+
+function renderSearchResults({ groups }) {
+  searchResults.innerHTML = '';
+  searchResults.hidden = false;
+  if (!groups || groups.length === 0) {
+    const p = document.createElement('div');
+    p.className = 'search-empty';
+    p.textContent = 'No matches.';
+    searchResults.appendChild(p);
+    return;
+  }
+  for (const group of groups) {
+    const wrap = document.createElement('div');
+    wrap.className = 'search-group';
+    const head = document.createElement('div');
+    head.className = 'search-group-head';
+    const label = document.createElement('span');
+    label.className = 'search-group-label';
+    label.textContent = group.label;
+    const count = document.createElement('span');
+    count.className = 'search-group-count';
+    const isCapped = group.hits.length >= SEARCH_PER_GROUP_LIMIT;
+    count.textContent = `${group.hits.length}${isCapped ? '+' : ''}`;
+    head.appendChild(label);
+    head.appendChild(count);
+    wrap.appendChild(head);
+    for (const hit of group.hits) wrap.appendChild(renderSearchHit(group, hit));
+    searchResults.appendChild(wrap);
+  }
+}
+
+function renderSearchHit(group, hit) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'search-hit';
+  btn.setAttribute('role', 'option');
+  const title = document.createElement('div');
+  title.className = 'search-hit-title';
+  const titleText = document.createElement('span');
+  titleText.textContent = hit.title;
+  title.appendChild(titleText);
+  if (group.kind === 'canon_entries') {
+    if (hit.locked) {
+      const lock = document.createElement('span');
+      lock.className = 'search-hit-badge';
+      lock.title = 'Locked';
+      lock.textContent = '🔒';
+      title.appendChild(lock);
+    }
+    if (hit.entry_type) {
+      const type = document.createElement('span');
+      type.className = 'search-hit-badge';
+      type.textContent = String(hit.entry_type).replace(/_/g, ' ');
+      title.appendChild(type);
+    }
+    if (hit.canon_status) {
+      const stat = document.createElement('span');
+      stat.className = 'search-hit-badge';
+      stat.textContent = hit.canon_status;
+      title.appendChild(stat);
+    }
+  } else if (group.kind === 'tags' && hit.is_seed) {
+    const seed = document.createElement('span');
+    seed.className = 'search-hit-badge';
+    seed.textContent = 'seeded';
+    title.appendChild(seed);
+  }
+  btn.appendChild(title);
+  if (hit.snippet) {
+    const snip = document.createElement('div');
+    snip.className = 'search-hit-snippet';
+    snip.textContent = hit.snippet;
+    btn.appendChild(snip);
+  } else if (group.kind === 'tags' && hit.category) {
+    const meta = document.createElement('div');
+    meta.className = 'search-hit-meta';
+    meta.textContent = hit.category;
+    btn.appendChild(meta);
+  }
+  btn.addEventListener('click', () => openSearchHit(group, hit));
+  return btn;
+}
+
+function openSearchHit(group, hit) {
+  if (group.kind === 'tags') {
+    // Tags aren't entries — applying them as a filter is the click action.
+    searchTagSelectedId = hit.id;
+    renderSearchTagTrigger();
+    runSearchNow();
+    searchInput.focus();
+    return;
+  }
+  const workspace = SEARCH_KIND_TO_WORKSPACE[group.kind];
+  if (!workspace) return;
+  closeSearchResults();
+  if (group.kind === 'chats') {
+    setChatOpen(true);
+    setActiveChat(hit.id);
+    return;
+  }
+  if (SEARCH_POPOUT_KINDS.has(group.kind)) {
+    window.revival.popout.open(workspace, hit.id);
+    return;
+  }
+  // Canon Bible / Writing Lab: route to the workspace; entry selection is a
+  // later phase (Canon Bible deep-link is on the P32+ track).
+  route(workspace);
+}
+
+searchInput.addEventListener('input', () => {
+  searchClear.hidden = !searchInput.value;
+  scheduleSearch();
+});
+searchInput.addEventListener('focus', () => {
+  if (searchInput.value.trim()) runSearchNow();
+});
+searchClear.addEventListener('click', () => {
+  searchInput.value = '';
+  searchClear.hidden = true;
+  closeSearchResults();
+  searchInput.focus();
+});
+for (const sel of [
+  searchFilterWorkspace,
+  searchFilterType,
+  searchFilterCanonStatus,
+  searchFilterLock,
+]) {
+  sel.addEventListener('change', () => {
+    if (searchInput.value.trim()) runSearchNow();
+  });
+}
+
+// Outside-click dismiss for the overlay and the tag popover. The result
+// overlay closes only when the click leaves the topbar entirely; the tag
+// popover closes whenever the click lands outside of it (including on
+// other filters in the same bar — they're not part of the popover).
+document.addEventListener('mousedown', (e) => {
+  const topbar = document.getElementById('topbar');
+  if (!searchResults.hidden && topbar && !topbar.contains(e.target)) {
+    closeSearchResults();
+  }
+  if (
+    !searchFilterTagPopover.hidden &&
+    !searchFilterTagPopover.contains(e.target) &&
+    e.target !== searchFilterTagTrigger
+  ) {
+    closeSearchTagPopover();
+  }
+});
+
+// Cmd/Ctrl+Shift+F focuses the bar from anywhere; Escape dismisses the
+// overlay without clearing the query so the user can adjust filters and
+// reopen with the same term.
+window.addEventListener('keydown', (e) => {
+  if (
+    (e.metaKey || e.ctrlKey) &&
+    e.shiftKey &&
+    (e.key === 'f' || e.key === 'F')
+  ) {
+    e.preventDefault();
+    searchInput.focus();
+    searchInput.select();
+    if (searchInput.value.trim()) runSearchNow();
+    return;
+  }
+  if (e.key === 'Escape') {
+    if (!searchFilterTagPopover.hidden) {
+      e.preventDefault();
+      closeSearchTagPopover();
+      searchFilterTagTrigger.focus();
+      return;
+    }
+    if (!searchResults.hidden) {
+      e.preventDefault();
+      closeSearchResults();
+      searchInput.blur();
+    }
+  }
+});
+
+// PTAG allows tag creation from any entry's picker, so the filter list goes
+// stale whenever another window writes. Reuse the popout signal as a cheap
+// refresh trigger — listAll is small.
+window.revival.popout.onChanged(() => loadSearchTagFilter());
+
 route('Home');

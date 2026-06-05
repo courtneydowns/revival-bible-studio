@@ -2175,6 +2175,236 @@ const canon = {
   },
 };
 
+// PSEARCH — global search across workspaces, canon entries, chats, and tags.
+//
+// Returns results grouped by source so the UI can render one section per
+// kind. Each group's hits are limited (PER_GROUP_LIMIT) so a generic term
+// doesn't dump the whole DB into a dropdown.
+//
+// Filters:
+//   - workspace  : restricts to a single source kind (e.g. 'unsorted',
+//                  'canon_entries', 'chats', 'tags'). Empty/null = all.
+//   - tagId      : restricts entry-bearing sources to rows that carry this
+//                  tag in taggable_tags. Doesn't apply to chats or tags.
+//   - entryType  : canon_entries only — filters by entry_type enum.
+//   - canonStatus: canon_entries only — filters by canon_status enum.
+//   - lockStatus : canon_entries only — 'locked' / 'unlocked' (NULL = both).
+//
+// Active rows only (archived_at IS NULL where the column exists; retired = 0
+// for canon_entries). Title matches outrank body matches inside each source
+// so the most relevant hit is the one shown first.
+const PER_GROUP_LIMIT = 25;
+
+const SEARCH_SOURCES = [
+  { kind: 'unsorted',         label: 'Unsorted',        workspace: 'Unsorted',        table: 'unsorted_items',       entityKind: 'unsorted' },
+  { kind: 'source_material',  label: 'Source Material', workspace: 'Source Material', table: 'source_material',      entityKind: 'source_material' },
+  { kind: 'documents',        label: 'Documents',       workspace: 'Documents',       table: 'documents',            entityKind: 'documents' },
+  { kind: 'open_questions',   label: 'Open Questions',  workspace: 'Open Questions',  table: 'open_questions',       entityKind: 'open_questions' },
+  { kind: 'conflicts',        label: 'Conflicts',       workspace: 'Conflicts',       table: 'conflicts',            entityKind: 'conflicts' },
+  { kind: 'decisions',        label: 'Decisions',       workspace: 'Decisions',       table: 'decisions',            entityKind: 'decisions' },
+  { kind: 'brainstorm',       label: 'Brainstorm',      workspace: 'Brainstorm',      table: 'brainstorm_items',     entityKind: 'brainstorm' },
+  { kind: 'research',         label: 'Research',        workspace: 'Research',        table: 'research_items',       entityKind: 'research' },
+  { kind: 'characters',       label: 'Characters',      workspace: 'Characters',      table: 'characters_workspace', entityKind: 'characters' },
+  { kind: 'episodes',         label: 'Episodes',        workspace: 'Episodes',        table: 'episodes_workspace',   entityKind: 'episodes' },
+  { kind: 'writing_lab',      label: 'Writing Lab',     workspace: 'Writing Lab',     table: 'writing_lab_drafts',   entityKind: null },
+];
+
+function snippet(body, term, span = 80) {
+  if (!body) return '';
+  const text = String(body).replace(/\s+/g, ' ');
+  if (!term) return text.slice(0, span);
+  const i = text.toLowerCase().indexOf(term.toLowerCase());
+  if (i < 0) return text.slice(0, span);
+  const start = Math.max(0, i - Math.floor(span / 3));
+  return (start > 0 ? '…' : '') + text.slice(start, start + span);
+}
+
+const search = {
+  run: ({
+    q,
+    workspace,
+    tagId,
+    entryType,
+    canonStatus,
+    lockStatus,
+  } = {}) => {
+    const term = String(q || '').trim();
+    if (!term) return { groups: [], totals: { hits: 0 } };
+    const like = `%${term.replace(/[%_]/g, (c) => '\\' + c)}%`;
+    const db = getDb();
+    const groups = [];
+    let totalHits = 0;
+
+    // Entry-bearing workspaces (title + body LIKE; optional tag filter).
+    for (const src of SEARCH_SOURCES) {
+      if (workspace && workspace !== src.kind) continue;
+      let sql;
+      const params = [];
+      if (tagId && src.entityKind) {
+        sql = `
+          SELECT t.id, t.title, t.body
+            FROM ${src.table} t
+            JOIN taggable_tags tt
+              ON tt.entity_kind = ? AND tt.entity_id = t.id
+           WHERE t.archived_at IS NULL
+             AND tt.tag_id = ?
+             AND (t.title LIKE ? ESCAPE '\\' OR t.body LIKE ? ESCAPE '\\')
+           ORDER BY (t.title LIKE ? ESCAPE '\\') DESC,
+                    t.updated_at DESC, t.id DESC
+           LIMIT ?
+        `;
+        params.push(src.entityKind, Number(tagId), like, like, like, PER_GROUP_LIMIT);
+      } else if (tagId && !src.entityKind) {
+        // Tag filter excludes sources with no entity_kind (e.g. writing_lab).
+        continue;
+      } else {
+        sql = `
+          SELECT id, title, body
+            FROM ${src.table}
+           WHERE archived_at IS NULL
+             AND (title LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\')
+           ORDER BY (title LIKE ? ESCAPE '\\') DESC,
+                    updated_at DESC, id DESC
+           LIMIT ?
+        `;
+        params.push(like, like, like, PER_GROUP_LIMIT);
+      }
+      const rows = db.prepare(sql).all(...params);
+      if (rows.length === 0) continue;
+      const hits = rows.map((r) => ({
+        id: r.id,
+        title: r.title || '(untitled)',
+        snippet: snippet(r.body, term),
+      }));
+      groups.push({
+        kind: src.kind,
+        label: src.label,
+        workspace: src.workspace,
+        hits,
+      });
+      totalHits += hits.length;
+    }
+
+    // Canon entries — its own filters (entry_type / canon_status / lock).
+    if (!workspace || workspace === 'canon_entries') {
+      const where = [
+        'ce.retired = 0',
+        "(ce.title LIKE ? ESCAPE '\\' OR ce.body LIKE ? ESCAPE '\\')",
+      ];
+      const params = [like, like];
+      if (tagId) {
+        where.unshift(
+          `EXISTS (SELECT 1 FROM taggable_tags tt
+                    WHERE tt.entity_kind = 'canon_entries'
+                      AND tt.entity_id = ce.id
+                      AND tt.tag_id = ?)`
+        );
+        params.unshift(Number(tagId));
+      }
+      if (entryType) {
+        where.push('ce.entry_type = ?');
+        params.push(entryType);
+      }
+      if (canonStatus) {
+        where.push('ce.canon_status = ?');
+        params.push(canonStatus);
+      }
+      if (lockStatus === 'locked') where.push('ce.locked = 1');
+      else if (lockStatus === 'unlocked') where.push('ce.locked = 0');
+      params.push(like, PER_GROUP_LIMIT);
+      const sql = `
+        SELECT ce.id, ce.title, ce.body, ce.entry_type,
+               ce.locked, ce.canon_status
+          FROM canon_entries ce
+         WHERE ${where.join(' AND ')}
+         ORDER BY (ce.title LIKE ? ESCAPE '\\') DESC,
+                  ce.updated_at DESC, ce.id DESC
+         LIMIT ?
+      `;
+      const rows = db.prepare(sql).all(...params);
+      if (rows.length > 0) {
+        groups.push({
+          kind: 'canon_entries',
+          label: 'Canon Bible',
+          workspace: 'Canon Bible',
+          hits: rows.map((r) => ({
+            id: r.id,
+            title: r.title || '(untitled)',
+            snippet: snippet(r.body, term),
+            entry_type: r.entry_type,
+            locked: !!r.locked,
+            canon_status: r.canon_status,
+          })),
+        });
+        totalHits += rows.length;
+      }
+    }
+
+    // Chats — title only (no body column on chats). Active chats only.
+    if (!workspace || workspace === 'chats') {
+      if (!tagId) {
+        const rows = db
+          .prepare(
+            `SELECT id, title FROM chats
+              WHERE archived_at IS NULL AND title LIKE ? ESCAPE '\\'
+              ORDER BY updated_at DESC, id DESC
+              LIMIT ?`
+          )
+          .all(like, PER_GROUP_LIMIT);
+        if (rows.length > 0) {
+          groups.push({
+            kind: 'chats',
+            label: 'Chats',
+            workspace: 'Chat',
+            hits: rows.map((r) => ({ id: r.id, title: r.title })),
+          });
+          totalHits += rows.length;
+        }
+      }
+    }
+
+    // Tags — match by name. Clicking a tag hit applies it as a filter in the UI.
+    if (!workspace || workspace === 'tags') {
+      if (!tagId) {
+        const rows = db
+          .prepare(
+            `SELECT id, name, category, is_seed
+               FROM tags
+              WHERE name LIKE ? ESCAPE '\\'
+              ORDER BY (name LIKE ? ESCAPE '\\') DESC, name COLLATE NOCASE
+              LIMIT ?`
+          )
+          .all(like, like, PER_GROUP_LIMIT);
+        if (rows.length > 0) {
+          groups.push({
+            kind: 'tags',
+            label: 'Tags',
+            workspace: null,
+            hits: rows.map((r) => ({
+              id: r.id,
+              title: r.name,
+              category: r.category,
+              is_seed: !!r.is_seed,
+            })),
+          });
+          totalHits += rows.length;
+        }
+      }
+    }
+
+    return { groups, totals: { hits: totalHits } };
+  },
+
+  // Static metadata for the renderer's filter dropdowns. Kept here so the UI
+  // doesn't hard-code workspace names independently of the server side.
+  sources: () =>
+    SEARCH_SOURCES.map((s) => ({
+      kind: s.kind,
+      label: s.label,
+      workspace: s.workspace,
+    })),
+};
+
 module.exports = {
   initDatabase,
   getDb,
@@ -2184,6 +2414,7 @@ module.exports = {
   canon,
   canonProposals,
   tags,
+  search,
   getDbPath,
   DB_FILENAME,
   MIGRATIONS,

@@ -217,6 +217,11 @@ function registerIpc() {
     db.tags.rename(tagId, name)
   );
 
+  // PSEARCH — global search across workspaces, canon entries, chats, tags.
+  // One read-only IPC; the renderer debounces and passes the term + active
+  // filters in a single call.
+  ipcMain.handle('search:run', (_event, params) => db.search.run(params));
+
   ipcMain.handle('settings:getProjectRules', () => db.settings.getProjectRules());
   ipcMain.handle('settings:setProjectRules', (_event, text) =>
     db.settings.setProjectRules(text)

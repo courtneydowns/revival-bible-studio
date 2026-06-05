@@ -33,7 +33,11 @@
         background: var(--bg);
         color: var(--text);
       }
-      #app { display: flex; height: 100%; }
+      /* PSEARCH: column layout so the always-on top bar sits above #app
+         (nav + content). The fixed Panic/theme/chat icons stay where they
+         are — topbar leaves them clear via left/right padding. */
+      body { display: flex; flex-direction: column; }
+      #app { display: flex; flex: 1 1 auto; min-height: 0; }
 
       #nav {
         width: 220px;
@@ -42,8 +46,9 @@
         border-right: 1px solid var(--border);
         overflow-y: auto;
         overflow-x: hidden;
-        /* Extra top padding clears the small fixed Panic Export icon (top-left). */
-        padding: 44px 0 12px;
+        /* Topbar sits above #app and already clears the fixed Panic icon, so
+           the nav only needs its own modest top padding here. */
+        padding: 12px 0;
         transition: flex-basis 0.14s ease, width 0.14s ease;
       }
 
@@ -76,6 +81,247 @@
         border-color: var(--accent);
       }
       #panic-export:disabled { cursor: default; }
+
+      /* --- PSEARCH: top bar + result overlay -------------------------------
+         Always-on strip across the whole app. Left padding clears the fixed
+         Panic + theme icons; right padding clears the chat toggle. The
+         results overlay is positioned relative to the bar via #topbar's
+         position:relative, so it spans the bar's width and stacks above
+         page content (z-index just below the chat drawer). */
+      #topbar {
+        flex: 0 0 44px;
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 48px 0 78px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--border);
+        z-index: 35;
+      }
+      .search-bar {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 4px 10px;
+        min-width: 0;
+      }
+      .search-bar:focus-within { border-color: var(--accent); }
+      .search-icon {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1;
+        flex: 0 0 auto;
+      }
+      .search-input {
+        flex: 1;
+        min-width: 0;
+        background: transparent;
+        border: none;
+        outline: none;
+        font: inherit;
+        font-size: 13px;
+        color: var(--text);
+        padding: 4px 0;
+      }
+      .search-clear {
+        background: none;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 14px;
+        padding: 2px 6px;
+        line-height: 1;
+      }
+      .search-clear:hover { color: var(--text); }
+      .search-filters {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex: 0 0 auto;
+      }
+      .search-filter {
+        font: inherit;
+        font-size: 12px;
+        color: var(--text);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 4px 6px;
+        cursor: pointer;
+        max-width: 140px;
+      }
+      .search-filter:focus { outline: none; border-color: var(--accent); }
+
+      /* Tag-filter combobox: visible trigger button + popover with its own
+         search input and scrollable list. Lets the user sift ~130 tags
+         without leaving the bar. The popover anchors to the trigger. */
+      .search-filter-combo { position: relative; flex: 0 0 auto; }
+      .search-filter-trigger {
+        text-align: left;
+        min-width: 96px;
+        max-width: 160px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .search-filter-trigger[aria-expanded="true"] {
+        border-color: var(--accent);
+      }
+      .search-filter-popover {
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        width: 260px;
+        max-height: 320px;
+        display: flex;
+        flex-direction: column;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+        z-index: 37;
+        padding: 6px;
+      }
+      .search-filter-popover[hidden] { display: none; }
+      .search-filter-popover-input {
+        flex: 0 0 auto;
+        font: inherit;
+        font-size: 12px;
+        color: var(--text);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 5px 8px;
+        outline: none;
+      }
+      .search-filter-popover-input:focus { border-color: var(--accent); }
+      .search-filter-popover-list {
+        flex: 1 1 auto;
+        overflow-y: auto;
+        margin-top: 6px;
+      }
+      .search-filter-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        color: var(--text);
+        font: inherit;
+        font-size: 12px;
+        padding: 6px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .search-filter-option:hover { background: var(--hover); }
+      .search-filter-option.active { color: var(--accent); font-weight: 600; }
+      .search-filter-option-cat {
+        margin-left: auto;
+        font-size: 10px;
+        color: var(--muted);
+      }
+      .search-filter-popover-empty {
+        padding: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        text-align: center;
+      }
+
+      .search-shortcut {
+        font-size: 11px;
+        color: var(--muted);
+        padding-left: 4px;
+        white-space: nowrap;
+      }
+
+      .search-results {
+        position: absolute;
+        top: 100%;
+        left: 78px;
+        right: 48px;
+        margin-top: 6px;
+        max-height: 70vh;
+        overflow-y: auto;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+        z-index: 36;
+        padding: 8px 0;
+      }
+      .search-results[hidden] { display: none; }
+      .search-empty,
+      .search-hint {
+        padding: 14px 18px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .search-group { padding: 6px 0; }
+      .search-group + .search-group { border-top: 1px solid var(--border); }
+      .search-group-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        padding: 6px 18px 4px;
+      }
+      .search-group-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+      .search-group-count { font-size: 11px; color: var(--muted); }
+      .search-hit {
+        display: block;
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        color: var(--text);
+        font: inherit;
+        padding: 8px 18px;
+        cursor: pointer;
+      }
+      .search-hit:hover { background: var(--hover); }
+      .search-hit-title {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 2px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .search-hit-meta {
+        font-size: 11px;
+        color: var(--muted);
+        font-weight: 400;
+      }
+      .search-hit-snippet {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.4;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .search-hit-badge {
+        display: inline-block;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 1px 5px;
+      }
+
       /* Nav header: brand label + the collapse/expand toggle, side by side. */
       .nav-header {
         display: flex;
@@ -1617,6 +1863,54 @@
     <button id="panic-export" type="button"
             aria-label="Panic Export — save a full backup now"
             title="Panic Export — save a full backup now">⚡</button>
+
+    <!-- PSEARCH: always-on top bar — search across workspaces, canon, chats,
+         tags. Cmd/Ctrl+Shift+F focuses the input from anywhere; Escape
+         closes the result overlay. Filters narrow by workspace, tag, canon
+         entry type, canon status, and lock status. -->
+    <header id="topbar" role="search">
+      <div class="search-bar">
+        <span class="search-icon" aria-hidden="true">🔍</span>
+        <input
+          id="search-input"
+          class="search-input"
+          type="search"
+          placeholder="Search workspaces, canon, chats, tags…"
+          aria-label="Search"
+          autocomplete="off"
+        />
+        <button id="search-clear" class="search-clear" type="button"
+                aria-label="Clear search" title="Clear" hidden>✕</button>
+      </div>
+      <div class="search-filters">
+        <select id="search-filter-workspace" class="search-filter"
+                aria-label="Filter by workspace"></select>
+        <div class="search-filter-combo" id="search-filter-tag-combo">
+          <button id="search-filter-tag-trigger" type="button"
+                  class="search-filter search-filter-trigger"
+                  aria-haspopup="listbox" aria-expanded="false"
+                  aria-label="Filter by tag">Any tag</button>
+          <div id="search-filter-tag-popover" class="search-filter-popover" hidden>
+            <input id="search-filter-tag-search" type="text"
+                   class="search-filter-popover-input"
+                   placeholder="Search tags…" aria-label="Search tag list"
+                   autocomplete="off" />
+            <div id="search-filter-tag-list" class="search-filter-popover-list"
+                 role="listbox" aria-label="Tag list"></div>
+          </div>
+        </div>
+        <select id="search-filter-type" class="search-filter"
+                aria-label="Filter by canon entry type"></select>
+        <select id="search-filter-canon-status" class="search-filter"
+                aria-label="Filter by canon status"></select>
+        <select id="search-filter-lock" class="search-filter"
+                aria-label="Filter by lock status"></select>
+      </div>
+      <span class="search-shortcut" aria-hidden="true">⌘⇧F</span>
+      <div id="search-results" class="search-results" role="listbox"
+           aria-label="Search results" hidden></div>
+    </header>
+
     <div id="app">
       <nav id="nav">
         <div class="nav-header">

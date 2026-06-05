@@ -176,11 +176,12 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Search
 
-### PSEARCH — Global search
+### PSEARCH — Global search ✅
 - Search across all workspaces, canon entries, chats, tags
 - Filterable by: workspace, entry type, tag, canon status, lock status
 - Results grouped by source
-- **Smoke:** Search a term that exists in three different workspaces, confirm results from each; filter by workspace, confirm narrowing
+- Always-on top bar with Cmd/Ctrl+Shift+F shortcut; tag filter is a searchable combobox
+- **Smoke passed.**
 
 ---
 

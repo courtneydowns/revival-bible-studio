@@ -153,6 +153,11 @@ contextBridge.exposeInMainWorld('revival', {
     setProjectRules: (text) =>
       ipcRenderer.invoke('settings:setProjectRules', text),
   },
+  // PSEARCH — read-only global search. Renderer passes { q, workspace,
+  // tagId, entryType, canonStatus, lockStatus }; main returns groups by source.
+  search: {
+    run: (params) => ipcRenderer.invoke('search:run', params),
+  },
   panic: {
     export: () => ipcRenderer.invoke('panic:export'),
   },
