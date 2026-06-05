@@ -41,6 +41,9 @@ function registerIpc() {
   ipcMain.handle('documents:delete', (_event, id) => db.documents.delete(id));
   ipcMain.handle('documents:archive', (_event, id) => db.documents.archive(id));
   ipcMain.handle('documents:restore', (_event, id) => db.documents.restore(id));
+
+  ipcMain.handle('chats:list', () => db.chats.list());
+  ipcMain.handle('chats:create', (_event, chat) => db.chats.create(chat));
 }
 
 app.whenReady().then(() => {

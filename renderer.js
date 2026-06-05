@@ -33,7 +33,7 @@ const WORKSPACE_INFO = {
   },
   'Chat': {
     purpose: 'Talk through the Revival project with Claude. (Becomes a global drawer in a later phase.)',
-    next: 'Open the chat drawer (💬 Chat, bottom-right of any workspace) to start. Attaching Source Material comes in a later phase.',
+    next: 'Open the chat drawer (💬 Chat, bottom-right of any workspace), click “+ New chat” to create chats, and switch between them with the dropdown. Attaching Source Material comes in a later phase.',
     savedTo: 'Chats are kept in this Chat workspace. Attachments come from Source Material only.',
     lifecycle: 'Chats can be renamed, archived, and restored. Nothing is finalized without your confirmation.',
   },
@@ -721,15 +721,83 @@ nav.appendChild(themeToggle);
 
 // --- Global Chat drawer (shell only; no AI yet) -----------------------------
 // The toggle is fixed and outside #content, so the drawer opens/closes from
-// every workspace without taking over the app.
+// every workspace without taking over the app. P15 adds multiple chats: a
+// title dropdown lists them and switches the active chat. Chats are created
+// only on an explicit "+ New chat" click — nothing is seeded silently. There
+// are no messages yet (those arrive with AI in a later phase).
 const chatDrawer = document.getElementById('chat-drawer');
 const chatToggle = document.getElementById('chat-toggle');
 const chatClose = document.getElementById('chat-close');
+const chatSelect = document.getElementById('chat-select');
+const chatNewBtn = document.getElementById('chat-new');
+const chatMessages = document.getElementById('chat-messages');
+
+const ACTIVE_CHAT_KEY = 'revival.chat.active';
+let chatList = [];
+let activeChatId = null;
 
 function setChatOpen(open) {
   chatDrawer.classList.toggle('open', open);
   chatDrawer.setAttribute('aria-hidden', open ? 'false' : 'true');
   chatToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+// The message area is a shell: no messages exist yet. It names the active chat
+// so switching via the dropdown visibly changes what's shown.
+function renderChatBody() {
+  chatMessages.innerHTML = '';
+  const p = document.createElement('p');
+  p.className = 'chat-empty';
+  const active = chatList.find((c) => c.id === activeChatId);
+  if (!active) {
+    p.textContent =
+      'No chats yet. Click “+ New chat” to start one. Messaging Claude is added in a later phase; attachments will come from Source Material only. Nothing here is saved or sent without your confirmation.';
+  } else {
+    p.textContent =
+      `You’re in “${active.title}”. Messaging Claude here is added in a later phase. ` +
+      'Attachments will come from Source Material only. Nothing here is saved or sent without your confirmation.';
+  }
+  chatMessages.appendChild(p);
+}
+
+function renderChatSelect() {
+  chatSelect.innerHTML = '';
+  if (chatList.length === 0) {
+    const opt = document.createElement('option');
+    opt.textContent = 'No chats yet';
+    chatSelect.appendChild(opt);
+    chatSelect.disabled = true;
+    return;
+  }
+  chatSelect.disabled = false;
+  for (const chat of chatList) {
+    const opt = document.createElement('option');
+    opt.value = String(chat.id);
+    opt.textContent = chat.title;
+    chatSelect.appendChild(opt);
+  }
+  chatSelect.value = String(activeChatId);
+}
+
+function setActiveChat(id) {
+  activeChatId = id;
+  if (id == null) {
+    localStorage.removeItem(ACTIVE_CHAT_KEY);
+  } else {
+    localStorage.setItem(ACTIVE_CHAT_KEY, String(id));
+  }
+  renderChatSelect();
+  renderChatBody();
+}
+
+async function loadChats() {
+  chatList = await window.revival.chats.list();
+  // Restore the previously active chat if it still exists; else fall back to
+  // the first chat, or none when the list is empty.
+  const saved = Number(localStorage.getItem(ACTIVE_CHAT_KEY));
+  const stillExists = chatList.some((c) => c.id === saved);
+  const next = stillExists ? saved : chatList.length ? chatList[0].id : null;
+  setActiveChat(next);
 }
 
 chatToggle.addEventListener('click', () =>
@@ -741,5 +809,25 @@ document.addEventListener('keydown', (e) => {
     setChatOpen(false);
   }
 });
+
+chatSelect.addEventListener('change', () => {
+  setActiveChat(Number(chatSelect.value));
+});
+
+chatNewBtn.addEventListener('click', async () => {
+  chatNewBtn.disabled = true;
+  try {
+    // Default name is just a sequential label; rename arrives in a later phase.
+    const created = await window.revival.chats.create({
+      title: `Chat ${chatList.length + 1}`,
+    });
+    chatList.push(created);
+    setActiveChat(created.id);
+  } finally {
+    chatNewBtn.disabled = false;
+  }
+});
+
+loadChats();
 
 route('Home');

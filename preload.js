@@ -30,4 +30,8 @@ contextBridge.exposeInMainWorld('revival', {
     archive: (id) => ipcRenderer.invoke('documents:archive', id),
     restore: (id) => ipcRenderer.invoke('documents:restore', id),
   },
+  chats: {
+    list: () => ipcRenderer.invoke('chats:list'),
+    create: (chat) => ipcRenderer.invoke('chats:create', chat),
+  },
 });

@@ -80,6 +80,24 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '006_chats',
+    up(db) {
+      // Chats: named conversation containers in the global Chat drawer. Shell
+      // only — no messages and no AI yet (those arrive in later phases). The
+      // archived_at column is included now for the standard reversible-archive
+      // shape; rename/archive/restore wiring comes in a later phase.
+      db.exec(`
+        CREATE TABLE chats (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          title       TEXT NOT NULL,
+          created_at  TEXT NOT NULL,
+          updated_at  TEXT NOT NULL,
+          archived_at TEXT
+        );
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -268,6 +286,29 @@ function makeEntryRepo(table) {
 const sourceMaterial = makeEntryRepo('source_material');
 const documents = makeEntryRepo('documents');
 
+// --- Chats repository ------------------------------------------------------
+// Chats are conversation containers for the global Chat drawer. P15 covers
+// create + list (active) only; rename/archive/restore arrive in a later phase.
+const chats = {
+  list: () =>
+    getDb()
+      .prepare(
+        'SELECT * FROM chats WHERE archived_at IS NULL ORDER BY created_at ASC, id ASC'
+      )
+      .all(),
+  get: (id) => getDb().prepare('SELECT * FROM chats WHERE id = ?').get(id),
+  create: ({ title } = {}) => {
+    const cleanTitle = (title || '').trim() || 'New chat';
+    const now = new Date().toISOString();
+    const info = getDb()
+      .prepare(
+        'INSERT INTO chats (title, created_at, updated_at) VALUES (?, ?, ?)'
+      )
+      .run(cleanTitle, now, now);
+    return chats.get(info.lastInsertRowid);
+  },
+};
+
 module.exports = {
   initDatabase,
   getDb,
@@ -276,6 +317,7 @@ module.exports = {
   MIGRATIONS,
   sourceMaterial,
   documents,
+  chats,
   listUnsorted,
   listArchivedUnsorted,
   getUnsorted,

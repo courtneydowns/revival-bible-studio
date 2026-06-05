@@ -281,8 +281,24 @@
         padding: 16px 18px;
         border-bottom: 1px solid var(--border);
       }
-      .chat-title { font-size: 16px; font-weight: 600; }
-      .chat-subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+      .chat-heading { flex: 1; min-width: 0; }
+      #chat-select {
+        font: inherit;
+        font-size: 15px;
+        font-weight: 600;
+        max-width: 100%;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 9px;
+        cursor: pointer;
+      }
+      #chat-select:disabled { opacity: 0.6; cursor: default; }
+      #chat-select:focus { outline: none; border-color: var(--accent); }
+      .chat-header-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+      #chat-new { font: inherit; font-size: 13px; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+      .chat-subtitle { font-size: 12px; color: var(--muted); margin-top: 4px; }
       #chat-close {
         background: none;
         border: none;
@@ -339,19 +355,15 @@
     <aside id="chat-drawer" aria-hidden="true" aria-label="Chat">
       <header class="chat-header">
         <div class="chat-heading">
-          <div class="chat-title">Revival Chat</div>
-          <div class="chat-subtitle">Default chat · reachable from anywhere</div>
+          <select id="chat-select" aria-label="Active chat" disabled></select>
+          <div class="chat-subtitle">Switch chats from the dropdown · reachable from anywhere</div>
         </div>
-        <button id="chat-close" aria-label="Close chat">✕</button>
+        <div class="chat-header-actions">
+          <button id="chat-new" class="btn-secondary" type="button">+ New chat</button>
+          <button id="chat-close" aria-label="Close chat">✕</button>
+        </div>
       </header>
-      <div class="chat-messages">
-        <p class="chat-empty">
-          This is your project chat — open from any workspace.
-          Messaging Claude here is added in a later phase. Attachments will come
-          from Source Material only. Nothing here is saved or sent without your
-          confirmation.
-        </p>
-      </div>
+      <div class="chat-messages" id="chat-messages"></div>
       <form class="chat-composer" id="chat-composer">
         <textarea
           class="chat-input"
