@@ -1901,6 +1901,72 @@ const tags = {
       .prepare('SELECT id, name, category, is_seed FROM tags WHERE id = ?')
       .get(info.lastInsertRowid);
   },
+
+  // PTAGDEL — usage summary for the delete confirmation. Returns the number of
+  // entries the tag is on and how many distinct workspaces (entity_kinds) those
+  // entries span, so the UI can show "used on N entries across X workspaces".
+  usage: (tagId) => {
+    const tid = Number(tagId);
+    if (!Number.isFinite(tid)) throw new Error('tag id is required');
+    const row = getDb()
+      .prepare(
+        `SELECT COUNT(*)                       AS entries,
+                COUNT(DISTINCT entity_kind)     AS workspaces
+           FROM taggable_tags
+          WHERE tag_id = ?`
+      )
+      .get(tid);
+    return { entries: row.entries || 0, workspaces: row.workspaces || 0 };
+  },
+
+  // PTAGDEL — delete a user-created tag. Seeded tags can never be deleted (the
+  // UI hides the affordance; this is the backend guard). Unlinks the tag from
+  // every entity, then removes the tag itself. The ON DELETE CASCADE on
+  // taggable_tags would do the unlink, but we delete links explicitly so the
+  // behavior is independent of the foreign_keys pragma.
+  remove: (tagId) => {
+    const tid = Number(tagId);
+    if (!Number.isFinite(tid)) throw new Error('tag id is required');
+    const tag = getDb()
+      .prepare('SELECT id, is_seed FROM tags WHERE id = ?')
+      .get(tid);
+    if (!tag) throw new Error('Tag not found.');
+    if (tag.is_seed) throw new Error('Seeded tags cannot be deleted.');
+    const tx = getDb().transaction((id) => {
+      getDb().prepare('DELETE FROM taggable_tags WHERE tag_id = ?').run(id);
+      getDb().prepare('DELETE FROM tags WHERE id = ?').run(id);
+    });
+    tx(tid);
+    return { deleted: true };
+  },
+
+  // PTAGDEL — rename a user-created tag in place. Seeded tags are immutable.
+  // The new name is normalized (lowercased + trimmed) like create(); renaming
+  // to a name that already exists (case-insensitive, different tag) is blocked
+  // to preserve duplicate prevention. No links are touched — every entry that
+  // carries this tag now shows the new name automatically.
+  rename: (tagId, newName) => {
+    const tid = Number(tagId);
+    if (!Number.isFinite(tid)) throw new Error('tag id is required');
+    const clean = String(newName || '').trim().toLowerCase();
+    if (!clean) throw new Error('Tag name is required.');
+    const tag = getDb()
+      .prepare('SELECT id, name, category, is_seed FROM tags WHERE id = ?')
+      .get(tid);
+    if (!tag) throw new Error('Tag not found.');
+    if (tag.is_seed) throw new Error('Seeded tags cannot be renamed.');
+    const clash = getDb()
+      .prepare('SELECT id FROM tags WHERE name = ? COLLATE NOCASE AND id != ?')
+      .get(clean, tid);
+    if (clash) throw new Error(`A tag named “${clean}” already exists.`);
+    const now = new Date().toISOString();
+    getDb()
+      .prepare('UPDATE tags SET name = ?, updated_at = ? WHERE id = ?')
+      .run(clean, now, tid);
+    return getDb()
+      .prepare('SELECT id, name, category, is_seed FROM tags WHERE id = ?')
+      .get(tid);
+  },
 };
 
 const canonProposals = {

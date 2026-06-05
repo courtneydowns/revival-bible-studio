@@ -1602,7 +1602,237 @@ function renderSettingsPage(section) {
     refreshDirty();
   })();
 
+  renderManageTags(section);
   renderPanicExport(section);
+}
+
+// --- Settings: Manage Tags (PTAGDEL) ---------------------------------------
+// Lists every tag. User-created tags can be renamed in place (across all
+// entries) or deleted (unlinked from every entry everywhere, then removed).
+// Seeded tags are immutable here — no rename, no delete affordance — per the
+// tag rules. Delete asks for confirmation and shows the usage count first.
+function renderManageTags(section) {
+  const api = window.revival.tags;
+
+  const block = document.createElement('div');
+  block.className = 'entry-form settings-block';
+
+  // Collapsed by default — the tag library can be long. Expanding reveals a
+  // search box that filters the list as you type (name, case-insensitive).
+  const details = document.createElement('details');
+  details.className = 'tag-manage-details';
+
+  const summary = document.createElement('summary');
+  summary.className = 'settings-heading tag-manage-summary';
+  summary.textContent = 'Manage Tags';
+  details.appendChild(summary);
+
+  const desc = document.createElement('p');
+  desc.className = 'settings-desc';
+  desc.textContent =
+    'Rename or delete the tags you created. Renaming updates the tag everywhere ' +
+    'it is used. Deleting removes it from every entry across all workspaces. ' +
+    'Seeded tags cannot be renamed or deleted.';
+
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.className = 'tag-manage-search';
+  search.placeholder = 'Search tags…';
+  search.addEventListener('input', render);
+
+  const status = document.createElement('p');
+  status.className = 'draft-status';
+
+  const listHost = document.createElement('div');
+  listHost.className = 'tag-manage-list';
+
+  details.append(desc, search, status, listHost);
+  block.appendChild(details);
+  section.appendChild(block);
+
+  let library = [];
+
+  // Re-fetch from the db, then render through the current search filter.
+  async function reload() {
+    try {
+      library = await api.listAll();
+    } catch (err) {
+      setStatus(status, `Could not load tags: ${err.message || err}`);
+      return;
+    }
+    render();
+  }
+
+  // Render the cached library filtered by the search box. Pure DOM rebuild;
+  // reload() handles re-fetching after a rename/delete.
+  function render() {
+    const q = search.value.trim().toLowerCase();
+    const matches = q
+      ? library.filter((t) => t.name.toLowerCase().includes(q))
+      : library;
+
+    listHost.innerHTML = '';
+    if (!library.length) {
+      const empty = document.createElement('p');
+      empty.className = 'settings-desc';
+      empty.textContent = 'No tags yet.';
+      listHost.appendChild(empty);
+      return;
+    }
+    if (!matches.length) {
+      const empty = document.createElement('p');
+      empty.className = 'settings-desc';
+      empty.textContent = `No tags match “${search.value.trim()}”.`;
+      listHost.appendChild(empty);
+      return;
+    }
+    for (const tag of matches) {
+      listHost.appendChild(renderRow(tag));
+    }
+  }
+
+  function renderRow(tag) {
+    const row = document.createElement('div');
+    row.className = 'tag-manage-row';
+
+    const name = document.createElement('span');
+    name.className = 'tag-manage-name';
+    name.textContent = tag.name;
+    row.appendChild(name);
+
+    if (tag.is_seed) {
+      const badge = document.createElement('span');
+      badge.className = 'tag-manage-seed';
+      badge.textContent = 'seeded';
+      badge.title = 'Seeded tags cannot be renamed or deleted.';
+      row.appendChild(badge);
+      return row;
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'tag-manage-actions';
+
+    const renameBtn = document.createElement('button');
+    renameBtn.type = 'button';
+    renameBtn.textContent = 'Rename';
+    renameBtn.addEventListener('click', () =>
+      startRename(row, tag, actions)
+    );
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'danger';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', () =>
+      startDelete(row, tag, actions)
+    );
+
+    actions.append(renameBtn, deleteBtn);
+    row.appendChild(actions);
+    return row;
+  }
+
+  // Inline rename: swap the action buttons for an input + Save/Cancel.
+  function startRename(row, tag, actions) {
+    actions.innerHTML = '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'tag-manage-input';
+    input.value = tag.name;
+
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.textContent = 'Save';
+
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.textContent = 'Cancel';
+    cancel.addEventListener('click', reload);
+
+    async function commit() {
+      const next = input.value.trim();
+      if (!next || next.toLowerCase() === tag.name.toLowerCase()) {
+        reload();
+        return;
+      }
+      save.disabled = true;
+      try {
+        await api.rename(tag.id, next);
+        if (window.RevivalTags) window.RevivalTags.clearCache();
+        setStatus(status, `Renamed “${tag.name}” to “${next.toLowerCase()}”.`);
+        reload();
+      } catch (err) {
+        save.disabled = false;
+        setStatus(status, `Could not rename: ${err.message || err}`);
+      }
+    }
+
+    save.addEventListener('click', commit);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') commit();
+      if (e.key === 'Escape') reload();
+    });
+
+    actions.append(input, save, cancel);
+    input.focus();
+    input.select();
+  }
+
+  // Inline delete: fetch usage, show the count, require an explicit confirm.
+  async function startDelete(row, tag, actions) {
+    actions.innerHTML = '';
+    const loading = document.createElement('span');
+    loading.className = 'tag-manage-confirm-text';
+    loading.textContent = 'Checking usage…';
+    actions.appendChild(loading);
+
+    let usage = { entries: 0, workspaces: 0 };
+    try {
+      usage = await api.usage(tag.id);
+    } catch (err) {
+      setStatus(status, `Could not check usage: ${err.message || err}`);
+      reload();
+      return;
+    }
+
+    actions.innerHTML = '';
+    const text = document.createElement('span');
+    text.className = 'tag-manage-confirm-text';
+    text.textContent =
+      usage.entries === 0
+        ? `“${tag.name}” is not used on any entries. Delete it?`
+        : `Delete “${tag.name}”? Used on ${usage.entries} ` +
+          `entr${usage.entries === 1 ? 'y' : 'ies'} across ` +
+          `${usage.workspaces} workspace${usage.workspaces === 1 ? '' : 's'}. ` +
+          `This unlinks it from all of them.`;
+
+    const confirm = document.createElement('button');
+    confirm.type = 'button';
+    confirm.className = 'danger';
+    confirm.textContent = 'Delete';
+
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.textContent = 'Cancel';
+    cancel.addEventListener('click', reload);
+
+    confirm.addEventListener('click', async () => {
+      confirm.disabled = true;
+      try {
+        await api.remove(tag.id);
+        if (window.RevivalTags) window.RevivalTags.clearCache();
+        setStatus(status, `Deleted “${tag.name}”.`);
+        reload();
+      } catch (err) {
+        confirm.disabled = false;
+        setStatus(status, `Could not delete: ${err.message || err}`);
+      }
+    });
+
+    actions.append(text, confirm, cancel);
+  }
+
+  reload();
 }
 
 // --- Panic Export (P21) ----------------------------------------------------

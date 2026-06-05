@@ -211,6 +211,11 @@ function registerIpc() {
     db.tags.clearFor(kind, id)
   );
   ipcMain.handle('tags:create', (_event, payload) => db.tags.create(payload));
+  ipcMain.handle('tags:usage', (_event, tagId) => db.tags.usage(tagId));
+  ipcMain.handle('tags:remove', (_event, tagId) => db.tags.remove(tagId));
+  ipcMain.handle('tags:rename', (_event, tagId, name) =>
+    db.tags.rename(tagId, name)
+  );
 
   ipcMain.handle('settings:getProjectRules', () => db.settings.getProjectRules());
   ipcMain.handle('settings:setProjectRules', (_event, text) =>

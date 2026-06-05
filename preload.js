@@ -144,6 +144,9 @@ contextBridge.exposeInMainWorld('revival', {
       ipcRenderer.invoke('tags:detach', kind, id, tagId),
     clearFor: (kind, id) => ipcRenderer.invoke('tags:clearFor', kind, id),
     create: (payload) => ipcRenderer.invoke('tags:create', payload),
+    usage: (tagId) => ipcRenderer.invoke('tags:usage', tagId),
+    remove: (tagId) => ipcRenderer.invoke('tags:remove', tagId),
+    rename: (tagId, name) => ipcRenderer.invoke('tags:rename', tagId, name),
   },
   settings: {
     getProjectRules: () => ipcRenderer.invoke('settings:getProjectRules'),
