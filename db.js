@@ -1071,6 +1071,57 @@ const MIGRATIONS = [
       `);
     },
   },
+
+  {
+    name: '031_open_questions_conflicts_decisions_reshape',
+    up(db) {
+      // PR4 — Reshape: open_questions + conflicts + decisions.
+      //
+      // Aligns these three queue/decision workspaces with the FINAL canon
+      // schema (docs/CANON_SCHEMA_APPROVED.md). Additive only — every new
+      // column is nullable, no renames, no FKs, no recreates. Existing rows
+      // get NULL for every added column.
+      //
+      //   - draft_*/last_drafted_at trio on all three: stages in-progress
+      //     edits for the upcoming Canon Review flow without touching the
+      //     committed title/body. Same shape PR2 added to unsorted_items/
+      //     documents/source_material.
+      //   - open_questions only:
+      //       tier INTEGER NULL CHECK(tier IN (1,2,3))   — question importance
+      //       category TEXT NULL                          — free-text grouping
+      //       canon_promoted_entry_id INTEGER NULL        — populated when a
+      //         question is promoted to canon via Canon Review; plain INTEGER
+      //         per BUILD_PLAN PR4 (no FK — wire-up arrives later).
+      //       resolved_by_decision_id INTEGER NULL        — populated when a
+      //         question is resolved by a Decision; same — plain INTEGER for
+      //         now, FK wiring deferred.
+      //   - decisions only:
+      //       decided_at TEXT NULL                        — timestamp of the
+      //         settled-decision moment, distinct from created_at/updated_at.
+      //
+      // ALTER TABLE ADD COLUMN with a self-referencing CHECK is supported by
+      // the SQLite version better-sqlite3 ships (same form already used for
+      // file_kind in migration 029).
+      db.exec(`
+        ALTER TABLE open_questions ADD COLUMN draft_title TEXT;
+        ALTER TABLE open_questions ADD COLUMN draft_body TEXT;
+        ALTER TABLE open_questions ADD COLUMN last_drafted_at TEXT;
+        ALTER TABLE open_questions ADD COLUMN tier INTEGER CHECK(tier IN (1,2,3));
+        ALTER TABLE open_questions ADD COLUMN category TEXT;
+        ALTER TABLE open_questions ADD COLUMN canon_promoted_entry_id INTEGER;
+        ALTER TABLE open_questions ADD COLUMN resolved_by_decision_id INTEGER;
+
+        ALTER TABLE conflicts ADD COLUMN draft_title TEXT;
+        ALTER TABLE conflicts ADD COLUMN draft_body TEXT;
+        ALTER TABLE conflicts ADD COLUMN last_drafted_at TEXT;
+
+        ALTER TABLE decisions ADD COLUMN draft_title TEXT;
+        ALTER TABLE decisions ADD COLUMN draft_body TEXT;
+        ALTER TABLE decisions ADD COLUMN last_drafted_at TEXT;
+        ALTER TABLE decisions ADD COLUMN decided_at TEXT;
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
