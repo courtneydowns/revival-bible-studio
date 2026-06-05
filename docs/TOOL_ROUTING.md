@@ -37,20 +37,20 @@
 | P17–P18 Chat attachments | **CLI** | Cross-module wiring |
 | P19 Project Rules editor | **VS Code ext** | Likely single component |
 | P20 Panic Export v1 | **CLI** | New module, file I/O |
-| P21–P25 Remaining queue/decision workspaces | **VS Code ext** | Copy of Unsorted pattern, small |
-| P26 Characters CRUD | **VS Code ext** | Copy of Unsorted pattern |
-| P27 Episodes CRUD | **VS Code ext** | Copy of Unsorted pattern |
+| P21–P25 Remaining workspaces | **VS Code ext** | Copy of Unsorted pattern, small |
+| P26 Characters CRUD | **VS Code ext** | Copy of Unsorted pattern, small |
+| P27 Episodes CRUD | **VS Code ext** | Copy of Unsorted pattern, small |
 | P28 Home dashboard | **CLI** | Aggregates from multiple sources |
 | P29 Writing Lab | **CLI** | New module |
 | **P30 Canon schema design** | **claude.ai (Opus)** | **No code. Highest-stakes decision in the project.** |
 | P31 Canon tables + read view | **CLI** | New schema + UI |
 | P32–P35 Canon features | **CLI** | Each touches multiple files |
-| P36 Cross-workspace attachments | **CLI** | Cross-module wiring (picker + bi-directional links) |
-| P37 Characters relational view | **CLI** | New UI module |
+| P36 Cross-workspace attachments | **CLI** | Cross-module wiring, join tables |
+| P37 Characters relational view | **CLI** | New visual component |
 | P38 Characters/Episodes → Canon Review | **CLI** | Cross-module flow |
 | P39 Claude API config | **CLI** | New module + settings UI |
 | P40 Chat AI send/receive | **CLI** | API wiring |
-| P41 AI suggestion → Canon Review pipeline | **CLI** | Cross-module flow |
+| P41 AI → Canon Review pipeline | **CLI** | Cross-module flow |
 
 ---
 
