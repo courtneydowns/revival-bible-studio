@@ -199,17 +199,21 @@ function makeEntryWorkspace(config) {
   const finalizeHint = `Click “${addLabel}” to finalize.`;
 
   return function renderEntryWorkspace(section) {
+  // Optional accent class lets a workspace look visibly distinct from the
+  // others that share this template (e.g. Conflicts vs Open Questions).
+  if (config.sectionClass) section.classList.add(config.sectionClass);
+
   // Create form
   const form = document.createElement('form');
   form.className = 'entry-form';
 
   const titleInput = document.createElement('input');
   titleInput.type = 'text';
-  titleInput.placeholder = 'Title';
+  titleInput.placeholder = config.titlePlaceholder || 'Title';
   titleInput.maxLength = 200;
 
   const bodyInput = document.createElement('textarea');
-  bodyInput.placeholder = 'Notes (optional)';
+  bodyInput.placeholder = config.bodyPlaceholder || 'Notes (optional)';
   bodyInput.rows = 3;
 
   const submit = document.createElement('button');
@@ -813,6 +817,16 @@ const CONTENT_RENDERERS = {
     apiName: 'openQuestions',
     draftPrefix: 'open_questions',
     addLabel: 'Add Question',
+  }),
+  // Conflicts shares the lifecycle but is styled distinctly (red contradiction
+  // accent + tailored labels) so it never reads like Open Questions.
+  'Conflicts': makeEntryWorkspace({
+    apiName: 'conflicts',
+    draftPrefix: 'conflicts',
+    addLabel: 'Log Conflict',
+    sectionClass: 'ws-conflicts',
+    titlePlaceholder: 'What contradicts what?',
+    bodyPlaceholder: 'The two sides in tension, and where each comes from (optional)',
   }),
 };
 

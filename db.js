@@ -139,6 +139,25 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '009_conflicts',
+    up(db) {
+      // Conflicts: contradictions that need resolving. Same lifecycle/shape as
+      // the other entry workspaces, but kept in its own table — per CLAUDE.md
+      // Conflicts and Open Questions are separate workspaces and must not be
+      // blended.
+      db.exec(`
+        CREATE TABLE conflicts (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          title       TEXT NOT NULL,
+          body        TEXT NOT NULL DEFAULT '',
+          created_at  TEXT NOT NULL,
+          updated_at  TEXT NOT NULL,
+          archived_at TEXT
+        );
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -327,6 +346,7 @@ function makeEntryRepo(table) {
 const sourceMaterial = makeEntryRepo('source_material');
 const documents = makeEntryRepo('documents');
 const openQuestions = makeEntryRepo('open_questions');
+const conflicts = makeEntryRepo('conflicts');
 
 // --- Chats repository ------------------------------------------------------
 // Chats are conversation containers for the global Chat drawer. Bespoke (no
@@ -516,6 +536,7 @@ module.exports = {
   sourceMaterial,
   documents,
   openQuestions,
+  conflicts,
   chats,
   chatSources,
   listUnsorted,

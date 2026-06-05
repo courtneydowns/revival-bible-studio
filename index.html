@@ -228,6 +228,20 @@
       }
       .entry-meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
 
+      /* Conflicts: visibly distinct from Open Questions (a red contradiction
+         accent on each card + the new-conflict form). */
+      .ws-conflicts .entry-card {
+        border-left: 3px solid #e06c6c;
+      }
+      .ws-conflicts .entry-form {
+        border-left: 3px solid #e06c6c;
+        padding-left: 12px;
+      }
+      .ws-conflicts .entry-title::before {
+        content: '⚠ ';
+        color: #e06c6c;
+      }
+
       .entry-card input,
       .entry-card textarea {
         font: inherit;
