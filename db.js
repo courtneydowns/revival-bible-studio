@@ -363,8 +363,10 @@ const chats = {
 // --- Chat ↔ Source attachments repository ----------------------------------
 // "Keep active" mode (P18): the sources a chat keeps attached and always
 // visible. Source Material is the only attachable type. Joined on read so the
-// drawer has titles without a second query. Removing an attachment (one-click
-// detach) and the "next message only" mode arrive in P19.
+// drawer has titles without a second query. P19 adds one-click detach below.
+// The other P19 mode — "next message only" — is intentionally NOT stored here:
+// it's ephemeral (cleared on send, never surviving a restart), so it lives in
+// renderer memory only. This table is exclusively the persistent keep-active set.
 const chatSources = {
   list: (chatId) =>
     getDb()
@@ -390,6 +392,15 @@ const chatSources = {
         'INSERT OR IGNORE INTO chat_sources (chat_id, source_id, created_at) VALUES (?, ?, ?)'
       )
       .run(chatId, sourceId, new Date().toISOString());
+    return chatSources.list(chatId);
+  },
+  // One-click remove (P19): drop a keep-active attachment. Idempotent — removing
+  // a source that isn't attached is a harmless no-op. Returns the fresh list so
+  // the drawer re-renders from the source of truth.
+  detach: (chatId, sourceId) => {
+    getDb()
+      .prepare('DELETE FROM chat_sources WHERE chat_id = ? AND source_id = ?')
+      .run(chatId, sourceId);
     return chatSources.list(chatId);
   },
 };

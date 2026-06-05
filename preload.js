@@ -42,5 +42,7 @@ contextBridge.exposeInMainWorld('revival', {
     list: (chatId) => ipcRenderer.invoke('chatSources:list', chatId),
     attach: (chatId, sourceId) =>
       ipcRenderer.invoke('chatSources:attach', chatId, sourceId),
+    detach: (chatId, sourceId) =>
+      ipcRenderer.invoke('chatSources:detach', chatId, sourceId),
   },
 });

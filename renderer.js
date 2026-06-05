@@ -33,7 +33,7 @@ const WORKSPACE_INFO = {
   },
   'Chat': {
     purpose: 'Talk through the Revival project with Claude. (Becomes a global drawer in a later phase.)',
-    next: 'Open the chat drawer (💬 Chat, bottom-right of any workspace), click “+ New chat” to create chats, and switch between them with the dropdown. Rename or archive the active chat with the buttons below the title; archived chats restore from the collapsed section. Use “+ Attach source” to keep Source Material active for the chat — attached sources stay listed above the composer. One-click remove and a “next message only” mode come in the next phase.',
+    next: 'Open the chat drawer (💬 Chat, bottom-right of any workspace), click “+ New chat” to create chats, and switch between them with the dropdown. Rename or archive the active chat with the buttons below the title; archived chats restore from the collapsed section. Use “+ Attach source” to add Source Material in one of two modes: “Keep active” stays listed for the whole chat, while “Next message only” is used once and clears on the next send. Remove any active source with the ✕ on its chip. (Sending here is a draft action only — Claude messaging comes later; nothing is saved or sent.)',
     savedTo: 'Chats are kept in this Chat workspace. Attachments come from Source Material only.',
     lifecycle: 'Chats can be renamed, archived, and restored. Nothing is finalized without your confirmation.',
   },
@@ -754,13 +754,21 @@ const chatArchivedList = document.getElementById('chat-archived-list');
 const chatSourcesList = document.getElementById('chat-sources-list');
 const chatAttachBtn = document.getElementById('chat-attach');
 const chatSourcePicker = document.getElementById('chat-source-picker');
+const chatComposer = document.getElementById('chat-composer');
+const chatInput = document.getElementById('chat-input');
+const chatSend = document.getElementById('chat-send');
 
 const ACTIVE_CHAT_KEY = 'revival.chat.active';
 const CHAT_EXPANDED_KEY = 'revival.chat.expanded';
 let chatList = [];
 let archivedChats = [];
 let activeChatId = null;
+// Keep-active sources for the current chat (persisted; loaded from SQLite).
 let activeSources = [];
+// "Next message only" sources (P19): ephemeral and per-chat, held in memory
+// only so they never survive a send or a restart. Keyed by chat id → array of
+// source objects, so switching chats keeps each chat's pending picks separate.
+const nextSourcesByChat = new Map();
 
 function setChatOpen(open) {
   chatDrawer.classList.toggle('open', open);
@@ -861,17 +869,62 @@ function renderArchivedChats() {
   }
 }
 
-// --- Active sources (P18, "keep active" mode) ------------------------------
-// The sources a chat keeps attached are always visible above the composer so
-// the user knows exactly what Claude would use. Source Material is the only
-// attachable type. Attachments persist in SQLite per chat — they survive
-// reopening the drawer, switching chats, and restarting the app. One-click
-// remove and the "next message only" mode arrive in P19.
+// --- Active sources (P18 keep-active + P19 next-message-only) ---------------
+// The sources a chat would use are always visible above the composer so the
+// user knows exactly what Claude would draw on. Source Material is the only
+// attachable type. Two modes:
+//   • "keep active"        — persisted in SQLite, stays listed for the chat.
+//   • "next message only"  — in-memory only, cleared on the next draft send.
+// Every chip carries a one-click remove (P19). Composer enablement rides along
+// here since it depends on whether a chat is active.
+function nextSourcesFor(chatId) {
+  return nextSourcesByChat.get(chatId) || [];
+}
+
+function buildSourceChip(src, mode) {
+  const chip = document.createElement('span');
+  chip.className = mode === 'next' ? 'source-chip chip-next' : 'source-chip';
+
+  const title = document.createElement('span');
+  title.className = 'chip-title';
+  title.textContent = src.title;
+  chip.appendChild(title);
+
+  // A keep-active source archived after attaching stays active but is flagged.
+  if (mode === 'keep' && src.archived_at) {
+    const note = document.createElement('span');
+    note.className = 'chip-archived';
+    note.textContent = '(archived)';
+    chip.appendChild(note);
+  }
+
+  if (mode === 'next') {
+    const badge = document.createElement('span');
+    badge.className = 'chip-mode';
+    badge.textContent = 'next message only';
+    chip.appendChild(badge);
+  }
+
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'chip-remove';
+  remove.textContent = '✕';
+  remove.title = 'Remove source';
+  remove.setAttribute('aria-label', `Remove ${src.title}`);
+  remove.addEventListener('click', () => removeSource(src.id, mode));
+  chip.appendChild(remove);
+
+  return chip;
+}
+
 function renderActiveSources() {
   chatSourcesList.innerHTML = '';
-  chatAttachBtn.disabled = activeChatId == null;
+  const hasChat = activeChatId != null;
+  chatAttachBtn.disabled = !hasChat;
+  chatInput.disabled = !hasChat;
+  chatSend.disabled = !hasChat;
 
-  if (activeChatId == null) {
+  if (!hasChat) {
     const p = document.createElement('p');
     p.className = 'chat-sources-empty';
     p.textContent = 'Start or pick a chat to attach sources.';
@@ -879,7 +932,8 @@ function renderActiveSources() {
     return;
   }
 
-  if (activeSources.length === 0) {
+  const nextSources = nextSourcesFor(activeChatId);
+  if (activeSources.length === 0 && nextSources.length === 0) {
     const p = document.createElement('p');
     p.className = 'chat-sources-empty';
     p.textContent =
@@ -889,24 +943,28 @@ function renderActiveSources() {
   }
 
   for (const src of activeSources) {
-    const chip = document.createElement('span');
-    chip.className = 'source-chip';
-
-    const title = document.createElement('span');
-    title.className = 'chip-title';
-    title.textContent = src.title;
-    chip.appendChild(title);
-
-    // A source archived after attaching stays active but is flagged.
-    if (src.archived_at) {
-      const note = document.createElement('span');
-      note.className = 'chip-archived';
-      note.textContent = '(archived)';
-      chip.appendChild(note);
-    }
-
-    chatSourcesList.appendChild(chip);
+    chatSourcesList.appendChild(buildSourceChip(src, 'keep'));
   }
+  for (const src of nextSources) {
+    chatSourcesList.appendChild(buildSourceChip(src, 'next'));
+  }
+}
+
+// One-click remove. Keep-active detaches in SQLite; next-message-only just
+// drops from the in-memory list for the active chat.
+async function removeSource(sourceId, mode) {
+  if (activeChatId == null) return;
+  if (mode === 'keep') {
+    activeSources = await window.revival.chatSources.detach(
+      activeChatId,
+      sourceId
+    );
+    renderActiveSources();
+    return;
+  }
+  const list = nextSourcesFor(activeChatId).filter((s) => s.id !== sourceId);
+  nextSourcesByChat.set(activeChatId, list);
+  renderActiveSources();
 }
 
 async function loadActiveSources() {
@@ -916,6 +974,17 @@ async function loadActiveSources() {
     return;
   }
   activeSources = await window.revival.chatSources.list(activeChatId);
+  // Prune any next-message-only picks whose source was deleted elsewhere, so a
+  // stale chip can't linger after the underlying source is gone.
+  const next = nextSourcesByChat.get(activeChatId);
+  if (next && next.length) {
+    const allSources = await window.revival.sourceMaterial.list();
+    const liveIds = new Set(allSources.map((s) => s.id));
+    nextSourcesByChat.set(
+      activeChatId,
+      next.filter((s) => liveIds.has(s.id))
+    );
+  }
   renderActiveSources();
 }
 
@@ -925,12 +994,16 @@ function hidePicker() {
 }
 
 // The picker lists Source Material only (no other types, no Context Packets),
-// already-attached and archived sources excluded so the choices are valid.
+// excluding sources already attached in either mode so the choices are valid.
+// Each row offers both attach modes (P19): keep active vs. next message only.
 async function showPicker() {
   if (activeChatId == null) return;
   const sources = await window.revival.sourceMaterial.list();
-  const attachedIds = new Set(activeSources.map((s) => s.id));
-  const available = sources.filter((s) => !attachedIds.has(s.id));
+  const usedIds = new Set([
+    ...activeSources.map((s) => s.id),
+    ...nextSourcesFor(activeChatId).map((s) => s.id),
+  ]);
+  const available = sources.filter((s) => !usedIds.has(s.id));
 
   chatSourcePicker.innerHTML = '';
   if (available.length === 0) {
@@ -942,27 +1015,54 @@ async function showPicker() {
     chatSourcePicker.appendChild(hint);
   } else {
     for (const src of available) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'picker-item';
-      btn.textContent = src.title;
-      btn.addEventListener('click', async () => {
-        btn.disabled = true;
-        try {
-          activeSources = await window.revival.chatSources.attach(
-            activeChatId,
-            src.id
-          );
-          renderActiveSources();
-          hidePicker();
-        } catch (e) {
-          btn.disabled = false;
-        }
-      });
-      chatSourcePicker.appendChild(btn);
+      const row = document.createElement('div');
+      row.className = 'picker-item';
+
+      const title = document.createElement('span');
+      title.className = 'picker-title';
+      title.textContent = src.title;
+      row.appendChild(title);
+
+      const keepBtn = document.createElement('button');
+      keepBtn.type = 'button';
+      keepBtn.className = 'picker-mode-btn';
+      keepBtn.textContent = 'Keep active';
+      keepBtn.addEventListener('click', () => attachSource(src, 'keep', row));
+      row.appendChild(keepBtn);
+
+      const nextBtn = document.createElement('button');
+      nextBtn.type = 'button';
+      nextBtn.className = 'picker-mode-btn';
+      nextBtn.textContent = 'Next message only';
+      nextBtn.addEventListener('click', () => attachSource(src, 'next', row));
+      row.appendChild(nextBtn);
+
+      chatSourcePicker.appendChild(row);
     }
   }
   chatSourcePicker.hidden = false;
+}
+
+// Attach a source in the chosen mode. Keep-active persists via SQLite;
+// next-message-only is held in memory for the active chat only.
+async function attachSource(src, mode, row) {
+  if (activeChatId == null) return;
+  row.querySelectorAll('button').forEach((b) => (b.disabled = true));
+  try {
+    if (mode === 'keep') {
+      activeSources = await window.revival.chatSources.attach(
+        activeChatId,
+        src.id
+      );
+    } else {
+      const list = nextSourcesFor(activeChatId);
+      nextSourcesByChat.set(activeChatId, [...list, src]);
+    }
+    renderActiveSources();
+    hidePicker();
+  } catch (e) {
+    row.querySelectorAll('button').forEach((b) => (b.disabled = false));
+  }
 }
 
 function setActiveChat(id) {
@@ -1045,6 +1145,19 @@ chatAttachBtn.addEventListener('click', () => {
     showPicker();
   } else {
     hidePicker();
+  }
+});
+
+// Draft send (P19): no AI, nothing stored or sent. Its only job this phase is
+// to clear the composer and drop the chat's "next message only" sources, so
+// that single-use mode behaves as named. Keep-active sources are untouched.
+chatComposer.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (activeChatId == null) return;
+  chatInput.value = '';
+  if (nextSourcesFor(activeChatId).length) {
+    nextSourcesByChat.set(activeChatId, []);
+    renderActiveSources();
   }
 });
 

@@ -457,6 +457,61 @@
         white-space: nowrap;
       }
       .source-chip .chip-archived { color: var(--muted); font-style: italic; }
+      /* "next message only" chips read as transient: dashed border + a badge. */
+      .source-chip.chip-next { border-style: dashed; }
+      .source-chip .chip-mode {
+        font-size: 10px;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .source-chip .chip-remove {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        padding: 0;
+        font: inherit;
+        font-size: 13px;
+        line-height: 1;
+        color: var(--muted);
+        background: none;
+        border: none;
+        border-radius: 999px;
+        cursor: pointer;
+      }
+      .source-chip .chip-remove:hover { color: var(--text); background: var(--hover); }
+      /* Picker rows carry the title plus the two attach-mode buttons. */
+      .picker-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px solid var(--border);
+        padding: 6px 10px;
+      }
+      .picker-item:last-child { border-bottom: none; }
+      .picker-title {
+        flex: 1;
+        font-size: 13px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .picker-mode-btn {
+        font: inherit;
+        font-size: 11px;
+        white-space: nowrap;
+        background: none;
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 3px 9px;
+        cursor: pointer;
+      }
+      .picker-mode-btn:hover { background: var(--hover); }
+      .picker-mode-btn:disabled { opacity: 0.5; cursor: default; }
       .chat-source-picker {
         margin-top: 8px;
         border: 1px solid var(--border);
@@ -467,22 +522,6 @@
       }
       .chat-source-picker[hidden] { display: none; }
       .picker-hint { font-size: 12px; color: var(--muted); padding: 8px 10px; margin: 0; }
-      .picker-item {
-        display: block;
-        width: 100%;
-        text-align: left;
-        font: inherit;
-        font-size: 13px;
-        background: none;
-        color: var(--text);
-        border: none;
-        border-bottom: 1px solid var(--border);
-        padding: 8px 10px;
-        cursor: pointer;
-      }
-      .picker-item:last-child { border-bottom: none; }
-      .picker-item:hover { background: var(--hover); }
-      .picker-item:disabled { opacity: 0.5; cursor: default; }
 
       .chat-composer {
         display: flex;
@@ -542,10 +581,11 @@
         <summary>Archived chats</summary>
         <div class="chat-archived-list" id="chat-archived-list"></div>
       </details>
-      <!-- Active sources (P18): always visible so the user knows exactly what
-           Claude would use. Source Material is the only attachable type.
-           "Keep active" mode — attached sources stay listed. One-click remove
-           and "next message only" mode arrive in P19. -->
+      <!-- Active sources: always visible so the user knows exactly what Claude
+           would use. Source Material is the only attachable type. Two modes
+           (P19): "keep active" (persisted, stays listed) and "next message
+           only" (ephemeral, cleared on the next draft send). Every chip has a
+           one-click remove. -->
       <section class="chat-sources" id="chat-sources" aria-label="Active sources">
         <div class="chat-sources-head">
           <span class="chat-sources-label">Active sources</span>
@@ -554,14 +594,17 @@
         <div class="chat-sources-list" id="chat-sources-list"></div>
         <div class="chat-source-picker" id="chat-source-picker" hidden></div>
       </section>
+      <!-- Draft send (P19): no AI yet. Send clears the box and any "next message
+           only" sources so that mode can be demonstrated. Nothing is stored or
+           sent to Claude — real messaging arrives in a later phase. -->
       <form class="chat-composer" id="chat-composer">
         <textarea
+          id="chat-input"
           class="chat-input"
           rows="2"
-          placeholder="Sending is added in a later phase — this is the chat shell."
-          disabled
+          placeholder="Draft send only — clears the box and any “next message only” sources. Claude messaging comes later; nothing is saved or sent."
         ></textarea>
-        <button type="submit" class="btn-primary" disabled>Send</button>
+        <button id="chat-send" type="submit" class="btn-primary">Send</button>
       </form>
     </aside>
 

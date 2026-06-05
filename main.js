@@ -53,6 +53,9 @@ function registerIpc() {
   ipcMain.handle('chatSources:attach', (_event, chatId, sourceId) =>
     db.chatSources.attach(chatId, sourceId)
   );
+  ipcMain.handle('chatSources:detach', (_event, chatId, sourceId) =>
+    db.chatSources.detach(chatId, sourceId)
+  );
 }
 
 app.whenReady().then(() => {
