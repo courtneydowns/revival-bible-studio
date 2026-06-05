@@ -1777,6 +1777,114 @@ const CANON_LIST_COLUMNS = `
 // title + body so the future P35 UI can hydrate the proposal without losing
 // the original wording. source_kind is left free-form (workspace name) to
 // match how extract callers identify themselves; tighten in P35.
+// PTAG — tag library + polymorphic taggable_tags join.
+//
+// Schema lives in migrations 026_tags + 027_seed_tags. `entity_kind` matches
+// the workspace's DB table name (e.g. 'unsorted', 'source_material',
+// 'canon_entries') so each workspace's UI passes its own constant when it
+// reads/writes tags. Tag uniqueness is enforced at the DB (UNIQUE on name),
+// and taggable_tags has UNIQUE(tag_id, entity_kind, entity_id) so attaching
+// the same tag twice is a no-op rather than a duplicate row.
+const tags = {
+  listAll: () =>
+    getDb()
+      .prepare(
+        `SELECT id, name, category, is_seed
+           FROM tags
+          ORDER BY (category IS NULL), category COLLATE NOCASE, name COLLATE NOCASE`
+      )
+      .all(),
+
+  // One entity's tags. Used by the popout + detail panels.
+  listFor: (entityKind, entityId) =>
+    getDb()
+      .prepare(
+        `SELECT t.id, t.name, t.category, t.is_seed
+           FROM tags t
+           JOIN taggable_tags tt ON tt.tag_id = t.id
+          WHERE tt.entity_kind = ? AND tt.entity_id = ?
+          ORDER BY (t.category IS NULL), t.category COLLATE NOCASE, t.name COLLATE NOCASE`
+      )
+      .all(entityKind, entityId),
+
+  // Bulk variant for list rendering: returns a plain object id -> tag[] so
+  // workspaces can render badges without N round-trips.
+  bulkListFor: (entityKind, entityIds) => {
+    const ids = (entityIds || []).map(Number).filter(Number.isFinite);
+    const out = {};
+    for (const id of ids) out[id] = [];
+    if (ids.length === 0) return out;
+    const placeholders = ids.map(() => '?').join(',');
+    const rows = getDb()
+      .prepare(
+        `SELECT tt.entity_id AS entity_id, t.id, t.name, t.category, t.is_seed
+           FROM taggable_tags tt
+           JOIN tags t ON t.id = tt.tag_id
+          WHERE tt.entity_kind = ? AND tt.entity_id IN (${placeholders})
+          ORDER BY (t.category IS NULL), t.category COLLATE NOCASE, t.name COLLATE NOCASE`
+      )
+      .all(entityKind, ...ids);
+    for (const r of rows) {
+      const { entity_id, ...tag } = r;
+      (out[entity_id] = out[entity_id] || []).push(tag);
+    }
+    return out;
+  },
+
+  attach: (entityKind, entityId, tagId) => {
+    if (!entityKind) throw new Error('entity kind is required');
+    const eid = Number(entityId);
+    const tid = Number(tagId);
+    if (!Number.isFinite(eid) || !Number.isFinite(tid)) {
+      throw new Error('entity id and tag id are required');
+    }
+    const now = new Date().toISOString();
+    getDb()
+      .prepare(
+        `INSERT OR IGNORE INTO taggable_tags
+           (tag_id, entity_kind, entity_id, created_at)
+         VALUES (?, ?, ?, ?)`
+      )
+      .run(tid, entityKind, eid, now);
+    return tags.listFor(entityKind, eid);
+  },
+
+  detach: (entityKind, entityId, tagId) => {
+    const eid = Number(entityId);
+    const tid = Number(tagId);
+    getDb()
+      .prepare(
+        `DELETE FROM taggable_tags
+          WHERE tag_id = ? AND entity_kind = ? AND entity_id = ?`
+      )
+      .run(tid, entityKind, eid);
+    return tags.listFor(entityKind, eid);
+  },
+
+  // Create a user tag. Returns the existing row when the name is already
+  // taken (case-insensitive) so the picker's "Add as new tag" flow degrades
+  // to "select existing" without erroring on duplicates.
+  create: ({ name, category } = {}) => {
+    const clean = String(name || '').trim();
+    if (!clean) throw new Error('Tag name is required.');
+    const cat = (category || '').trim() || null;
+    const existing = getDb()
+      .prepare('SELECT id, name, category, is_seed FROM tags WHERE name = ? COLLATE NOCASE')
+      .get(clean);
+    if (existing) return existing;
+    const now = new Date().toISOString();
+    const info = getDb()
+      .prepare(
+        `INSERT INTO tags (name, category, is_seed, created_at, updated_at)
+         VALUES (?, ?, 0, ?, ?)`
+      )
+      .run(clean, cat, now, now);
+    return getDb()
+      .prepare('SELECT id, name, category, is_seed FROM tags WHERE id = ?')
+      .get(info.lastInsertRowid);
+  },
+};
+
 const canonProposals = {
   createFromExtract: ({
     title,
@@ -1991,6 +2099,7 @@ module.exports = {
   dashboard,
   canon,
   canonProposals,
+  tags,
   getDbPath,
   DB_FILENAME,
   MIGRATIONS,

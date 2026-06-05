@@ -132,6 +132,19 @@ Do not invent new top-level workspaces.
 
 ---
 
+## Tag rules
+
+- **Seeded tags cannot be deleted.** Only user-created tags can be deleted.
+- **Remove-tag-from-entry:** any tag can be removed from any individual entry at any time. The tag still exists; only the link between that entry and that tag is removed. This is not destructive — no confirmation required.
+- **Tag filter semantics:** AND (must have all selected tags). Multi-tag filter shows only entries that carry every selected tag.
+- **Tag normalization:** tags are lowercased and trimmed on save. `Canon`, `canon`, and `canon ` are the same tag.
+- **Duplicate prevention:** creating a tag that already exists (after normalization) is blocked. The input selects the existing tag instead.
+- **Autocomplete:** tag input autocompletes against all existing tags (seeded + user-created), case-insensitive.
+- **Delete a user-created tag (PTAGDEL):** shows usage count before confirmation ("used on N entries across X workspaces"). On confirm, tag is unlinked from all entries everywhere and deleted. Seeded tags have no delete affordance.
+- **Rename a user-created tag (PTAGDEL):** renames the tag in place across all entries. No unlinking occurs.
+
+---
+
 ## Editing / lifecycle
 
 - Every workspace supports editing.

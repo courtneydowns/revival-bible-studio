@@ -34,6 +34,8 @@
 | **PCAP Quick-capture** | **VS Code ext** | Small modal + Unsorted write |
 | **PKEY Command palette + keyboard nav** | **CLI** | Global, touches every workspace |
 | **PTAG Tag UI** | **CLI** | New component + touches all workspaces |
+| **PTAG+ Tag quality** | **VS Code ext** | Additions to existing tag component |
+| **PTAGDEL Tag delete + rename** | **VS Code ext** | Additions to tag management UI |
 | **PSEARCH Global search** | **CLI** | New module, cross-table queries |
 | **PHOME Home upgrade** | **VS Code ext** | Badge counts + recently viewed on existing page |
 | **PPASSIVE Status bar + linked indicator** | **VS Code ext** | Small additions to detail panel component |

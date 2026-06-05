@@ -112,38 +112,35 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## UI Foundation
 
-### PUI1 — Two-column layout component ✅
+### PUI1 — Two-column layout component
 - Reusable left-list / right-detail component dropped into every workspace
 - Left: title, type/status badge, preview line
 - Right: full content, editable, actions
 - Retrofit all existing workspaces (Unsorted, Open Questions, Conflicts, Decisions, Brainstorm, Research, Characters, Episodes, Documents, Source Material, Writing Lab)
-- **Smoke passed.**
+- **Smoke:** Open every workspace, confirm two-column layout, click an entry, detail panel opens
 
-### PUI2 — Full-screen popout window ✅
-- New BrowserWindow per entry — independent window state, rest of app stays usable
-- "Pop out ↗" button on every two-column workspace's detail view
-- Opens in Reference Mode; deliberate Edit click flips to Edit Mode
-- Full edit (title + body), archive/restore, delete inside the popout
-- popout:changed broadcast keeps main window's list in sync after each commit; popout shows "no longer available" if the entry is deleted from elsewhere
-- **Smoke passed.**
+### PUI2 — Full-screen popout window
+- Global popout available from any entry detail panel
+- Full edit, rename, delete, archive/restore all available within the popout
+- Independent window — rest of app remains usable
+- Opens in Reference Mode by default (see PCBREF for Canon Bible; same principle applies)
+- **Smoke:** Open a popout from three different workspaces, edit and save from within it, confirm changes persist
 
-### PUI3 — Highlight + extract + route ✅
+### PUI3 — Highlight + extract + route
 - Select any text in a detail panel or popout → extract menu appears
 - Route extracted text to: Unsorted, Brainstorm, Open Questions, Decisions, Conflicts, Research, Canon Review
 - Creates a new entry in the target workspace pre-filled with the selection and a source attribution
-- Canon Review staging via canon_proposals (pending new_entry) so the future P35 queue can hydrate the snippet with attribution intact
-- **Smoke passed.**
+- **Smoke:** Highlight text in a Source Material entry, route to Brainstorm, confirm new entry exists with attribution
 
 ---
 
 ## Quick Capture + Navigation
 
-### PCAP — Global quick-capture ✅
+### PCAP — Global quick-capture
 - Cmd+Shift+N from anywhere opens a minimal modal
 - Title + body, one-click save → drops to Unsorted
 - Dismissable with Escape
-- In-app shortcut (window keydown, not an OS-global accelerator) so it never hijacks the system-wide combo
-- **Smoke passed.**
+- **Smoke:** Trigger from three different workspaces, save an entry, confirm it appears in Unsorted
 
 ### PKEY — Command palette + keyboard navigation
 - Cmd+K opens command palette: jump to any workspace, any recent entry, any action
@@ -154,12 +151,25 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Tags
 
-### PTAG — Tag UI
+### PTAG — Tag UI ✅
 - Apply and remove tags on any entry across all workspaces and canon
-- Tag picker shows seeded tags + user-created tags, grouped by category
-- Browse by tag: filter any workspace or Canon Bible by one or more tags
-- Tags visible as badges on list items and detail panels
-- **Smoke:** Tag an entry in three different workspaces, filter by that tag, confirm correct results
+- Remove a tag from an entry (unlinks only; tag still exists; no confirmation needed)
+- Tag picker shows seeded tags + user-created tags, grouped by category; inline "Create new tag" when search has no exact match
+- Browse by tag: filter any workspace or Canon Bible by one or more tags (AND semantics)
+- Tags visible as badges on list items and as chips on detail panels (and in popouts)
+- **Smoke passed.**
+
+### PTAG+ — Tag quality: autocomplete, normalization, duplicate prevention
+- Tag input autocompletes against all existing tags (seeded + user-created), case-insensitive
+- Tags normalized: lowercased and trimmed on save
+- Creating a duplicate tag (after normalization) is blocked; input selects existing tag instead
+- Clear all tags from a single entry (bulk remove on that entry only; no global effect)
+- **Smoke:** Type a partial tag name and confirm autocomplete; try to create a duplicate with different casing and confirm it's blocked; clear all tags from one entry and confirm others are untouched
+
+### PTAGDEL — Tag delete + rename (user-created tags only)
+- Delete a user-created tag: shows usage count before confirmation ("used on N entries across X workspaces"); on confirm, tag unlinked from all entries and deleted; seeded tags have no delete affordance
+- Rename a user-created tag: renames in place across all entries; no unlinking
+- **Smoke:** Delete a user-created tag used on 3+ entries, confirm usage count shown, confirm tag gone from all entries after delete; rename a tag, confirm new name appears everywhere; confirm seeded tags show no delete option
 
 ---
 

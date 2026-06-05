@@ -22,3 +22,5 @@ Running log of UI/UX observations from smoke tests. Addressed in PPOL1 (pre-impo
 
 <!-- Add items below as you smoke test each phase -->
 
+On the workspace pages, the title overflows on the previews of the cards
+

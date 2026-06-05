@@ -132,6 +132,18 @@ contextBridge.exposeInMainWorld('revival', {
     createFromExtract: (payload) =>
       ipcRenderer.invoke('canonProposals:createFromExtract', payload),
   },
+  // PTAG — tag library + per-entity attach/detach. entity_kind = the DB
+  // table name (e.g. 'unsorted', 'canon_entries').
+  tags: {
+    listAll: () => ipcRenderer.invoke('tags:listAll'),
+    listFor: (kind, id) => ipcRenderer.invoke('tags:listFor', kind, id),
+    bulkListFor: (kind, ids) => ipcRenderer.invoke('tags:bulkListFor', kind, ids),
+    attach: (kind, id, tagId) =>
+      ipcRenderer.invoke('tags:attach', kind, id, tagId),
+    detach: (kind, id, tagId) =>
+      ipcRenderer.invoke('tags:detach', kind, id, tagId),
+    create: (payload) => ipcRenderer.invoke('tags:create', payload),
+  },
   settings: {
     getProjectRules: () => ipcRenderer.invoke('settings:getProjectRules'),
     setProjectRules: (text) =>

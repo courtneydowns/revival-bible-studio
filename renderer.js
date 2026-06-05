@@ -103,6 +103,10 @@ function setStatus(el, text) {
 // depending on what's selected.
 function makeEntryWorkspace(config) {
   const api = window.revival[config.apiName];
+  // PTAG — entityKind matches the DB table name (e.g. 'unsorted',
+  // 'source_material'). Workspaces that pass it in get the tag bar on
+  // their detail panel, tag badges on list items, and the filter bar.
+  const entityKind = config.entityKind || null;
   const Drafts = makeDrafts(config.draftPrefix);
   const addLabel = config.addLabel;
   const finalizeHint = `Click “${addLabel}” to finalize.`;
@@ -131,6 +135,23 @@ function makeEntryWorkspace(config) {
   let selectedId = null;
   let activeItems = [];
   let archivedItems = [];
+  // PTAG state: tagsById is the entity_id -> tag[] map for list badges and
+  // filter matching; tagFilter is the set of selected filter tag ids.
+  let tagsById = {};
+  let tagFilter = new Set();
+
+  // PTAG filter bar — above the + Add button so narrowing the list never
+  // pushes "+ Add" off-screen. Only mounted when the workspace declared an
+  // entityKind, so legacy workspaces without one still render normally.
+  if (entityKind && window.RevivalTags) {
+    const fc = window.RevivalTags.mountFilterBar(leftCol, entityKind, {
+      onChange: (sel) => {
+        tagFilter = sel;
+        renderList();
+      },
+    });
+    tagFilter = fc.selected;
+  }
 
   // Left column: + Add button, active list, collapsed archived section.
   const addBtn = document.createElement('button');
@@ -204,6 +225,12 @@ function makeEntryWorkspace(config) {
       btn.appendChild(p);
     }
 
+    // PTAG — compact tag badges on the list item.
+    if (window.RevivalTags) {
+      const tagList = tagsById[item.id] || [];
+      if (tagList.length) btn.appendChild(window.RevivalTags.buildBadges(tagList));
+    }
+
     btn.addEventListener('click', () => {
       selectedId = item.id;
       renderList();
@@ -212,23 +239,37 @@ function makeEntryWorkspace(config) {
     return btn;
   }
 
+  // PTAG — AND match: the item must carry every selected filter tag.
+  function matchesFilter(item) {
+    if (tagFilter.size === 0) return true;
+    const itemTags = tagsById[item.id] || [];
+    const have = new Set(itemTags.map((t) => t.id));
+    for (const id of tagFilter) if (!have.has(id)) return false;
+    return true;
+  }
+
   function renderList() {
     list.innerHTML = '';
-    if (activeItems.length === 0) {
+    const filteredActive = activeItems.filter(matchesFilter);
+    const filteredArchived = archivedItems.filter(matchesFilter);
+
+    if (filteredActive.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'tc-list-empty';
-      empty.textContent = 'No entries yet.';
+      empty.textContent = tagFilter.size
+        ? 'No entries match the selected tag(s).'
+        : 'No entries yet.';
       list.appendChild(empty);
     } else {
-      for (const item of activeItems) {
+      for (const item of filteredActive) {
         list.appendChild(buildListItem(item, false));
       }
     }
 
     archivedListEl.innerHTML = '';
-    archivedSummary.textContent = `Archived (${archivedItems.length})`;
-    archived.style.display = archivedItems.length === 0 ? 'none' : '';
-    for (const item of archivedItems) {
+    archivedSummary.textContent = `Archived (${filteredArchived.length})`;
+    archived.style.display = filteredArchived.length === 0 ? 'none' : '';
+    for (const item of filteredArchived) {
       archivedListEl.appendChild(buildListItem(item, true));
     }
   }
@@ -531,6 +572,29 @@ function makeEntryWorkspace(config) {
     }
 
     rightCol.appendChild(actions);
+
+    // PTAG — tag bar below the action row. Available on archived entries too
+    // so the user can adjust metadata without restoring first. Refreshes the
+    // bulk-tags map so list badges stay in sync when a chip changes.
+    if (entityKind && window.RevivalTags) {
+      window.RevivalTags.mountTagBar(rightCol, entityKind, item.id, {
+        onChange: () => refreshTagBadges(),
+      });
+    }
+  }
+
+  async function refreshTagBadges() {
+    if (!entityKind || !window.RevivalTags) return;
+    const allIds = [
+      ...activeItems.map((i) => i.id),
+      ...archivedItems.map((i) => i.id),
+    ];
+    try {
+      tagsById = await window.revival.tags.bulkListFor(entityKind, allIds);
+      renderList();
+    } catch {
+      /* non-fatal — badges stay stale until next list reload */
+    }
   }
 
   function showDeleteConfirm(actions, item) {
@@ -668,6 +732,20 @@ function makeEntryWorkspace(config) {
     ]);
     activeItems = items;
     archivedItems = archs;
+    // PTAG — bulk tags for badges + filter matching, one round-trip per
+    // list reload. Tags are read-only here; mutations go through the tag
+    // bar in the detail panel, which calls refreshTagBadges itself.
+    if (entityKind && window.RevivalTags) {
+      const allIds = [
+        ...activeItems.map((i) => i.id),
+        ...archivedItems.map((i) => i.id),
+      ];
+      try {
+        tagsById = await window.revival.tags.bulkListFor(entityKind, allIds);
+      } catch {
+        tagsById = {};
+      }
+    }
     if (selectedId !== null && selectedId !== 'new' && !findItem(selectedId)) {
       selectedId = null;
     }
@@ -713,7 +791,7 @@ function renderChatPage(section) {
 // entries (dev)" button that appears solely when the canon is empty. It calls
 // canon.devSeed (idempotent) so the smoke test has data to look at. Once any
 // entries exist the button vanishes — this is not a real-data entry path.
-function buildCanonCard(e) {
+function buildCanonCard(e, tagList, onTagChange) {
   const card = document.createElement('div');
   card.className = 'entry-card canon-card';
   if (e.locked) card.classList.add('canon-locked');
@@ -807,6 +885,15 @@ function buildCanonCard(e) {
   }
   card.appendChild(meta);
 
+  // PTAG — tag bar on canon cards. Canon content is read-only here, but tags
+  // are metadata (separate table) and the PTAG spec calls for "any entry
+  // across all workspaces and canon", so the picker is available on every card.
+  if (window.RevivalTags) {
+    window.RevivalTags.mountTagBar(card, 'canon_entries', e.id, {
+      onChange: typeof onTagChange === 'function' ? onTagChange : undefined,
+    });
+  }
+
   return card;
 }
 
@@ -840,6 +927,22 @@ function renderCanonBiblePage(section) {
   status.className = 'canon-status placeholder';
   section.appendChild(status);
 
+  // PTAG filter bar above the canon list. AND semantics across both active
+  // and retired lists.
+  let tagFilter = new Set();
+  let entriesCache = [];
+  let retiredCache = [];
+  let canonTagsById = {};
+  if (window.RevivalTags) {
+    const fc = window.RevivalTags.mountFilterBar(section, 'canon_entries', {
+      onChange: (sel) => {
+        tagFilter = sel;
+        renderLists();
+      },
+    });
+    tagFilter = fc.selected;
+  }
+
   // Active entries.
   const activeHeader = document.createElement('h2');
   activeHeader.className = 'canon-section-header';
@@ -860,11 +963,92 @@ function renderCanonBiblePage(section) {
   retired.appendChild(retiredList);
   section.appendChild(retired);
 
+  function matchesFilter(entry) {
+    if (tagFilter.size === 0) return true;
+    const have = new Set((canonTagsById[entry.id] || []).map((t) => t.id));
+    for (const id of tagFilter) if (!have.has(id)) return false;
+    return true;
+  }
+
+  // Repaint both lists from cache. Called by both the filter bar's onChange
+  // and after a tag mutation refreshes canonTagsById.
+  function renderLists() {
+    const filteredActive = entriesCache.filter(matchesFilter);
+    const filteredRetired = retiredCache.filter(matchesFilter);
+
+    list.innerHTML = '';
+    if (entriesCache.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'placeholder';
+      empty.textContent =
+        'No canon entries yet. Approved entries will land here from Canon Review.';
+      list.appendChild(empty);
+    } else if (filteredActive.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'placeholder';
+      empty.textContent = 'No active entries match the selected tag(s).';
+      list.appendChild(empty);
+    } else {
+      for (const e of filteredActive) {
+        list.appendChild(
+          buildCanonCard(e, canonTagsById[e.id], onCanonTagChange)
+        );
+      }
+    }
+
+    retiredSummary.textContent = `Retired (${filteredRetired.length})`;
+    retiredList.innerHTML = '';
+    if (retiredCache.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'placeholder';
+      empty.textContent = 'No retired entries.';
+      retiredList.appendChild(empty);
+    } else if (filteredRetired.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'placeholder';
+      empty.textContent = 'No retired entries match the selected tag(s).';
+      retiredList.appendChild(empty);
+    } else {
+      for (const e of filteredRetired) {
+        retiredList.appendChild(
+          buildCanonCard(e, canonTagsById[e.id], onCanonTagChange)
+        );
+      }
+    }
+  }
+
+  async function reloadCanonTags() {
+    if (!window.RevivalTags) return;
+    const allIds = [
+      ...entriesCache.map((e) => e.id),
+      ...retiredCache.map((e) => e.id),
+    ];
+    try {
+      canonTagsById = await window.revival.tags.bulkListFor(
+        'canon_entries',
+        allIds
+      );
+    } catch {
+      canonTagsById = {};
+    }
+  }
+
+  async function onCanonTagChange() {
+    await reloadCanonTags();
+    // No full re-render: the tag bar inside the card handles its own chip
+    // refresh. Re-render only if a filter is active so the affected card
+    // may slip in/out of view.
+    if (tagFilter.size > 0) renderLists();
+  }
+
   async function refresh() {
     const [entries, retiredEntries] = await Promise.all([
       window.revival.canon.list(),
       window.revival.canon.listRetired(),
     ]);
+    entriesCache = entries;
+    retiredCache = retiredEntries;
+    await reloadCanonTags();
 
     // Dev seed button: visible iff canon is completely empty.
     seedBar.innerHTML = '';
@@ -893,29 +1077,7 @@ function renderCanonBiblePage(section) {
       seedBar.appendChild(btn);
     }
 
-    // Active list.
-    list.innerHTML = '';
-    if (entries.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'placeholder';
-      empty.textContent =
-        'No canon entries yet. Approved entries will land here from Canon Review.';
-      list.appendChild(empty);
-    } else {
-      for (const e of entries) list.appendChild(buildCanonCard(e));
-    }
-
-    // Retired section.
-    retiredSummary.textContent = `Retired (${retiredEntries.length})`;
-    retiredList.innerHTML = '';
-    if (retiredEntries.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'placeholder';
-      empty.textContent = 'No retired entries.';
-      retiredList.appendChild(empty);
-    } else {
-      for (const e of retiredEntries) retiredList.appendChild(buildCanonCard(e));
-    }
+    renderLists();
   }
 
   refresh();
@@ -1531,9 +1693,23 @@ function renderWritingLabPage(section) {
   let selectedId = null;
   let activeItems = [];
   let archivedItems = [];
+  // PTAG state for the drafts list — same pattern as makeEntryWorkspace.
+  let tagsById = {};
+  let tagFilter = new Set();
   // Active editor's flushNow, if any — so list/header actions can commit
   // pending edits before switching away from the current draft.
   let activeFlush = null;
+
+  // PTAG filter bar above the drafts list (left column).
+  if (window.RevivalTags) {
+    const fc = window.RevivalTags.mountFilterBar(leftCol, 'writing_lab', {
+      onChange: (sel) => {
+        tagFilter = sel;
+        renderList();
+      },
+    });
+    tagFilter = fc.selected;
+  }
 
   function snippet(body) {
     const oneLine = String(body || '').replace(/\s+/g, ' ').trim();
@@ -1611,6 +1787,12 @@ function renderWritingLabPage(section) {
     wc.textContent = `${wordCount(item.body)} word(s)`;
     btn.appendChild(wc);
 
+    // PTAG — tag badges on the draft list item.
+    if (window.RevivalTags) {
+      const tagList = tagsById[item.id] || [];
+      if (tagList.length) btn.appendChild(window.RevivalTags.buildBadges(tagList));
+    }
+
     btn.addEventListener('click', async () => {
       if (selectedId === item.id) return;
       if (activeFlush) await activeFlush();
@@ -1621,24 +1803,51 @@ function renderWritingLabPage(section) {
     return btn;
   }
 
+  function matchesFilter(item) {
+    if (tagFilter.size === 0) return true;
+    const itemTags = tagsById[item.id] || [];
+    const have = new Set(itemTags.map((t) => t.id));
+    for (const id of tagFilter) if (!have.has(id)) return false;
+    return true;
+  }
+
   function renderList() {
     list.innerHTML = '';
-    if (activeItems.length === 0) {
+    const filteredActive = activeItems.filter(matchesFilter);
+    const filteredArchived = archivedItems.filter(matchesFilter);
+
+    if (filteredActive.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'tc-list-empty';
-      empty.textContent = 'No drafts yet.';
+      empty.textContent = tagFilter.size
+        ? 'No drafts match the selected tag(s).'
+        : 'No drafts yet.';
       list.appendChild(empty);
     } else {
-      for (const item of activeItems) {
+      for (const item of filteredActive) {
         list.appendChild(buildListItem(item, false));
       }
     }
 
     archivedListEl.innerHTML = '';
-    archivedSummary.textContent = `Archived (${archivedItems.length})`;
-    archived.style.display = archivedItems.length === 0 ? 'none' : '';
-    for (const item of archivedItems) {
+    archivedSummary.textContent = `Archived (${filteredArchived.length})`;
+    archived.style.display = filteredArchived.length === 0 ? 'none' : '';
+    for (const item of filteredArchived) {
       archivedListEl.appendChild(buildListItem(item, true));
+    }
+  }
+
+  async function refreshTagBadges() {
+    if (!window.RevivalTags) return;
+    const allIds = [
+      ...activeItems.map((i) => i.id),
+      ...archivedItems.map((i) => i.id),
+    ];
+    try {
+      tagsById = await window.revival.tags.bulkListFor('writing_lab', allIds);
+      renderList();
+    } catch {
+      /* non-fatal */
     }
   }
 
@@ -1715,6 +1924,19 @@ function renderWritingLabPage(section) {
 
     rightCol.append(bar, titleInput, bodyInput);
 
+    // PTAG — tag bar for the open draft. A brand-new untitled draft has no
+    // DB row yet, so the bar mounts after the first autosave creates one
+    // (handled in flush() below).
+    let tagBarMounted = false;
+    function mountTagBarIfReady() {
+      if (tagBarMounted || !window.RevivalTags || currentId == null) return;
+      tagBarMounted = true;
+      window.RevivalTags.mountTagBar(rightCol, 'writing_lab', currentId, {
+        onChange: () => refreshTagBadges(),
+      });
+    }
+    mountTagBarIfReady();
+
     function updateCounter() {
       counter.textContent = `${wordCount(bodyInput.value)} word(s)`;
     }
@@ -1757,6 +1979,7 @@ function renderWritingLabPage(section) {
           // The freshly-created row becomes the active selection so the list
           // can highlight it and subsequent navigation stays sane.
           selectedId = currentId;
+          mountTagBarIfReady();
         } else {
           rec = await api.update(currentId, { title, body });
         }
@@ -1906,6 +2129,18 @@ function renderWritingLabPage(section) {
       showEmpty();
       return;
     }
+    // PTAG — bulk tags for the drafts list.
+    if (window.RevivalTags) {
+      const allIds = [
+        ...activeItems.map((i) => i.id),
+        ...archivedItems.map((i) => i.id),
+      ];
+      try {
+        tagsById = await window.revival.tags.bulkListFor('writing_lab', allIds);
+      } catch {
+        tagsById = {};
+      }
+    }
     if (
       selectedId !== null &&
       selectedId !== 'new' &&
@@ -1928,11 +2163,13 @@ const CONTENT_RENDERERS = {
   'Canon Bible': renderCanonBiblePage,
   'Unsorted': makeEntryWorkspace({
     apiName: 'unsorted',
+    entityKind: 'unsorted',
     draftPrefix: 'unsorted',
     addLabel: 'Add to Unsorted',
   }),
   'Source Material': makeEntryWorkspace({
     apiName: 'sourceMaterial',
+    entityKind: 'source_material',
     draftPrefix: 'source_material',
     addLabel: 'Add Source',
     allowFileUpload: true,
@@ -1944,11 +2181,13 @@ const CONTENT_RENDERERS = {
   }),
   'Documents': makeEntryWorkspace({
     apiName: 'documents',
+    entityKind: 'documents',
     draftPrefix: 'documents',
     addLabel: 'Add Document',
   }),
   'Open Questions': makeEntryWorkspace({
     apiName: 'openQuestions',
+    entityKind: 'open_questions',
     draftPrefix: 'open_questions',
     addLabel: 'Add Question',
   }),
@@ -1956,6 +2195,7 @@ const CONTENT_RENDERERS = {
   // accent + tailored labels) so it never reads like Open Questions.
   'Conflicts': makeEntryWorkspace({
     apiName: 'conflicts',
+    entityKind: 'conflicts',
     draftPrefix: 'conflicts',
     addLabel: 'Log Conflict',
     sectionClass: 'ws-conflicts',
@@ -1964,6 +2204,7 @@ const CONTENT_RENDERERS = {
   }),
   'Decisions': makeEntryWorkspace({
     apiName: 'decisions',
+    entityKind: 'decisions',
     draftPrefix: 'decisions',
     addLabel: 'Record Decision',
     titlePlaceholder: 'What was decided?',
@@ -1971,6 +2212,7 @@ const CONTENT_RENDERERS = {
   }),
   'Brainstorm': makeEntryWorkspace({
     apiName: 'brainstorm',
+    entityKind: 'brainstorm',
     draftPrefix: 'brainstorm',
     addLabel: 'Add Idea',
     titlePlaceholder: 'What is the idea?',
@@ -1980,6 +2222,7 @@ const CONTENT_RENDERERS = {
   // tailored labels) so it never reads like Brainstorm's open ideation.
   'Research': makeEntryWorkspace({
     apiName: 'research',
+    entityKind: 'research',
     draftPrefix: 'research',
     addLabel: 'Add Research',
     sectionClass: 'ws-research',
@@ -1992,6 +2235,7 @@ const CONTENT_RENDERERS = {
   // generic queue.
   'Characters': makeEntryWorkspace({
     apiName: 'characters',
+    entityKind: 'characters',
     draftPrefix: 'characters',
     addLabel: 'Add Character',
     sectionClass: 'ws-characters',
@@ -2004,6 +2248,7 @@ const CONTENT_RENDERERS = {
   // Characters and the queue workspaces.
   'Episodes': makeEntryWorkspace({
     apiName: 'episodes',
+    entityKind: 'episodes',
     draftPrefix: 'episodes',
     addLabel: 'Add Episode',
     sectionClass: 'ws-episodes',

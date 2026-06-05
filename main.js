@@ -194,6 +194,21 @@ function registerIpc() {
     db.canonProposals.createFromExtract(payload)
   );
 
+  // PTAG — tag library + per-entity tag attach/detach. entity_kind is the
+  // workspace's DB table name; the renderer passes a constant per workspace.
+  ipcMain.handle('tags:listAll', () => db.tags.listAll());
+  ipcMain.handle('tags:listFor', (_event, kind, id) => db.tags.listFor(kind, id));
+  ipcMain.handle('tags:bulkListFor', (_event, kind, ids) =>
+    db.tags.bulkListFor(kind, ids)
+  );
+  ipcMain.handle('tags:attach', (_event, kind, id, tagId) =>
+    db.tags.attach(kind, id, tagId)
+  );
+  ipcMain.handle('tags:detach', (_event, kind, id, tagId) =>
+    db.tags.detach(kind, id, tagId)
+  );
+  ipcMain.handle('tags:create', (_event, payload) => db.tags.create(payload));
+
   ipcMain.handle('settings:getProjectRules', () => db.settings.getProjectRules());
   ipcMain.handle('settings:setProjectRules', (_event, text) =>
     db.settings.setProjectRules(text)

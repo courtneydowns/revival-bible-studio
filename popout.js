@@ -18,30 +18,35 @@
 const WORKSPACE_CONFIGS = {
   'Unsorted': {
     apiName: 'unsorted',
+    entityKind: 'unsorted',
     titlePlaceholder: 'Title',
     bodyPlaceholder: 'Notes (optional)',
     typeLabel: 'Entry',
   },
   'Source Material': {
     apiName: 'sourceMaterial',
+    entityKind: 'source_material',
     titlePlaceholder: 'Title',
     bodyPlaceholder: 'Notes (optional)',
     typeLabel: 'Source',
   },
   'Documents': {
     apiName: 'documents',
+    entityKind: 'documents',
     titlePlaceholder: 'Title',
     bodyPlaceholder: 'Notes (optional)',
     typeLabel: 'Document',
   },
   'Open Questions': {
     apiName: 'openQuestions',
+    entityKind: 'open_questions',
     titlePlaceholder: 'Title',
     bodyPlaceholder: 'Notes (optional)',
     typeLabel: 'Open question',
   },
   'Conflicts': {
     apiName: 'conflicts',
+    entityKind: 'conflicts',
     sectionClass: 'ws-conflicts',
     titlePlaceholder: 'What contradicts what?',
     bodyPlaceholder: 'The two sides in tension, and where each comes from (optional)',
@@ -49,18 +54,21 @@ const WORKSPACE_CONFIGS = {
   },
   'Decisions': {
     apiName: 'decisions',
+    entityKind: 'decisions',
     titlePlaceholder: 'What was decided?',
     bodyPlaceholder: 'The decision, and why it was settled this way (optional)',
     typeLabel: 'Decision',
   },
   'Brainstorm': {
     apiName: 'brainstorm',
+    entityKind: 'brainstorm',
     titlePlaceholder: 'What is the idea?',
     bodyPlaceholder: 'Where it might go, what sparked it (optional)',
     typeLabel: 'Idea',
   },
   'Research': {
     apiName: 'research',
+    entityKind: 'research',
     sectionClass: 'ws-research',
     titlePlaceholder: 'What was researched?',
     bodyPlaceholder: 'Findings, and where they came from — source/link (optional)',
@@ -68,6 +76,7 @@ const WORKSPACE_CONFIGS = {
   },
   'Characters': {
     apiName: 'characters',
+    entityKind: 'characters',
     sectionClass: 'ws-characters',
     titlePlaceholder: 'Character name',
     bodyPlaceholder: 'Who they are — role, traits, arc, open threads (optional)',
@@ -75,6 +84,7 @@ const WORKSPACE_CONFIGS = {
   },
   'Episodes': {
     apiName: 'episodes',
+    entityKind: 'episodes',
     sectionClass: 'ws-episodes',
     titlePlaceholder: 'Episode title',
     bodyPlaceholder: 'Outline, scene list, beats, draft notes (optional)',
@@ -255,6 +265,14 @@ function renderView(card, mode, item) {
   actions.appendChild(deleteBtn);
 
   card.appendChild(actions);
+
+  // PTAG — tag bar in Reference Mode (Edit Mode rebuilds the card and
+  // intentionally omits it). Tag mutations don't broadcast to other windows
+  // here, so a main-window list won't update live; refreshing the popout
+  // (any save/archive/etc.) re-fetches tags.
+  if (config && config.entityKind && window.RevivalTags) {
+    window.RevivalTags.mountTagBar(card, config.entityKind, item.id);
+  }
 }
 
 function showDeleteConfirm(card, mode, actions, item) {
