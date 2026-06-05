@@ -551,6 +551,226 @@ function renderChatPage(section) {
   section.appendChild(btn);
 }
 
+// --- Canon Bible (P31) — read-only list view -------------------------------
+// First UI surface on top of the canon schema. The page lists active canon
+// entries with provenance fields visible (origin_kind, origin_lock_code,
+// origin session, legacy IDs, lock/provisional/status/certainty/review
+// state). A collapsed "Retired" section sits below so the supersede chain
+// stays visible without dominating the page. Editing, lock toggles, and the
+// Canon Review queue arrive in P32–P35; nothing here mutates canon yet.
+//
+// One dev affordance is included for the P31 smoke test only: a "Seed sample
+// entries (dev)" button that appears solely when the canon is empty. It calls
+// canon.devSeed (idempotent) so the smoke test has data to look at. Once any
+// entries exist the button vanishes — this is not a real-data entry path.
+function buildCanonCard(e) {
+  const card = document.createElement('div');
+  card.className = 'entry-card canon-card';
+  if (e.locked) card.classList.add('canon-locked');
+  if (e.retired) card.classList.add('canon-retired');
+
+  // Header: type badge + title.
+  const header = document.createElement('div');
+  header.className = 'canon-card-header';
+  const typeBadge = document.createElement('span');
+  typeBadge.className = 'canon-type-badge';
+  typeBadge.textContent = e.entry_type;
+  header.appendChild(typeBadge);
+  const title = document.createElement('span');
+  title.className = 'entry-title';
+  title.textContent = e.title;
+  header.appendChild(title);
+  card.appendChild(header);
+
+  if (e.body) {
+    const body = document.createElement('div');
+    body.className = 'entry-body';
+    body.textContent = e.body;
+    card.appendChild(body);
+  }
+
+  // Status chips — lock/provisional/status/certainty/review_state.
+  const chips = document.createElement('div');
+  chips.className = 'canon-chips';
+  const addChip = (label, cls) => {
+    if (!label) return;
+    const c = document.createElement('span');
+    c.className = `canon-chip ${cls || ''}`.trim();
+    c.textContent = label;
+    chips.appendChild(c);
+  };
+  if (e.locked) {
+    addChip(
+      e.locked_label ? `🔒 locked · ${e.locked_label}` : '🔒 locked',
+      'canon-chip-locked'
+    );
+  }
+  if (e.retired) addChip('retired', 'canon-chip-retired');
+  if (e.provisional) addChip('provisional', 'canon-chip-provisional');
+  if (e.canon_status) addChip(`status: ${e.canon_status}`);
+  if (e.certainty) addChip(`certainty: ${e.certainty}`);
+  if (e.review_state) addChip(`review: ${e.review_state}`);
+  if (chips.children.length) card.appendChild(chips);
+
+  // Legacy IDs (T/Q/A/CF/…) — primary first, then secondaries muted.
+  if (e.legacy_ids && e.legacy_ids.length) {
+    const ids = document.createElement('div');
+    ids.className = 'canon-ids';
+    const label = document.createElement('span');
+    label.className = 'canon-ids-label';
+    label.textContent = 'IDs:';
+    ids.appendChild(label);
+    for (const lid of e.legacy_ids) {
+      const tag = document.createElement('span');
+      tag.className = 'canon-idtag';
+      if (!lid.isPrimary) tag.classList.add('canon-idtag-secondary');
+      tag.textContent = lid.isPrimary ? lid.code : `${lid.code} (alt)`;
+      ids.appendChild(tag);
+    }
+    card.appendChild(ids);
+  }
+
+  // Provenance — origin_kind / origin_lock_code / origin session. Always
+  // shown for visibility; if a field is null we just omit that bit.
+  const provBits = [];
+  if (e.origin_kind) provBits.push(`origin: ${e.origin_kind}`);
+  if (e.origin_lock_code) provBits.push(`lock code: ${e.origin_lock_code}`);
+  if (e.origin_session_label) {
+    const dt = e.origin_session_date ? ` (${e.origin_session_date})` : '';
+    provBits.push(`session: ${e.origin_session_label}${dt}`);
+  }
+  if (provBits.length) {
+    const prov = document.createElement('div');
+    prov.className = 'canon-prov';
+    prov.textContent = provBits.join(' · ');
+    card.appendChild(prov);
+  }
+
+  // Timestamps.
+  const meta = document.createElement('div');
+  meta.className = 'entry-meta';
+  const created = new Date(e.created_at).toLocaleString();
+  if (e.retired && e.retired_at) {
+    meta.textContent = `created ${created} · retired ${new Date(e.retired_at).toLocaleString()}`;
+  } else {
+    meta.textContent = `created ${created} · updated ${new Date(e.updated_at).toLocaleString()}`;
+  }
+  card.appendChild(meta);
+
+  return card;
+}
+
+function renderCanonBiblePage(section) {
+  section.classList.add('ws-canon');
+
+  // Five-UI-questions intro: where am I / what is this for / what next /
+  // where saved material goes / how to edit. All five answered up front so
+  // the read-only state isn't confusing.
+  const intro = document.createElement('div');
+  intro.className = 'canon-intro';
+  const lede = document.createElement('p');
+  lede.innerHTML =
+    '<strong>The locked reference version of canonical Revival truth.</strong>';
+  intro.appendChild(lede);
+  const sub = document.createElement('p');
+  sub.className = 'placeholder';
+  sub.textContent =
+    'Read-only at this phase. New entries land here after approval in Canon ' +
+    'Review (P35); editing, lock/unlock, and supersede arrive in P32–P34. ' +
+    'Until then this view exists so you can see what canon already holds.';
+  intro.appendChild(sub);
+  section.appendChild(intro);
+
+  // Dev seed bar — only renders when the canon is empty.
+  const seedBar = document.createElement('div');
+  seedBar.className = 'canon-seedbar';
+  section.appendChild(seedBar);
+
+  const status = document.createElement('div');
+  status.className = 'canon-status placeholder';
+  section.appendChild(status);
+
+  // Active entries.
+  const activeHeader = document.createElement('h2');
+  activeHeader.className = 'canon-section-header';
+  activeHeader.textContent = 'Active';
+  section.appendChild(activeHeader);
+
+  const list = document.createElement('div');
+  list.className = 'entry-list';
+  section.appendChild(list);
+
+  // Collapsed Retired section (collapsed-by-default, same pattern as Archive).
+  const retired = document.createElement('details');
+  retired.className = 'archived-section';
+  const retiredSummary = document.createElement('summary');
+  retired.appendChild(retiredSummary);
+  const retiredList = document.createElement('div');
+  retiredList.className = 'entry-list';
+  retired.appendChild(retiredList);
+  section.appendChild(retired);
+
+  async function refresh() {
+    const [entries, retiredEntries] = await Promise.all([
+      window.revival.canon.list(),
+      window.revival.canon.listRetired(),
+    ]);
+
+    // Dev seed button: visible iff canon is completely empty.
+    seedBar.innerHTML = '';
+    if (entries.length === 0 && retiredEntries.length === 0) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-secondary';
+      btn.textContent = 'Seed sample entries (dev)';
+      btn.title =
+        'Inserts a few sample canon entries with provenance for the P31 smoke test. One-shot — vanishes once any entries exist.';
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          const res = await window.revival.canon.devSeed();
+          setStatus(
+            status,
+            res.inserted > 0
+              ? `Seeded ${res.inserted} sample entries.`
+              : 'Already seeded — no changes.'
+          );
+        } catch (err) {
+          setStatus(status, `Seed failed: ${err.message || err}`);
+        }
+        await refresh();
+      });
+      seedBar.appendChild(btn);
+    }
+
+    // Active list.
+    list.innerHTML = '';
+    if (entries.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'placeholder';
+      empty.textContent =
+        'No canon entries yet. Approved entries will land here from Canon Review.';
+      list.appendChild(empty);
+    } else {
+      for (const e of entries) list.appendChild(buildCanonCard(e));
+    }
+
+    // Retired section.
+    retiredSummary.textContent = `Retired (${retiredEntries.length})`;
+    retiredList.innerHTML = '';
+    if (retiredEntries.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'placeholder';
+      empty.textContent = 'No retired entries.';
+      retiredList.appendChild(empty);
+    } else {
+      for (const e of retiredEntries) retiredList.appendChild(buildCanonCard(e));
+    }
+  }
+
+  refresh();
+}
+
 // --- Home dashboard (P27) ---------------------------------------------------
 // A read-only overview: a count per storage-backed workspace, a recent-activity
 // feed, and dismissible Next Step Suggestions. Home mutates nothing — it only
@@ -1556,6 +1776,7 @@ const CONTENT_RENDERERS = {
   'Writing Lab': renderWritingLabPage,
   'Chat': renderChatPage,
   'Settings': renderSettingsPage,
+  'Canon Bible': renderCanonBiblePage,
   'Unsorted': makeEntryWorkspace({
     apiName: 'unsorted',
     draftPrefix: 'unsorted',

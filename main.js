@@ -156,6 +156,15 @@ function registerIpc() {
     db.dashboard.summary(limit)
   );
 
+  // Canon Bible (P31): read-only list + a one-shot dev seed used solely by the
+  // P31 smoke test. devSeed is idempotent and visible in the UI — it does NOT
+  // bypass Canon Review for real entries; it just primes an empty DB so the
+  // read view has something to show. P32+ replaces this with real proposals.
+  ipcMain.handle('canon:list', () => db.canon.list());
+  ipcMain.handle('canon:listRetired', () => db.canon.listRetired());
+  ipcMain.handle('canon:count', () => db.canon.count());
+  ipcMain.handle('canon:devSeed', () => db.canon.devSeed());
+
   ipcMain.handle('settings:getProjectRules', () => db.settings.getProjectRules());
   ipcMain.handle('settings:setProjectRules', (_event, text) =>
     db.settings.setProjectRules(text)

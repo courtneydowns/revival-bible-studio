@@ -318,6 +318,70 @@
         color: #d6a14f;
       }
 
+      /* Canon Bible (P31): read-only list. The card gets a gold left rule so it
+         reads as the "locked truth" surface, never as just another working
+         queue. Status chips + provenance row are the visible difference from
+         the simpler entry workspaces. */
+      .ws-canon .canon-intro { max-width: 720px; margin-bottom: 20px; }
+      .ws-canon .canon-intro p { margin: 0 0 8px 0; }
+      .ws-canon .canon-seedbar { margin-bottom: 10px; }
+      .ws-canon .canon-status { margin-bottom: 14px; font-size: 12px; }
+      .ws-canon .canon-section-header {
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 4px 0 8px 0;
+      }
+      .canon-card { border-left: 3px solid #b08c4a; }
+      .canon-card.canon-locked { border-left-color: #d6a14f; }
+      .canon-card.canon-retired { opacity: 0.7; }
+      .canon-card-header {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        margin-bottom: 4px;
+      }
+      .canon-type-badge {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        background: rgba(214, 161, 79, 0.18);
+        color: #d6a14f;
+        border-radius: 4px;
+        padding: 2px 7px;
+      }
+      .canon-chips {
+        display: flex; gap: 6px; flex-wrap: wrap;
+        margin-top: 8px;
+      }
+      .canon-chip {
+        font-size: 11px;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 2px 8px;
+      }
+      .canon-chip-locked { color: #d6a14f; border-color: #d6a14f; }
+      .canon-chip-retired { color: #888; border-color: #888; }
+      .canon-chip-provisional { color: #c79a55; border-color: #c79a55; }
+      .canon-ids {
+        margin-top: 8px; font-size: 12px; color: var(--muted);
+        display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      }
+      .canon-ids-label { letter-spacing: 0.02em; }
+      .canon-idtag {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 1px 6px;
+        color: var(--text);
+      }
+      .canon-idtag-secondary { opacity: 0.55; }
+      .canon-prov {
+        font-size: 12px; color: var(--muted); margin-top: 6px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
       .entry-card input,
       .entry-card textarea {
         font: inherit;

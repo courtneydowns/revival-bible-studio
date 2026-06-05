@@ -120,6 +120,12 @@ contextBridge.exposeInMainWorld('revival', {
   dashboard: {
     summary: (limit) => ipcRenderer.invoke('dashboard:summary', limit),
   },
+  canon: {
+    list: () => ipcRenderer.invoke('canon:list'),
+    listRetired: () => ipcRenderer.invoke('canon:listRetired'),
+    count: () => ipcRenderer.invoke('canon:count'),
+    devSeed: () => ipcRenderer.invoke('canon:devSeed'),
+  },
   settings: {
     getProjectRules: () => ipcRenderer.invoke('settings:getProjectRules'),
     setProjectRules: (text) =>
