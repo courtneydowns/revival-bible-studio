@@ -137,30 +137,6 @@
       #content h1 { margin: 0 0 8px; font-size: 26px; }
       #content .placeholder { color: var(--muted); font-size: 15px; }
 
-      dl.principles {
-        margin: 28px 0 0;
-        max-width: 720px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        overflow: hidden;
-      }
-      dl.principles dt {
-        background: var(--panel);
-        color: var(--muted);
-        font-size: 12px;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        padding: 10px 18px 4px;
-      }
-      dl.principles dd {
-        margin: 0;
-        padding: 0 18px 14px;
-        font-size: 14px;
-        line-height: 1.45;
-        border-bottom: 1px solid var(--border);
-      }
-      dl.principles dd:last-child { border-bottom: none; }
-
       .ws-content { max-width: 720px; margin-top: 28px; }
 
       .entry-form {
@@ -308,6 +284,163 @@
       }
       .archived-section > summary:hover { color: var(--text); }
       .archived-section .entry-list { margin-top: 12px; }
+
+      /* --- Home dashboard (P27) --------------------------------------- */
+      .home-section-label {
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 26px 0 10px;
+      }
+      .home-suggestions-head,
+      .home-recent-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin: 4px 0 10px;
+      }
+      .home-recent-head { margin-top: 26px; }
+      .home-suggestions-head .home-section-label,
+      .home-recent-head .home-section-label { margin: 0; }
+      .suggestions-refresh {
+        font: inherit;
+        font-size: 12px;
+        color: var(--text);
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 4px 10px;
+        cursor: pointer;
+      }
+      .suggestions-refresh:hover { border-color: var(--accent); background: var(--hover); }
+      .suggestions-refresh:disabled { opacity: 0.5; cursor: default; }
+
+      .home-suggestions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 8px;
+      }
+      .suggestion-card {
+        position: relative;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--accent);
+        border-radius: 6px;
+        padding: 9px 28px 9px 11px;
+        cursor: pointer;
+      }
+      .suggestion-card:hover { border-color: var(--accent); background: var(--hover); }
+      .suggestion-text {
+        font-size: 13px;
+        line-height: 1.35;
+        color: var(--text);
+      }
+      .suggestion-dismiss {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        font: inherit;
+        font-size: 12px;
+        line-height: 1;
+        color: var(--muted);
+        background: none;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .suggestion-dismiss:hover { background: var(--hover); color: var(--text); }
+
+      .home-counts {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 6px;
+      }
+      .count-cell {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 5px;
+        text-align: left;
+        font: inherit;
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 10px;
+        cursor: pointer;
+      }
+      .count-cell:hover { border-color: var(--accent); background: var(--hover); }
+      .count-number { font-size: 16px; font-weight: 600; line-height: 1.1; }
+      .count-label { font-size: 12px; color: var(--muted); }
+      .count-archived { font-size: 10px; color: var(--muted); }
+
+      .home-recent {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 10px;
+      }
+      .recent-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        text-align: left;
+        font: inherit;
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 7px 26px 7px 10px;
+        cursor: pointer;
+      }
+      .recent-card:hover { border-color: var(--accent); background: var(--hover); }
+      .recent-clear {
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        font: inherit;
+        font-size: 11px;
+        line-height: 1;
+        color: var(--muted);
+        background: none;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .recent-clear:hover { background: var(--hover); color: var(--text); }
+      .recent-foot {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      .recent-ws {
+        font-size: 10px;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .recent-title {
+        font-size: 13px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .recent-meta { font-size: 11px; color: var(--muted); }
 
       /* --- Global Chat drawer (P14) ----------------------------------- */
       /* Fixed toggle, always visible so the drawer is reachable from any

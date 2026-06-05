@@ -1,5 +1,5 @@
 // Left-nav routing for the 14 Revival workspaces.
-// Each page renders the shared 5-question UI-principle template (see CLAUDE.md).
+// Each page renders its title plus any workspace-specific functional UI.
 
 const WORKSPACES = [
   'Home',
@@ -18,111 +18,9 @@ const WORKSPACES = [
   'Settings',
 ];
 
-// Per-workspace answers to the 5 UI questions.
-// Q1 "Where am I" is derived from the name; the other four live here.
-// `lifecycle` defaults to the standard edit/delete/archive/restore wording.
-const STD_LIFECYCLE =
-  'Each entry can be edited, deleted (for mistakes), or archived to a collapsed section and restored later.';
-
-const WORKSPACE_INFO = {
-  'Home': {
-    purpose: 'An overview of the whole Revival project — where everything lives and what needs attention.',
-    next: 'Pick a workspace from the left to start working.',
-    savedTo: 'Nothing is saved here; Home only summarizes what lives in the other workspaces.',
-    lifecycle: 'Nothing to edit here — manage material inside its own workspace.',
-  },
-  'Chat': {
-    purpose: 'Talk through the Revival project with Claude. (Becomes a global drawer in a later phase.)',
-    next: 'Open the chat drawer (💬 Chat, bottom-right of any workspace), click “+ New chat” to create chats, and switch between them with the dropdown. Rename or archive the active chat with the buttons below the title; archived chats restore from the collapsed section. Use “+ Attach source” to add Source Material in one of two modes: “Keep active” stays listed for the whole chat, while “Next message only” is used once and clears on the next send. Remove any active source with the ✕ on its chip. (Sending here is a draft action only — Claude messaging comes later; nothing is saved or sent.)',
-    savedTo: 'Chats are kept in this Chat workspace. Attachments come from Source Material only.',
-    lifecycle: 'Chats can be renamed, archived, and restored. Nothing is finalized without your confirmation.',
-  },
-  'Writing Lab': {
-    purpose: 'Long-form drafting space with autosave for working on Revival writing.',
-    next: 'Open or start a draft and write.',
-    savedTo: 'Drafts are preserved in the Writing Lab. Autosave preserves drafts — it does not finalize them.',
-    lifecycle: STD_LIFECYCLE,
-  },
-  'Source Material': {
-    purpose: 'Reference inputs for the project. The only thing that can be attached to Chat.',
-    next: 'Add a source, or open one to view it.',
-    savedTo: 'Sources are stored here and stay visibly separate from Documents.',
-    lifecycle: STD_LIFECYCLE,
-  },
-  'Documents': {
-    purpose: 'Working and finished documents — kept separate from Source Material.',
-    next: 'Create a document or open an existing one to edit.',
-    savedTo: 'Documents are stored here, not blended with Source Material.',
-    lifecycle: STD_LIFECYCLE,
-  },
-  'Canon Bible': {
-    purpose: 'The currently accepted Revival truth. Locked = accepted, not impossible to change.',
-    next: 'Browse entries; propose changes through Canon Review rather than editing truth silently.',
-    savedTo: 'Accepted canon lives here. Retired/superseded entries stay in a collapsed section.',
-    lifecycle: 'Entries are editable; locking warns before edits; superseding retires the old version into a collapsed section.',
-  },
-  'Unsorted': {
-    purpose: 'A general routing queue for anything that does not fit a workspace yet.',
-    next: 'Drop an item here, then route it to the right workspace when you know where it belongs.',
-    savedTo: 'Items stay in Unsorted until you move them somewhere specific.',
-    lifecycle: STD_LIFECYCLE,
-  },
-  'Canon Review': {
-    purpose: 'The approval space for anything that may affect official Revival truth.',
-    next: 'Review proposed changes and approve, reject, or send them back.',
-    savedTo: 'Approved changes flow into the Canon Bible. Nothing reaches canon without approval here.',
-    lifecycle: 'Proposals can be approved, rejected, or sent back. No automatic canon mutation.',
-  },
-  'Open Questions': {
-    purpose: 'Unresolved questions about the Revival project.',
-    next: 'Add a question, or open one to work toward an answer.',
-    savedTo: 'Questions are stored here, separate from Conflicts.',
-    lifecycle: STD_LIFECYCLE,
-  },
-  'Conflicts': {
-    purpose: 'Contradictions that need resolving — kept distinct from Open Questions.',
-    next: 'Log a conflict, or open one to resolve it.',
-    savedTo: 'Conflicts are stored here, visibly distinct from Open Questions.',
-    lifecycle: STD_LIFECYCLE,
-  },
-  'Decisions': {
-    purpose: 'Settled decisions for the Revival project.',
-    next: 'Record a decision, or open one to revisit it.',
-    savedTo: 'Decisions are stored here.',
-    lifecycle: STD_LIFECYCLE,
-  },
-  'Brainstorm': {
-    purpose: 'Open idea generation — kept separate from Research.',
-    next: 'Capture ideas freely; refine or route the good ones later.',
-    savedTo: 'Ideas are stored here, separate from Research.',
-    lifecycle: STD_LIFECYCLE,
-  },
-  'Research': {
-    purpose: 'Background and external research — kept separate from Brainstorm.',
-    next: 'Add a research note, or open one to expand it.',
-    savedTo: 'Research is stored here, not blended with Brainstorm.',
-    lifecycle: STD_LIFECYCLE,
-  },
-  'Settings': {
-    purpose: 'Project configuration, including always-on Project Rules that Claude receives.',
-    next: 'Review or edit your Project Rules and other settings.',
-    savedTo: 'Settings are saved to this project. Project Rules are always-on and visible — no hidden memory.',
-    lifecycle: 'Settings values can be edited and saved; changes persist across restarts.',
-  },
-};
-
-const QUESTIONS = [
-  ['Where am I', (name) => `Revival Studio › ${name}`],
-  ['What is this page for', (name, info) => info.purpose],
-  ['What should I do next', (name, info) => info.next],
-  ['Where saved material goes', (name, info) => info.savedTo],
-  ['How to edit, delete, archive, restore, or undo', (name, info) => info.lifecycle],
-];
-
-// Reusable template: renders the 5-question panel for a workspace, then any
-// workspace-specific functional UI below it.
+// Reusable template: renders the workspace title, then any workspace-specific
+// functional UI below it.
 function renderWorkspacePage(name) {
-  const info = WORKSPACE_INFO[name];
   const content = CONTENT_RENDERERS[name];
 
   const page = document.createElement('div');
@@ -137,17 +35,6 @@ function renderWorkspacePage(name) {
     sub.textContent = 'Placeholder — workspace features come in a later phase.';
     page.appendChild(sub);
   }
-
-  const panel = document.createElement('dl');
-  panel.className = 'principles';
-  for (const [label, answer] of QUESTIONS) {
-    const dt = document.createElement('dt');
-    dt.textContent = label;
-    const dd = document.createElement('dd');
-    dd.textContent = answer(name, info);
-    panel.append(dt, dd);
-  }
-  page.appendChild(panel);
 
   if (content) {
     const section = document.createElement('div');
@@ -662,6 +549,442 @@ function renderChatPage(section) {
   section.appendChild(btn);
 }
 
+// --- Home dashboard (P27) ---------------------------------------------------
+// A read-only overview: a count per storage-backed workspace, a recent-activity
+// feed, and dismissible Next Step Suggestions. Home mutates nothing — it only
+// summarizes what lives in the other workspaces (per CLAUDE.md). Counts come
+// straight from the DB so they always match each workspace's own lists.
+//
+// Suggestions are generated from the live counts but keyed by a stable id;
+// dismissals are persisted in localStorage so a dismissed suggestion stays
+// dismissed across restarts (it never reappears, even if its count changes).
+const DISMISSED_SUGGESTIONS_KEY = 'revival.home.dismissedSuggestions';
+// How many Next Step cards show at once, and the hard ceiling on recent-activity
+// cards. Both keep Home from ever needing to scroll; recent is also trimmed to
+// whatever space is left after Next steps + Workspaces.
+const SUGGESTION_CAP = 6;
+const RECENT_CAP = 6;
+
+function getDismissedSuggestions() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(DISMISSED_SUGGESTIONS_KEY));
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function dismissSuggestion(id) {
+  const set = getDismissedSuggestions();
+  set.add(id);
+  localStorage.setItem(DISMISSED_SUGGESTIONS_KEY, JSON.stringify([...set]));
+}
+
+// Bring every dismissed suggestion back (the Refresh action).
+function clearDismissedSuggestions() {
+  localStorage.removeItem(DISMISSED_SUGGESTIONS_KEY);
+}
+
+// Build the candidate suggestions from the live counts. Each has a stable id so
+// dismissal is permanent regardless of how the underlying number changes. The
+// catalog is intentionally larger than SUGGESTION_CAP so Refresh has extras to
+// cycle through.
+function buildSuggestions(countsByKey) {
+  const n = (key) => (countsByKey[key] ? countsByKey[key].active : 0);
+  const list = [];
+
+  // Attention-needed (only when there's something to act on).
+  if (n('unsorted') > 0) {
+    list.push({
+      id: 'route-unsorted',
+      text: `Route ${n('unsorted')} item(s) waiting in Unsorted.`,
+      route: 'Unsorted',
+    });
+  }
+  if (n('conflicts') > 0) {
+    list.push({
+      id: 'resolve-conflicts',
+      text: `Resolve ${n('conflicts')} open conflict(s).`,
+      route: 'Conflicts',
+    });
+  }
+  if (n('open_questions') > 0) {
+    list.push({
+      id: 'answer-questions',
+      text: `Answer ${n('open_questions')} open question(s).`,
+      route: 'Open Questions',
+    });
+  }
+
+  // Getting-started nudges (only while a workspace is still empty).
+  if (n('source_material') === 0) {
+    list.push({
+      id: 'add-source',
+      text: 'Add Source Material so you can attach references in Chat.',
+      route: 'Source Material',
+    });
+  }
+  if (n('documents') === 0) {
+    list.push({ id: 'start-document', text: 'Start your first Document.', route: 'Documents' });
+  }
+  if (n('decisions') === 0) {
+    list.push({ id: 'record-decision', text: 'Record a Decision once something is settled.', route: 'Decisions' });
+  }
+  if (n('brainstorm') === 0) {
+    list.push({ id: 'capture-idea', text: 'Capture an idea in Brainstorm.', route: 'Brainstorm' });
+  }
+  if (n('research') === 0) {
+    list.push({ id: 'add-research', text: 'Add a Research note.', route: 'Research' });
+  }
+  if (n('chats') === 0) {
+    list.push({ id: 'start-chat', text: 'Start a chat to think through Revival.', route: 'Chat' });
+  }
+
+  // Always-available housekeeping so there's usually something to act on.
+  list.push({ id: 'review-rules', text: 'Review your always-on Project Rules in Settings.', route: 'Settings' });
+  list.push({ id: 'panic-backup', text: 'Run a Panic Export to back everything up.', route: 'Settings' });
+
+  return list;
+}
+
+function renderHomePage(section) {
+  const loading = document.createElement('p');
+  loading.className = 'placeholder';
+  loading.textContent = 'Loading overview…';
+  section.appendChild(loading);
+
+  (async () => {
+    let summary;
+    try {
+      // Fetch a generous pool; the recent feed is trimmed below to only the
+      // cards that fit without scrolling.
+      summary = await window.revival.dashboard.summary(30);
+    } catch (err) {
+      loading.textContent = `Could not load overview: ${err.message || err}`;
+      return;
+    }
+    loading.remove();
+
+    let countsByKey = {};
+    for (const c of summary.counts) countsByKey[c.key] = c;
+
+    // The recent-activity grid + its label; populated below. Trimmed toward the
+    // cards that fit in the visible content area (capped at RECENT_CAP) to keep
+    // scrolling minimal — but it ALWAYS shows at least one row and never hides
+    // the header, so the section can't disappear. Cards have a uniform height,
+    // so we measure one card + the grid's column count to pick how many to show.
+    let recentFeed = null;
+    let recentLabel = null;
+    // Session-only rotation offset for cycling Next Step suggestions on Refresh.
+    let suggestionOffset = 0;
+
+    function trimRecentToFit() {
+      const feed = recentFeed;
+      if (!feed || !document.body.contains(feed)) return;
+      const cards = Array.from(feed.querySelectorAll('.recent-card'));
+      if (cards.length === 0) return;
+      feed.style.display = '';
+      if (recentLabel) recentLabel.style.display = '';
+      cards.forEach((c) => (c.style.display = ''));
+
+      const contentEl = document.getElementById('content');
+      const gridStyle = getComputedStyle(feed);
+      const cols =
+        gridStyle.gridTemplateColumns.split(' ').filter(Boolean).length || 1;
+      const rowGap = parseFloat(gridStyle.rowGap) || 0;
+      const cardH = cards[0].getBoundingClientRect().height;
+      const feedTop = feed.getBoundingClientRect().top;
+      const contentBottom = contentEl.getBoundingClientRect().bottom;
+      const BOTTOM_PAD = 40; // matches #content's bottom padding
+      const avail = contentBottom - feedTop - BOTTOM_PAD;
+
+      let rows = Math.floor((avail + rowGap) / (cardH + rowGap));
+      if (rows < 1) rows = 1; // always show at least one row — never disappear
+      const maxCards = Math.min(rows * cols, RECENT_CAP, cards.length);
+      cards.forEach((c, i) => {
+        c.style.display = i < maxCards ? '' : 'none';
+      });
+    }
+
+    // Refresh Next steps: bring back any dismissed suggestions, re-check the
+    // live counts, and cycle the visible window through any extras.
+    let refreshing = false;
+    async function refreshSuggestions(btn) {
+      if (refreshing) return;
+      refreshing = true;
+      if (btn) btn.disabled = true;
+      clearDismissedSuggestions(); // bring everything back
+      suggestionOffset += SUGGESTION_CAP;
+      try {
+        const fresh = await window.revival.dashboard.summary(0);
+        countsByKey = {};
+        for (const c of fresh.counts) countsByKey[c.key] = c;
+      } catch {
+        /* keep the existing counts on failure */
+      }
+      refreshing = false;
+      renderSuggestions();
+      trimRecentToFit();
+    }
+
+    // Re-fit on resize; the listener removes itself once Home is left (the feed
+    // is detached when route() wipes #content).
+    function onResize() {
+      if (!recentFeed || !document.body.contains(recentFeed)) {
+        window.removeEventListener('resize', onResize);
+        return;
+      }
+      trimRecentToFit();
+    }
+
+    // --- Next Step Suggestions (dismissible) ---
+    const suggestionsWrap = document.createElement('div');
+    suggestionsWrap.className = 'home-suggestions';
+    section.appendChild(suggestionsWrap);
+
+    function renderSuggestions() {
+      suggestionsWrap.innerHTML = '';
+      const dismissed = getDismissedSuggestions();
+      const candidates = buildSuggestions(countsByKey).filter(
+        (s) => !dismissed.has(s.id)
+      );
+
+      // The header (label + Refresh) ALWAYS renders — so even when every
+      // suggestion has been dismissed, Refresh is still there to bring them back.
+      const head = document.createElement('div');
+      head.className = 'home-suggestions-head';
+
+      const label = document.createElement('span');
+      label.className = 'home-section-label';
+      label.textContent = 'Next steps';
+      head.appendChild(label);
+
+      const refresh = document.createElement('button');
+      refresh.type = 'button';
+      refresh.className = 'suggestions-refresh';
+      refresh.textContent = '↻ Refresh';
+      refresh.title = 'Bring back dismissed suggestions and re-check';
+      refresh.addEventListener('click', () => refreshSuggestions(refresh));
+      head.appendChild(refresh);
+
+      suggestionsWrap.appendChild(head);
+
+      if (candidates.length === 0) {
+        const hint = document.createElement('p');
+        hint.className = 'placeholder';
+        hint.textContent = 'All dismissed — hit Refresh to bring them back.';
+        suggestionsWrap.appendChild(hint);
+        return;
+      }
+
+      // Show up to SUGGESTION_CAP; when there are extras, Refresh rotates a
+      // sliding window through them.
+      let shown;
+      if (candidates.length <= SUGGESTION_CAP) {
+        shown = candidates;
+      } else {
+        const start = suggestionOffset % candidates.length;
+        shown = [];
+        for (let i = 0; i < SUGGESTION_CAP; i++) {
+          shown.push(candidates[(start + i) % candidates.length]);
+        }
+      }
+
+      const cards = document.createElement('div');
+      cards.className = 'home-suggestions-grid';
+      for (const s of shown) {
+        const card = document.createElement('div');
+        card.className = 'suggestion-card';
+        card.title = `Go to ${s.route}`;
+        card.addEventListener('click', () => route(s.route));
+
+        const text = document.createElement('div');
+        text.className = 'suggestion-text';
+        text.textContent = s.text;
+
+        const dismiss = document.createElement('button');
+        dismiss.type = 'button';
+        dismiss.className = 'suggestion-dismiss';
+        dismiss.textContent = '✕';
+        dismiss.title = 'Dismiss';
+        dismiss.setAttribute('aria-label', 'Dismiss suggestion');
+        dismiss.addEventListener('click', (e) => {
+          e.stopPropagation();
+          dismissSuggestion(s.id);
+          renderSuggestions();
+          trimRecentToFit();
+        });
+
+        card.append(text, dismiss);
+        cards.appendChild(card);
+      }
+      suggestionsWrap.appendChild(cards);
+    }
+    renderSuggestions();
+
+    // --- Counts per workspace ---
+    const countsLabel = document.createElement('div');
+    countsLabel.className = 'home-section-label';
+    countsLabel.textContent = 'Workspaces';
+    section.appendChild(countsLabel);
+
+    const grid = document.createElement('div');
+    grid.className = 'home-counts';
+    for (const c of summary.counts) {
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = 'count-cell';
+      cell.title = `Go to ${c.route}`;
+      cell.addEventListener('click', () => route(c.route));
+
+      const num = document.createElement('div');
+      num.className = 'count-number';
+      num.textContent = String(c.active);
+
+      const label = document.createElement('div');
+      label.className = 'count-label';
+      label.textContent = c.label;
+
+      cell.append(num, label);
+
+      if (c.archived > 0) {
+        const arch = document.createElement('div');
+        arch.className = 'count-archived';
+        arch.textContent = `${c.archived} archived`;
+        cell.appendChild(arch);
+      }
+
+      grid.appendChild(cell);
+    }
+    section.appendChild(grid);
+
+    // --- Recent activity ---
+    // Cards are clearable (the ✕ hides a card from view — it does NOT delete the
+    // underlying entry) and Refresh re-pulls everything from the DB, bringing
+    // cleared cards back. Clearing is view-only and in-memory, so leaving and
+    // returning to Home also restores the full feed.
+    let recentItems = summary.recent;
+    const clearedRecentIds = new Set();
+    const recentKey = (it) => `${it.route}:${it.id}`;
+
+    // Header carries the label + Refresh; recentLabel points at it so the trim
+    // logic shows/hides the whole header alongside the feed.
+    const recentHead = document.createElement('div');
+    recentHead.className = 'home-recent-head';
+    recentLabel = recentHead;
+
+    const recentTitle = document.createElement('span');
+    recentTitle.className = 'home-section-label';
+    recentTitle.textContent = 'Recent activity';
+    recentHead.appendChild(recentTitle);
+
+    const recentRefresh = document.createElement('button');
+    recentRefresh.type = 'button';
+    recentRefresh.className = 'suggestions-refresh';
+    recentRefresh.textContent = '↻ Refresh';
+    recentRefresh.title = 'Re-pull recent activity (restores cleared cards)';
+    recentRefresh.addEventListener('click', () => refreshRecent(recentRefresh));
+    recentHead.appendChild(recentRefresh);
+    section.appendChild(recentHead);
+
+    const feed = document.createElement('div');
+    feed.className = 'home-recent';
+    recentFeed = feed;
+    section.appendChild(feed);
+
+    function buildRecentCard(item) {
+      const card = document.createElement('div');
+      card.className = 'recent-card';
+      card.title = `Go to ${item.workspace}`;
+      card.addEventListener('click', () => route(item.route));
+
+      const title = document.createElement('div');
+      title.className = 'recent-title';
+      title.textContent = item.title;
+
+      const foot = document.createElement('div');
+      foot.className = 'recent-foot';
+
+      const ws = document.createElement('span');
+      ws.className = 'recent-ws';
+      ws.textContent = item.workspace;
+
+      const meta = document.createElement('span');
+      meta.className = 'recent-meta';
+      const edited = item.updated_at && item.updated_at !== item.created_at;
+      const when = new Date(item.updated_at).toLocaleDateString();
+      meta.textContent = `${edited ? 'Edited' : 'Added'} ${when}`;
+
+      foot.append(ws, meta);
+
+      const clear = document.createElement('button');
+      clear.type = 'button';
+      clear.className = 'recent-clear';
+      clear.textContent = '✕';
+      clear.title = 'Clear from view (does not delete it)';
+      clear.setAttribute('aria-label', `Clear ${item.title} from view`);
+      clear.addEventListener('click', (e) => {
+        e.stopPropagation();
+        clearedRecentIds.add(recentKey(item));
+        renderRecent();
+      });
+
+      card.append(title, foot, clear);
+      return card;
+    }
+
+    function renderRecent() {
+      feed.innerHTML = '';
+      recentHead.style.display = '';
+      feed.style.display = '';
+
+      if (recentItems.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'placeholder';
+        empty.style.gridColumn = '1 / -1';
+        empty.textContent =
+          'Nothing yet — add something in any workspace to see it here.';
+        feed.appendChild(empty);
+        return;
+      }
+
+      const visible = recentItems.filter(
+        (it) => !clearedRecentIds.has(recentKey(it))
+      );
+      if (visible.length === 0) {
+        const hint = document.createElement('p');
+        hint.className = 'placeholder';
+        hint.style.gridColumn = '1 / -1';
+        hint.textContent =
+          'All cleared from view — hit Refresh to bring them back.';
+        feed.appendChild(hint);
+        return;
+      }
+
+      for (const item of visible) feed.appendChild(buildRecentCard(item));
+      // Trim to only the cards that fit (after layout settles).
+      requestAnimationFrame(trimRecentToFit);
+    }
+
+    // Refresh: forget what was cleared and re-pull the latest activity.
+    async function refreshRecent(btn) {
+      if (btn) btn.disabled = true;
+      clearedRecentIds.clear();
+      try {
+        const fresh = await window.revival.dashboard.summary(30);
+        recentItems = fresh.recent;
+      } catch {
+        /* keep existing items on failure */
+      }
+      renderRecent();
+      if (btn) btn.disabled = false;
+    }
+
+    renderRecent();
+    window.addEventListener('resize', onResize);
+  })();
+}
+
 // --- Settings: Project Rules (P20) -----------------------------------------
 // Always-on, always-visible guidance Claude receives. Stored in SQLite (via the
 // settings IPC) so it survives restarts — there is no hidden project memory.
@@ -790,6 +1113,7 @@ function renderPanicExport(section) {
 }
 
 const CONTENT_RENDERERS = {
+  'Home': renderHomePage,
   'Chat': renderChatPage,
   'Settings': renderSettingsPage,
   'Unsorted': makeEntryWorkspace({

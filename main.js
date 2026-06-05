@@ -126,6 +126,12 @@ function registerIpc() {
     return { canceled: false, folder, ...counts };
   });
 
+  // Home dashboard (P27): read-only summary — counts per workspace + a recent
+  // activity feed. No mutation.
+  ipcMain.handle('dashboard:summary', (_event, limit) =>
+    db.dashboard.summary(limit)
+  );
+
   ipcMain.handle('settings:getProjectRules', () => db.settings.getProjectRules());
   ipcMain.handle('settings:setProjectRules', (_event, text) =>
     db.settings.setProjectRules(text)

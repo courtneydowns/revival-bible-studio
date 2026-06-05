@@ -580,11 +580,67 @@ async function exportAll(destFolder) {
   return { db: DB_FILENAME, tables: tables.length, sources: sources.length };
 }
 
+// --- Home dashboard (P27) --------------------------------------------------
+// Read-only aggregation for the Home overview: a count per workspace and a
+// single recent-activity feed across every storage-backed workspace. Nothing
+// here mutates anything — Home only summarizes what lives elsewhere (per
+// CLAUDE.md). The section list is a trusted constant (table/label/route are
+// never user input), so interpolating them into the count + UNION queries is
+// safe. Only workspaces with real storage appear; Canon Bible/Review and
+// Writing Lab have no tables yet and are intentionally omitted.
+const DASHBOARD_SECTIONS = [
+  { key: 'unsorted',        label: 'Unsorted',        table: 'unsorted',        route: 'Unsorted' },
+  { key: 'source_material', label: 'Source Material', table: 'source_material', route: 'Source Material' },
+  { key: 'documents',       label: 'Documents',       table: 'documents',       route: 'Documents' },
+  { key: 'open_questions',  label: 'Open Questions',  table: 'open_questions',  route: 'Open Questions' },
+  { key: 'conflicts',       label: 'Conflicts',       table: 'conflicts',       route: 'Conflicts' },
+  { key: 'decisions',       label: 'Decisions',       table: 'decisions',       route: 'Decisions' },
+  { key: 'brainstorm',      label: 'Brainstorm',      table: 'brainstorm',      route: 'Brainstorm' },
+  { key: 'research',        label: 'Research',        table: 'research',        route: 'Research' },
+  { key: 'chats',           label: 'Chats',           table: 'chats',           route: 'Chat' },
+];
+
+const dashboard = {
+  // One row per workspace: active (live) and archived counts. These are the
+  // numbers Home shows and must match each workspace's own lists exactly.
+  counts: () => {
+    const db = getDb();
+    return DASHBOARD_SECTIONS.map((s) => {
+      const active = db
+        .prepare(`SELECT COUNT(*) AS n FROM ${s.table} WHERE archived_at IS NULL`)
+        .get().n;
+      const archived = db
+        .prepare(`SELECT COUNT(*) AS n FROM ${s.table} WHERE archived_at IS NOT NULL`)
+        .get().n;
+      return { key: s.key, label: s.label, route: s.route, active, archived };
+    });
+  },
+  // Most-recently-touched active entries across all workspaces, newest first.
+  // updated_at carries the latest touch (create or edit); the renderer decides
+  // the "created vs edited" wording. Archived entries are excluded so the feed
+  // reflects what's actively being worked on.
+  recent: (limit = 8) => {
+    const unionSql = DASHBOARD_SECTIONS.map(
+      (s) =>
+        `SELECT '${s.label}' AS workspace, '${s.route}' AS route, id, title, ` +
+        `created_at, updated_at FROM ${s.table} WHERE archived_at IS NULL`
+    ).join(' UNION ALL ');
+    return getDb()
+      .prepare(`${unionSql} ORDER BY updated_at DESC, id DESC LIMIT ?`)
+      .all(limit);
+  },
+  summary: (limit = 8) => ({
+    counts: dashboard.counts(),
+    recent: dashboard.recent(limit),
+  }),
+};
+
 module.exports = {
   initDatabase,
   getDb,
   exportAll,
   settings,
+  dashboard,
   getDbPath,
   DB_FILENAME,
   MIGRATIONS,
