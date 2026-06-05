@@ -5,16 +5,6 @@ Local-first creative/editorial workspace for the **Revival project only**. Not a
 
 ---
 
-## Before starting any phase — required
-
-- When the user references a phase (e.g. "P22", "phase 22", "start P5"), **read `docs/BUILD_PLAN.md` first** and locate that phase entry.
-- The phase entry defines scope and the smoke test. Do not start work without it.
-- If the phase number is not in `docs/BUILD_PLAN.md`, stop and ask.
-- Do not infer phase scope from memory or from this file. `docs/BUILD_PLAN.md` is the source of truth for phase scope.
-- One phase per session. Do not bundle phases. Do not skip the smoke test gate.
-
----
-
 ## Hard rules — never violate
 
 - **No OpenAI / ChatGPT integration. Ever.** No OpenAI provider code, no model pickers, no OpenAI API key fields, no generic provider routing scaffolding.
@@ -48,7 +38,7 @@ Local-first creative/editorial workspace for the **Revival project only**. Not a
 
 ## Workspaces — the only ones
 
-Home, Chat, Writing Lab, Source Material, Documents, Canon Bible, Unsorted, Canon Review, Open Questions, Conflicts, Decisions, Brainstorm, Research, Settings.
+Home, Chat, Writing Lab, Source Material, Documents, Canon Bible, Characters, Episodes, Unsorted, Canon Review, Open Questions, Conflicts, Decisions, Brainstorm, Research, Settings.
 
 Do not invent new top-level workspaces.
 
@@ -80,6 +70,41 @@ Do not invent new top-level workspaces.
 - Open Questions and Conflicts are separate workspaces.
 - Source Material and Documents are separate.
 - Brainstorm and Research are separate.
+- **Characters and Episodes are separate** (see below).
+
+---
+
+## Characters workspace
+
+- Working surface for **character development and synthesis**, not just a list of names.
+- Holds character entries with a development view per character.
+- Supports a **relational view** showing how characters connect (relationships, factions, arcs, conflicts).
+- Resolved items from other workspaces (Decisions, Open Questions, Conflicts, Brainstorm, Research) can be **attached/linked** to a character — see Cross-workspace attachments below.
+- Settled character facts that should become canon flow to **Canon Bible via Canon Review**. Same approval discipline as everything else. No direct writes to Canon Bible.
+- Canon Bible holds the **locked reference version** of canonical character facts. Characters workspace is where you *work on* characters; Canon Bible is where settled truth lives.
+- Standard lifecycle: edit, delete (for mistakes), collapsed archive section at bottom of the same page. No separate archive page.
+
+---
+
+## Episodes workspace
+
+- Working surface for **episode drafting and outlining** (outlines, scene lists, beats, draft notes).
+- Canon facts that emerge from an episode flow to **Canon Bible via Canon Review**. Same approval discipline.
+- Canon Bible holds the locked canonical version of episode facts. Episodes workspace is where the drafting work happens.
+- Standard lifecycle: edit, delete (for mistakes), collapsed archive section at bottom of the same page.
+
+---
+
+## Cross-workspace attachments (Characters, Episodes)
+
+- Pattern: **link, don't copy.** One source of truth.
+- A Character or Episode entry has an "Attached" section.
+- Picker lets the user attach resolved items from Decisions, Open Questions, Conflicts, Brainstorm, Research.
+- Attached items appear as references (title + home workspace + click-through to the original).
+- Removing an attachment unlinks only; the original is untouched.
+- If the original is later edited, superseded, or archived, the attachment reflects that automatically — no sync step.
+- Bi-directional visibility: the original item shows which Characters/Episodes it's linked to, for traceability.
+- Schema details (join tables, multi-attach, etc.) are decided at P28.
 
 ---
 
@@ -107,7 +132,7 @@ Do not invent new top-level workspaces.
 
 - SQLite. Local only.
 - **Do not invent the Canon Bible schema yet.**
-- At the schema phase: inspect the finalized project knowledge files and propose a schema covering categories, tables/entities, relationships, edit/lock/archive/supersede behavior, source provenance, and future change handling.
+- At the schema phase: inspect the finalized project knowledge files and propose a schema covering categories, tables/entities, relationships, edit/lock/archive/supersede behavior, source provenance, cross-workspace attachments (Characters/Episodes ↔ Decisions/Open Questions/Conflicts/Brainstorm/Research), and future change handling.
 - **Stop for a schema approval checkpoint before implementing.**
 
 ---
