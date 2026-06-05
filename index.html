@@ -232,6 +232,20 @@
         color: #5a8fd6;
       }
 
+      /* Characters: a violet accent so the development surface reads distinctly
+         from the queue/decision workspaces. */
+      .ws-characters .entry-card {
+        border-left: 3px solid #9b7fd6;
+      }
+      .ws-characters .entry-form {
+        border-left: 3px solid #9b7fd6;
+        padding-left: 12px;
+      }
+      .ws-characters .entry-title::before {
+        content: '👤 ';
+        color: #9b7fd6;
+      }
+
       .entry-card input,
       .entry-card textarea {
         font: inherit;

@@ -210,6 +210,27 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '013_characters',
+    up(db) {
+      // Characters (P26): the working surface for character development. For
+      // now it shares the standard entry shape (title = character name, body =
+      // development notes) and the same reversible-archive lifecycle. The
+      // relational view, cross-workspace attachments, and canon flow are
+      // explicitly later phases (P36+) — own table now so that wiring has a
+      // home to grow into. No direct writes to Canon Bible (per CLAUDE.md).
+      db.exec(`
+        CREATE TABLE characters (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          title       TEXT NOT NULL,
+          body        TEXT NOT NULL DEFAULT '',
+          created_at  TEXT NOT NULL,
+          updated_at  TEXT NOT NULL,
+          archived_at TEXT
+        );
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -402,6 +423,7 @@ const conflicts = makeEntryRepo('conflicts');
 const decisions = makeEntryRepo('decisions');
 const brainstorm = makeEntryRepo('brainstorm');
 const research = makeEntryRepo('research');
+const characters = makeEntryRepo('characters');
 
 // --- Chats repository ------------------------------------------------------
 // Chats are conversation containers for the global Chat drawer. Bespoke (no
@@ -597,6 +619,7 @@ const DASHBOARD_SECTIONS = [
   { key: 'decisions',       label: 'Decisions',       table: 'decisions',       route: 'Decisions' },
   { key: 'brainstorm',      label: 'Brainstorm',      table: 'brainstorm',      route: 'Brainstorm' },
   { key: 'research',        label: 'Research',        table: 'research',        route: 'Research' },
+  { key: 'characters',      label: 'Characters',      table: 'characters',      route: 'Characters' },
   { key: 'chats',           label: 'Chats',           table: 'chats',           route: 'Chat' },
 ];
 
@@ -651,6 +674,7 @@ module.exports = {
   decisions,
   brainstorm,
   research,
+  characters,
   chats,
   chatSources,
   listUnsorted,

@@ -1,4 +1,4 @@
-// Left-nav routing for the 14 Revival workspaces.
+// Left-nav routing for the Revival workspaces.
 // Each page renders its title plus any workspace-specific functional UI.
 
 const WORKSPACES = [
@@ -8,6 +8,7 @@ const WORKSPACES = [
   'Source Material',
   'Documents',
   'Canon Bible',
+  'Characters',
   'Unsorted',
   'Canon Review',
   'Open Questions',
@@ -636,6 +637,9 @@ function buildSuggestions(countsByKey) {
   if (n('research') === 0) {
     list.push({ id: 'add-research', text: 'Add a Research note.', route: 'Research' });
   }
+  if (n('characters') === 0) {
+    list.push({ id: 'add-character', text: 'Add a Character to start developing them.', route: 'Characters' });
+  }
   if (n('chats') === 0) {
     list.push({ id: 'start-chat', text: 'Start a chat to think through Revival.', route: 'Chat' });
   }
@@ -1175,6 +1179,18 @@ const CONTENT_RENDERERS = {
     sectionClass: 'ws-research',
     titlePlaceholder: 'What was researched?',
     bodyPlaceholder: 'Findings, and where they came from — source/link (optional)',
+  }),
+  // Characters (P26): basic create/edit/delete/archive/restore on character
+  // entries (name + development notes). Relational view, attachments, and canon
+  // flow are later phases. Distinct violet accent so it never reads like a
+  // generic queue.
+  'Characters': makeEntryWorkspace({
+    apiName: 'characters',
+    draftPrefix: 'characters',
+    addLabel: 'Add Character',
+    sectionClass: 'ws-characters',
+    titlePlaceholder: 'Character name',
+    bodyPlaceholder: 'Who they are — role, traits, arc, open threads (optional)',
   }),
 };
 
