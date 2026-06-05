@@ -112,35 +112,35 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## UI Foundation
 
-### PUI1 — Two-column layout component
+### PUI1 — Two-column layout component ✅
 - Reusable left-list / right-detail component dropped into every workspace
 - Left: title, type/status badge, preview line
 - Right: full content, editable, actions
 - Retrofit all existing workspaces (Unsorted, Open Questions, Conflicts, Decisions, Brainstorm, Research, Characters, Episodes, Documents, Source Material, Writing Lab)
-- **Smoke:** Open every workspace, confirm two-column layout, click an entry, detail panel opens
+- **Smoke passed.**
 
-### PUI2 — Full-screen popout window
+### PUI2 — Full-screen popout window ✅
 - Global popout available from any entry detail panel
 - Full edit, rename, delete, archive/restore all available within the popout
 - Independent window — rest of app remains usable
 - Opens in Reference Mode by default (see PCBREF for Canon Bible; same principle applies)
-- **Smoke:** Open a popout from three different workspaces, edit and save from within it, confirm changes persist
+- **Smoke passed.**
 
-### PUI3 — Highlight + extract + route
+### PUI3 — Highlight + extract + route ✅
 - Select any text in a detail panel or popout → extract menu appears
 - Route extracted text to: Unsorted, Brainstorm, Open Questions, Decisions, Conflicts, Research, Canon Review
 - Creates a new entry in the target workspace pre-filled with the selection and a source attribution
-- **Smoke:** Highlight text in a Source Material entry, route to Brainstorm, confirm new entry exists with attribution
+- **Smoke passed.**
 
 ---
 
 ## Quick Capture + Navigation
 
-### PCAP — Global quick-capture
+### PCAP — Global quick-capture ✅
 - Cmd+Shift+N from anywhere opens a minimal modal
 - Title + body, one-click save → drops to Unsorted
 - Dismissable with Escape
-- **Smoke:** Trigger from three different workspaces, save an entry, confirm it appears in Unsorted
+- **Smoke passed.**
 
 ### PKEY — Command palette + keyboard navigation
 - Cmd+K opens command palette: jump to any workspace, any recent entry, any action
@@ -159,17 +159,18 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Tags visible as badges on list items and as chips on detail panels (and in popouts)
 - **Smoke passed.**
 
-### PTAG+ — Tag quality: autocomplete, normalization, duplicate prevention
+### PTAG+ — Tag quality: autocomplete, normalization, duplicate prevention ✅
 - Tag input autocompletes against all existing tags (seeded + user-created), case-insensitive
 - Tags normalized: lowercased and trimmed on save
 - Creating a duplicate tag (after normalization) is blocked; input selects existing tag instead
 - Clear all tags from a single entry (bulk remove on that entry only; no global effect)
-- **Smoke:** Type a partial tag name and confirm autocomplete; try to create a duplicate with different casing and confirm it's blocked; clear all tags from one entry and confirm others are untouched
+- **Smoke passed.**
 
-### PTAGDEL — Tag delete + rename (user-created tags only)
+### PTAGDEL — Tag delete + rename (user-created tags only) ✅
 - Delete a user-created tag: shows usage count before confirmation ("used on N entries across X workspaces"); on confirm, tag unlinked from all entries and deleted; seeded tags have no delete affordance
 - Rename a user-created tag: renames in place across all entries; no unlinking
-- **Smoke:** Delete a user-created tag used on 3+ entries, confirm usage count shown, confirm tag gone from all entries after delete; rename a tag, confirm new name appears everywhere; confirm seeded tags show no delete option
+- Settings → Manage Tags is collapsed by default; expanding reveals a search box that filters the tag list
+- **Smoke passed.**
 
 ---
 
