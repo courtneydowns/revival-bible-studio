@@ -2619,14 +2619,24 @@ panicBtn.addEventListener('click', async () => {
 });
 
 // --- PCAP global quick-capture ----------------------------------------------
-// Cmd/Ctrl+Shift+N from any workspace opens a minimal modal: title + body,
-// one click saves straight to Unsorted. Escape or Cancel dismisses without
-// saving. The shortcut is in-app only (a window keydown, not an OS-global
-// accelerator) so it never hijacks the system-wide combo. If the user is
-// sitting on the Unsorted workspace, its list refreshes via the existing
-// PUI2 hook so the new entry shows immediately.
+// Cmd/Ctrl+Shift+N from any workspace opens a minimal modal: pick a
+// destination, then title + body, one click saves. Escape or Cancel dismisses
+// without saving. The shortcut is in-app only (a window keydown, not an
+// OS-global accelerator) so it never hijacks the system-wide combo. If the
+// user is sitting on the destination workspace, its list refreshes via the
+// existing PUI2 hook so the new entry shows immediately.
+//
+// Destinations map a display name (matching currentWorkspaceName) to the
+// preload api key. All four targets share the {title, body} create shape.
+const QC_DESTINATIONS = {
+  'Unsorted': 'unsorted',
+  'Brainstorm': 'brainstorm',
+  'Open Questions': 'openQuestions',
+  'Research': 'research',
+};
 const qcOverlay = document.getElementById('qc-overlay');
 const qcForm = document.getElementById('qc-form');
+const qcDest = document.getElementById('qc-dest');
 const qcTitle = document.getElementById('qc-title');
 const qcBody = document.getElementById('qc-body');
 const qcSave = document.getElementById('qc-save');
@@ -2663,15 +2673,17 @@ qcForm.addEventListener('submit', async (e) => {
     qcTitle.focus();
     return;
   }
+  const destName = qcDest.value;
+  const apiKey = QC_DESTINATIONS[destName] || 'unsorted';
   qcSave.disabled = true;
   try {
-    await window.revival.unsorted.create({
+    await window.revival[apiKey].create({
       title: qcTitle.value,
       body: qcBody.value,
     });
     closeQuickCapture();
-    // Reflect the new entry if Unsorted is the workspace on screen.
-    if (currentWorkspaceName === 'Unsorted' && currentWorkspaceRefresh) {
+    // Reflect the new entry if its destination is the workspace on screen.
+    if (currentWorkspaceName === destName && currentWorkspaceRefresh) {
       currentWorkspaceRefresh();
     }
   } catch (err) {

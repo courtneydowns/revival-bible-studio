@@ -1239,6 +1239,9 @@
       }
       .qc-head #qc-close:hover { color: var(--accent); }
       .qc-form { display: flex; flex-direction: column; gap: 10px; padding: 14px; }
+      .qc-dest-row { display: flex; align-items: center; gap: 10px; }
+      .qc-dest-label { font-size: 12px; color: var(--muted); flex: none; }
+      .qc-dest { flex: 1; cursor: pointer; }
       .qc-input,
       .qc-body {
         font: inherit;
@@ -1351,14 +1354,23 @@
           <button id="qc-close" type="button" aria-label="Close">✕</button>
         </header>
         <form id="qc-form" class="qc-form">
+          <label class="qc-dest-row">
+            <span class="qc-dest-label">Send to</span>
+            <select id="qc-dest" class="qc-input qc-dest" aria-label="Destination">
+              <option value="Unsorted">Unsorted</option>
+              <option value="Brainstorm">Brainstorm</option>
+              <option value="Open Questions">Open Questions</option>
+              <option value="Research">Research</option>
+            </select>
+          </label>
           <input id="qc-title" class="qc-input" type="text" placeholder="Title" aria-label="Title" />
           <textarea id="qc-body" class="qc-body" rows="4" placeholder="Notes (optional)" aria-label="Body"></textarea>
           <div class="qc-error" id="qc-error" hidden></div>
           <div class="qc-foot">
-            <span class="qc-hint">Saves to Unsorted · Esc to dismiss</span>
+            <span class="qc-hint">Esc to dismiss</span>
             <div class="qc-actions">
               <button id="qc-cancel" type="button" class="btn-secondary">Cancel</button>
-              <button id="qc-save" type="submit" class="btn-primary">Save to Unsorted</button>
+              <button id="qc-save" type="submit" class="btn-primary">Save</button>
             </div>
           </div>
         </form>
