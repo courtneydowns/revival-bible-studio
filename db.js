@@ -98,6 +98,28 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '007_chat_sources',
+    up(db) {
+      // Chat ↔ Source attachments (P18, "keep active" mode). A link table:
+      // a chat can keep several Source Material entries active, always visible
+      // so the user knows exactly what Claude would use. Source Material is the
+      // only attachable type (per CLAUDE.md) — hence the FK to source_material
+      // and nothing else. ON DELETE CASCADE drops the link when either the chat
+      // or the source is deleted, so no dangling attachments. The PK makes
+      // attaching idempotent (a source can't be attached twice to one chat).
+      db.exec(`
+        CREATE TABLE chat_sources (
+          chat_id    INTEGER NOT NULL,
+          source_id  INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY (chat_id, source_id),
+          FOREIGN KEY (chat_id)   REFERENCES chats(id)            ON DELETE CASCADE,
+          FOREIGN KEY (source_id) REFERENCES source_material(id)  ON DELETE CASCADE
+        );
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -338,6 +360,40 @@ const chats = {
   },
 };
 
+// --- Chat ↔ Source attachments repository ----------------------------------
+// "Keep active" mode (P18): the sources a chat keeps attached and always
+// visible. Source Material is the only attachable type. Joined on read so the
+// drawer has titles without a second query. Removing an attachment (one-click
+// detach) and the "next message only" mode arrive in P19.
+const chatSources = {
+  list: (chatId) =>
+    getDb()
+      .prepare(
+        `SELECT s.id, s.title, s.body, s.archived_at,
+                cs.created_at AS attached_at
+           FROM chat_sources cs
+           JOIN source_material s ON s.id = cs.source_id
+          WHERE cs.chat_id = ?
+          ORDER BY cs.created_at ASC, s.id ASC`
+      )
+      .all(chatId),
+  attach: (chatId, sourceId) => {
+    if (!chats.get(chatId)) throw new Error('Chat not found.');
+    const src = getDb()
+      .prepare('SELECT id FROM source_material WHERE id = ?')
+      .get(sourceId);
+    if (!src) throw new Error('Source not found.');
+    // Idempotent: INSERT OR IGNORE leans on the (chat_id, source_id) PK so
+    // attaching an already-active source is a harmless no-op.
+    getDb()
+      .prepare(
+        'INSERT OR IGNORE INTO chat_sources (chat_id, source_id, created_at) VALUES (?, ?, ?)'
+      )
+      .run(chatId, sourceId, new Date().toISOString());
+    return chatSources.list(chatId);
+  },
+};
+
 module.exports = {
   initDatabase,
   getDb,
@@ -347,6 +403,7 @@ module.exports = {
   sourceMaterial,
   documents,
   chats,
+  chatSources,
   listUnsorted,
   listArchivedUnsorted,
   getUnsorted,

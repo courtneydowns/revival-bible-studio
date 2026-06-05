@@ -33,7 +33,7 @@ const WORKSPACE_INFO = {
   },
   'Chat': {
     purpose: 'Talk through the Revival project with Claude. (Becomes a global drawer in a later phase.)',
-    next: 'Open the chat drawer (💬 Chat, bottom-right of any workspace), click “+ New chat” to create chats, and switch between them with the dropdown. Rename or archive the active chat with the buttons below the title; archived chats restore from the collapsed section. Attaching Source Material comes in a later phase.',
+    next: 'Open the chat drawer (💬 Chat, bottom-right of any workspace), click “+ New chat” to create chats, and switch between them with the dropdown. Rename or archive the active chat with the buttons below the title; archived chats restore from the collapsed section. Use “+ Attach source” to keep Source Material active for the chat — attached sources stay listed above the composer. One-click remove and a “next message only” mode come in the next phase.',
     savedTo: 'Chats are kept in this Chat workspace. Attachments come from Source Material only.',
     lifecycle: 'Chats can be renamed, archived, and restored. Nothing is finalized without your confirmation.',
   },
@@ -610,6 +610,12 @@ function makeEntryWorkspace(config) {
     for (const item of archivedItems) {
       archivedList.appendChild(buildArchivedCard(item));
     }
+
+    // Let a workspace react to its own changes elsewhere in the app. Source
+    // Material uses this to refresh the Chat drawer's always-visible active
+    // sources, so deleting a source (cascade-removes the attachment) or
+    // archiving one (flags it) updates the chips live instead of going stale.
+    if (config.onChange) config.onChange();
   }
 
   form.addEventListener('submit', async (e) => {
@@ -664,6 +670,11 @@ const CONTENT_RENDERERS = {
     draftPrefix: 'source_material',
     addLabel: 'Add Source',
     allowFileUpload: true,
+    // Keep the Chat drawer's active-sources chips in sync when sources change
+    // (delete cascades the attachment; archive flags it). loadActiveSources is
+    // a hoisted declaration, so referencing it here before its definition is
+    // fine — it only runs when a source is mutated at runtime.
+    onChange: () => loadActiveSources(),
   }),
   'Documents': makeEntryWorkspace({
     apiName: 'documents',
@@ -740,12 +751,16 @@ const chatRenameInput = document.getElementById('chat-rename-input');
 const chatRenameCancel = document.getElementById('chat-rename-cancel');
 const chatArchived = document.getElementById('chat-archived');
 const chatArchivedList = document.getElementById('chat-archived-list');
+const chatSourcesList = document.getElementById('chat-sources-list');
+const chatAttachBtn = document.getElementById('chat-attach');
+const chatSourcePicker = document.getElementById('chat-source-picker');
 
 const ACTIVE_CHAT_KEY = 'revival.chat.active';
 const CHAT_EXPANDED_KEY = 'revival.chat.expanded';
 let chatList = [];
 let archivedChats = [];
 let activeChatId = null;
+let activeSources = [];
 
 function setChatOpen(open) {
   chatDrawer.classList.toggle('open', open);
@@ -846,6 +861,110 @@ function renderArchivedChats() {
   }
 }
 
+// --- Active sources (P18, "keep active" mode) ------------------------------
+// The sources a chat keeps attached are always visible above the composer so
+// the user knows exactly what Claude would use. Source Material is the only
+// attachable type. Attachments persist in SQLite per chat — they survive
+// reopening the drawer, switching chats, and restarting the app. One-click
+// remove and the "next message only" mode arrive in P19.
+function renderActiveSources() {
+  chatSourcesList.innerHTML = '';
+  chatAttachBtn.disabled = activeChatId == null;
+
+  if (activeChatId == null) {
+    const p = document.createElement('p');
+    p.className = 'chat-sources-empty';
+    p.textContent = 'Start or pick a chat to attach sources.';
+    chatSourcesList.appendChild(p);
+    return;
+  }
+
+  if (activeSources.length === 0) {
+    const p = document.createElement('p');
+    p.className = 'chat-sources-empty';
+    p.textContent =
+      'No sources attached. Claude would use only what you attach here.';
+    chatSourcesList.appendChild(p);
+    return;
+  }
+
+  for (const src of activeSources) {
+    const chip = document.createElement('span');
+    chip.className = 'source-chip';
+
+    const title = document.createElement('span');
+    title.className = 'chip-title';
+    title.textContent = src.title;
+    chip.appendChild(title);
+
+    // A source archived after attaching stays active but is flagged.
+    if (src.archived_at) {
+      const note = document.createElement('span');
+      note.className = 'chip-archived';
+      note.textContent = '(archived)';
+      chip.appendChild(note);
+    }
+
+    chatSourcesList.appendChild(chip);
+  }
+}
+
+async function loadActiveSources() {
+  if (activeChatId == null) {
+    activeSources = [];
+    renderActiveSources();
+    return;
+  }
+  activeSources = await window.revival.chatSources.list(activeChatId);
+  renderActiveSources();
+}
+
+function hidePicker() {
+  chatSourcePicker.hidden = true;
+  chatSourcePicker.innerHTML = '';
+}
+
+// The picker lists Source Material only (no other types, no Context Packets),
+// already-attached and archived sources excluded so the choices are valid.
+async function showPicker() {
+  if (activeChatId == null) return;
+  const sources = await window.revival.sourceMaterial.list();
+  const attachedIds = new Set(activeSources.map((s) => s.id));
+  const available = sources.filter((s) => !attachedIds.has(s.id));
+
+  chatSourcePicker.innerHTML = '';
+  if (available.length === 0) {
+    const hint = document.createElement('p');
+    hint.className = 'picker-hint';
+    hint.textContent = sources.length
+      ? 'All Source Material is already attached to this chat.'
+      : 'No Source Material yet. Add some in the Source Material workspace.';
+    chatSourcePicker.appendChild(hint);
+  } else {
+    for (const src of available) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'picker-item';
+      btn.textContent = src.title;
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          activeSources = await window.revival.chatSources.attach(
+            activeChatId,
+            src.id
+          );
+          renderActiveSources();
+          hidePicker();
+        } catch (e) {
+          btn.disabled = false;
+        }
+      });
+      chatSourcePicker.appendChild(btn);
+    }
+  }
+  chatSourcePicker.hidden = false;
+}
+
 function setActiveChat(id) {
   activeChatId = id;
   if (id == null) {
@@ -854,9 +973,11 @@ function setActiveChat(id) {
     localStorage.setItem(ACTIVE_CHAT_KEY, String(id));
   }
   hideRename();
+  hidePicker();
   renderChatSelect();
   renderChatTools();
   renderChatBody();
+  loadActiveSources();
 }
 
 async function loadChats() {
@@ -916,6 +1037,14 @@ chatNewBtn.addEventListener('click', async () => {
     setActiveChat(created.id);
   } finally {
     chatNewBtn.disabled = false;
+  }
+});
+
+chatAttachBtn.addEventListener('click', () => {
+  if (chatSourcePicker.hidden) {
+    showPicker();
+  } else {
+    hidePicker();
   }
 });
 

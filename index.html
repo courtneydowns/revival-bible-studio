@@ -416,6 +416,74 @@
         margin: 0;
       }
 
+      /* --- Active sources bar (P18) ----------------------------------- */
+      .chat-sources {
+        border-top: 1px solid var(--border);
+        padding: 10px 18px;
+      }
+      .chat-sources-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .chat-sources-label {
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .chat-sources-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+      }
+      .chat-sources-empty { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+      .source-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        max-width: 100%;
+        font-size: 12px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 4px 10px;
+      }
+      .source-chip .chip-title {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .source-chip .chip-archived { color: var(--muted); font-style: italic; }
+      .chat-source-picker {
+        margin-top: 8px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--bg);
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      .chat-source-picker[hidden] { display: none; }
+      .picker-hint { font-size: 12px; color: var(--muted); padding: 8px 10px; margin: 0; }
+      .picker-item {
+        display: block;
+        width: 100%;
+        text-align: left;
+        font: inherit;
+        font-size: 13px;
+        background: none;
+        color: var(--text);
+        border: none;
+        border-bottom: 1px solid var(--border);
+        padding: 8px 10px;
+        cursor: pointer;
+      }
+      .picker-item:last-child { border-bottom: none; }
+      .picker-item:hover { background: var(--hover); }
+      .picker-item:disabled { opacity: 0.5; cursor: default; }
+
       .chat-composer {
         display: flex;
         gap: 8px;
@@ -474,6 +542,18 @@
         <summary>Archived chats</summary>
         <div class="chat-archived-list" id="chat-archived-list"></div>
       </details>
+      <!-- Active sources (P18): always visible so the user knows exactly what
+           Claude would use. Source Material is the only attachable type.
+           "Keep active" mode — attached sources stay listed. One-click remove
+           and "next message only" mode arrive in P19. -->
+      <section class="chat-sources" id="chat-sources" aria-label="Active sources">
+        <div class="chat-sources-head">
+          <span class="chat-sources-label">Active sources</span>
+          <button id="chat-attach" class="btn-tool" type="button">+ Attach source</button>
+        </div>
+        <div class="chat-sources-list" id="chat-sources-list"></div>
+        <div class="chat-source-picker" id="chat-source-picker" hidden></div>
+      </section>
       <form class="chat-composer" id="chat-composer">
         <textarea
           class="chat-input"

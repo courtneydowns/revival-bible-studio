@@ -48,6 +48,11 @@ function registerIpc() {
   ipcMain.handle('chats:rename', (_event, id, chat) => db.chats.rename(id, chat));
   ipcMain.handle('chats:archive', (_event, id) => db.chats.archive(id));
   ipcMain.handle('chats:restore', (_event, id) => db.chats.restore(id));
+
+  ipcMain.handle('chatSources:list', (_event, chatId) => db.chatSources.list(chatId));
+  ipcMain.handle('chatSources:attach', (_event, chatId, sourceId) =>
+    db.chatSources.attach(chatId, sourceId)
+  );
 }
 
 app.whenReady().then(() => {

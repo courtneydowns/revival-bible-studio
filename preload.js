@@ -38,4 +38,9 @@ contextBridge.exposeInMainWorld('revival', {
     archive: (id) => ipcRenderer.invoke('chats:archive', id),
     restore: (id) => ipcRenderer.invoke('chats:restore', id),
   },
+  chatSources: {
+    list: (chatId) => ipcRenderer.invoke('chatSources:list', chatId),
+    attach: (chatId, sourceId) =>
+      ipcRenderer.invoke('chatSources:attach', chatId, sourceId),
+  },
 });
