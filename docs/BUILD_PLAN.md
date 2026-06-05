@@ -119,12 +119,13 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Retrofit all existing workspaces (Unsorted, Open Questions, Conflicts, Decisions, Brainstorm, Research, Characters, Episodes, Documents, Source Material, Writing Lab)
 - **Smoke passed.**
 
-### PUI2 — Full-screen popout window
-- Global popout available from any entry detail panel
-- Full edit, rename, delete, archive/restore all available within the popout
-- Independent window — rest of app remains usable
-- Opens in Reference Mode by default (see PCBREF for Canon Bible; same principle applies)
-- **Smoke:** Open a popout from three different workspaces, edit and save from within it, confirm changes persist
+### PUI2 — Full-screen popout window ✅
+- New BrowserWindow per entry — independent window state, rest of app stays usable
+- "Pop out ↗" button on every two-column workspace's detail view
+- Opens in Reference Mode; deliberate Edit click flips to Edit Mode
+- Full edit (title + body), archive/restore, delete inside the popout
+- popout:changed broadcast keeps main window's list in sync after each commit; popout shows "no longer available" if the entry is deleted from elsewhere
+- **Smoke passed.**
 
 ### PUI3 — Highlight + extract + route
 - Select any text in a detail panel or popout → extract menu appears

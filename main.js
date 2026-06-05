@@ -28,6 +28,27 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'index.html'));
 }
 
+// PUI2: full-screen popout for any single entry. A second BrowserWindow
+// loads popout.html with the workspace + id encoded in the query string —
+// independent window state, full edit/rename/delete/archive/restore inside,
+// rest of the app stays usable. Opens in Reference Mode by default; the
+// popout itself flips into edit mode on a deliberate click.
+function createPopoutWindow(workspace, id) {
+  const win = new BrowserWindow({
+    width: 820,
+    height: 720,
+    title: 'Revival Studio',
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'preload.js'),
+    },
+  });
+  win.loadFile(path.join(__dirname, 'popout.html'), {
+    query: { workspace, id: String(id) },
+  });
+}
+
 function registerIpc() {
   ipcMain.handle('unsorted:list', () => db.listUnsorted());
   ipcMain.handle('unsorted:listArchived', () => db.listArchivedUnsorted());
@@ -169,6 +190,23 @@ function registerIpc() {
   ipcMain.handle('settings:setProjectRules', (_event, text) =>
     db.settings.setProjectRules(text)
   );
+
+  // PUI2 popout wiring.
+  //  • popout:open spawns a new BrowserWindow for a single entry.
+  //  • popout:changed is a one-way fan-out: whoever just mutated an entry
+  //    (popout OR main) tells every OTHER window to refresh its view of that
+  //    workspace, so list + detail stay in sync without manual reloads.
+  ipcMain.handle('popout:open', (_event, workspace, id) => {
+    createPopoutWindow(workspace, id);
+  });
+  ipcMain.on('popout:changed', (event, workspace) => {
+    const fromId = event.sender.id;
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w.webContents.id !== fromId) {
+        w.webContents.send('popout:changed', workspace);
+      }
+    }
+  });
 }
 
 app.whenReady().then(() => {

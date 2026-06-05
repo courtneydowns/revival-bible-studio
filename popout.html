@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'" />
+    <title>Revival Studio</title>
+    <style>
+      /* PUI2 popout window — a single-entry detail surface in its own
+         BrowserWindow. Shares the dark/light theme + accent vocabulary with
+         the main app via a CSS-variable subset so visual feel matches without
+         duplicating the full stylesheet. */
+      :root, :root[data-theme='dark'] {
+        --bg: #1a1a1a;
+        --panel: #232323;
+        --border: #333333;
+        --hover: #2c2c2c;
+        --text: #e8e8e8;
+        --muted: #9a9a9a;
+        --accent: #c98b5e;
+      }
+      :root[data-theme='light'] {
+        --bg: #f6f4f1;
+        --panel: #ffffff;
+        --border: #e2ddd6;
+        --hover: #ece8e2;
+        --text: #2a2723;
+        --muted: #6b655d;
+        --accent: #b3713f;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        height: 100%;
+        font-family: -apple-system, system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      /* Window frame: a thin top bar names the workspace + entry type so
+         "Where am I" stays answered when the popout is detached from the
+         main window. The detail card sits in a centered column below it. */
+      #popout-root {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 24px 28px 28px;
+        gap: 16px;
+        max-width: 980px;
+        margin: 0 auto;
+      }
+      .po-frame-bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .po-frame-bar .po-frame-dot { color: var(--accent); }
+      .po-frame-bar .po-frame-mode {
+        margin-left: auto;
+        font-style: italic;
+        text-transform: none;
+        letter-spacing: 0;
+      }
+
+      .po-detail {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 18px 20px;
+        overflow: auto;
+        flex: 1;
+        min-height: 0;
+      }
+
+      /* Shared detail typography — kept in sync with .tc-detail-* in index.html
+         so an entry looks the same in the popout as in the main window. */
+      .tc-detail-header {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 8px;
+        word-wrap: break-word;
+      }
+      .tc-detail-meta {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 14px;
+      }
+      .tc-detail-body {
+        font-size: 14px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        margin-bottom: 16px;
+      }
+      .tc-detail-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+      .tc-detail-actions button {
+        font: inherit;
+        border-radius: 6px;
+        padding: 6px 14px;
+        cursor: pointer;
+      }
+
+      .btn-primary {
+        font-weight: 600;
+        background: var(--accent);
+        color: #1a1a1a;
+        border: none;
+      }
+      .btn-primary:disabled { opacity: 0.45; cursor: default; }
+      .btn-secondary {
+        background: none;
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+      .btn-secondary:hover { background: var(--hover); }
+      .btn-danger {
+        background: none;
+        color: #e06c6c;
+        border: 1px solid #e06c6c;
+      }
+      .btn-danger:hover { background: #e06c6c; color: #fff; }
+      .btn-danger:disabled { opacity: 0.5; cursor: default; }
+      .confirm-row { align-items: center; flex-wrap: wrap; }
+      .confirm-text { font-size: 13px; color: var(--muted); margin-right: 4px; }
+
+      .draft-status { color: var(--muted); font-size: 12px; font-style: italic; margin: 0; }
+      .form-error { color: #e06c6c; font-size: 13px; margin: 0; }
+      .draft-badge {
+        font-size: 12px;
+        color: var(--accent);
+        margin-top: 6px;
+      }
+
+      /* Edit-mode inputs — borrow the wl-* sizing so editing in the popout
+         feels like the main app's edit form. */
+      .wl-title {
+        font: inherit; font-size: 19px; font-weight: 600; width: 100%;
+        background: var(--bg); color: var(--text);
+        border: 1px solid var(--border); border-radius: 6px;
+        padding: 10px 12px; margin-bottom: 10px;
+      }
+      .wl-title:focus { outline: none; border-color: var(--accent); }
+      .wl-body {
+        font: inherit; font-size: 15px; line-height: 1.6; width: 100%;
+        min-height: 50vh; resize: vertical;
+        background: var(--bg); color: var(--text);
+        border: 1px solid var(--border); border-radius: 6px;
+        padding: 14px 16px;
+      }
+      .wl-body:focus { outline: none; border-color: var(--accent); }
+
+      /* Workspace accents — visual continuity with the main app. */
+      .ws-conflicts .po-detail { border-left: 3px solid #e06c6c; }
+      .ws-conflicts .tc-detail-header::before { content: '⚠ '; color: #e06c6c; }
+      .ws-research .po-detail { border-left: 3px solid #5a8fd6; }
+      .ws-research .tc-detail-header::before { content: '🔎 '; color: #5a8fd6; }
+      .ws-characters .po-detail { border-left: 3px solid #9b7fd6; }
+      .ws-characters .tc-detail-header::before { content: '👤 '; color: #9b7fd6; }
+      .ws-episodes .po-detail { border-left: 3px solid #d6a14f; }
+      .ws-episodes .tc-detail-header::before { content: '🎬 '; color: #d6a14f; }
+
+      .po-missing {
+        display: flex; flex-direction: column; gap: 8px; align-items: center;
+        justify-content: center; height: 100%;
+        color: var(--muted); text-align: center; font-size: 14px;
+      }
+      .po-missing-title { font-size: 16px; color: var(--text); }
+    </style>
+  </head>
+  <body>
+    <div id="popout-root"></div>
+    <script src="popout.js"></script>
+  </body>
+</html>

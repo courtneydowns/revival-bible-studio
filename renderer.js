@@ -42,10 +42,28 @@ function renderWorkspacePage(name) {
     const section = document.createElement('div');
     section.className = 'ws-content';
     page.appendChild(section);
-    content(section);
+    content(section, name);
   }
 
   return page;
+}
+
+// --- PUI2 cross-window refresh hook -----------------------------------------
+// When a popout commits an edit/archive/delete, main.js fans the workspace
+// name out to every other window. A workspace registers its loadList here
+// when it mounts; route() clears the registration when the user navigates
+// away. The renderer module-level listener (set up far below, once the
+// preload bridge is available) calls the registered loadList only if the
+// signal's workspace matches the one currently mounted.
+let currentWorkspaceName = null;
+let currentWorkspaceRefresh = null;
+function setActiveWorkspaceRefresh(name, refresh) {
+  currentWorkspaceName = name || null;
+  currentWorkspaceRefresh = typeof refresh === 'function' ? refresh : null;
+}
+function clearActiveWorkspaceRefresh() {
+  currentWorkspaceName = null;
+  currentWorkspaceRefresh = null;
 }
 
 // --- Draft autosave (preservation only, never finalization) ----------------
@@ -94,7 +112,7 @@ function makeEntryWorkspace(config) {
     return oneLine.length > 80 ? `${oneLine.slice(0, 80)}…` : oneLine;
   }
 
-  return function renderEntryWorkspace(section) {
+  return function renderEntryWorkspace(section, workspaceName) {
   // Optional accent class lets a workspace look visibly distinct from the
   // others that share this template (e.g. Conflicts vs Open Questions).
   if (config.sectionClass) section.classList.add(config.sectionClass);
@@ -486,6 +504,22 @@ function makeEntryWorkspace(config) {
     });
     actions.appendChild(deleteBtn);
 
+    // PUI2: open this entry in its own window. The popout starts in
+    // Reference Mode and supports full edit/archive/restore/delete on its
+    // own; main window stays usable in parallel. Saves there refresh the
+    // list here automatically via the popout:changed broadcast.
+    if (workspaceName) {
+      const popoutBtn = document.createElement('button');
+      popoutBtn.type = 'button';
+      popoutBtn.className = 'btn-secondary';
+      popoutBtn.textContent = 'Pop out ↗';
+      popoutBtn.title = 'Open this entry in its own window';
+      popoutBtn.addEventListener('click', () => {
+        window.revival.popout.open(workspaceName, item.id);
+      });
+      actions.appendChild(popoutBtn);
+    }
+
     rightCol.appendChild(actions);
   }
 
@@ -636,6 +670,11 @@ function makeEntryWorkspace(config) {
     // archiving one (flags it) updates the chips live instead of going stale.
     if (config.onChange) config.onChange();
   }
+
+  // PUI2: register this workspace as the live refresh target so popout
+  // saves elsewhere refresh the list here. Cleared by route() when the
+  // user navigates away (see currentWorkspaceRefresh below).
+  setActiveWorkspaceRefresh(workspaceName, loadList);
 
   loadList();
   };
@@ -2001,9 +2040,22 @@ function route(name) {
   for (const key in buttons) {
     buttons[key].classList.toggle('active', key === name);
   }
+  // PUI2: drop any previous workspace's refresh registration before swapping
+  // pages so the popout:changed listener can't fire stale loadLists into a
+  // detached DOM. The next workspace re-registers itself on mount.
+  clearActiveWorkspaceRefresh();
   content.innerHTML = '';
   content.appendChild(renderWorkspacePage(name));
 }
+
+// PUI2: listen for popout commits in other windows and refresh the active
+// workspace's list when its signal matches. Registered once at module init —
+// the per-workspace dispatch happens via currentWorkspaceName/Refresh above.
+window.revival.popout.onChanged((ws) => {
+  if (ws && ws === currentWorkspaceName && currentWorkspaceRefresh) {
+    currentWorkspaceRefresh();
+  }
+});
 
 // Per-workspace nav icons. These are the only glyphs shown when the nav is
 // collapsed to its icon rail, so each one stands in for its workspace; the

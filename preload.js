@@ -134,4 +134,17 @@ contextBridge.exposeInMainWorld('revival', {
   panic: {
     export: () => ipcRenderer.invoke('panic:export'),
   },
+  // PUI2: open a single-entry popout window, and a tiny pub-sub so popout
+  // saves are reflected in the main window (and vice-versa). notifyChanged is
+  // fire-and-forget; onChanged returns the unsubscribe handle so a workspace
+  // can drop its listener when it unmounts.
+  popout: {
+    open: (workspace, id) => ipcRenderer.invoke('popout:open', workspace, id),
+    notifyChanged: (workspace) => ipcRenderer.send('popout:changed', workspace),
+    onChanged: (callback) => {
+      const handler = (_event, workspace) => callback(workspace);
+      ipcRenderer.on('popout:changed', handler);
+      return () => ipcRenderer.removeListener('popout:changed', handler);
+    },
+  },
 });
