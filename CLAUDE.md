@@ -8,7 +8,7 @@ Local-first creative/editorial workspace for the **Revival project only**. Not a
 ## Hard rules — never violate
 
 - **No OpenAI / ChatGPT integration. Ever.** No OpenAI provider code, no model pickers, no OpenAI API key fields, no generic provider routing scaffolding.
-- **Claude/Anthropic may eventually be the only AI provider.** Do not add AI execution until the user explicitly asks. First phases do not require AI.
+- **Claude is the only AI provider.** Do not add AI execution until the user explicitly asks.
 - **No hidden context. No hidden retrieval. No automatic canon mutation.**
 - **AI may suggest; human approves.** Nothing is stored, routed, tagged, archived, deleted, locked, or finalized without explicit user confirmation in the UI.
 - **No code or feature work without an explicit request from the user.** Ask first.
@@ -23,6 +23,7 @@ Local-first creative/editorial workspace for the **Revival project only**. Not a
 - No commits to `main` and no marking a phase done without that confirmation.
 - Never start the next phase without explicit go-ahead.
 - Avoid large rewrites. Preserve simple workflow over feature complexity.
+- **Polish items noticed during smoke tests go in `POLISH_NOTES.md` at repo root.** Do not fix them inline during a feature phase. They are addressed in PPOL1 and PPOL2.
 
 ---
 
@@ -33,6 +34,17 @@ Local-first creative/editorial workspace for the **Revival project only**. Not a
 3. What should I do next.
 4. Where saved material will go.
 5. How to edit, delete, archive, restore, or undo.
+
+---
+
+## UI patterns (established — apply consistently)
+
+- **Two-column layout:** every workspace. Left = list with title/type/status badge/preview line. Right = full detail panel, editable, with actions.
+- **Full-screen popout:** available from any detail panel. Full edit, rename, delete, archive/restore within the popout. Independent window state.
+- **Reference Mode / Edit Mode:** Canon Bible defaults to read-only Reference Mode. Edit Mode requires a deliberate toggle. Popout has independent mode state.
+- **Status bar:** thin persistent bar at bottom of every detail panel showing workspace, entry type, created date, last edited, lock status.
+- **Linked entries indicator:** passive count on every detail panel ("3 attachments / 2 canon links"), expandable on click.
+- **Collapsed archive/retired sections:** at bottom of the same page. No separate archive page anywhere.
 
 ---
 
@@ -95,16 +107,28 @@ Do not invent new top-level workspaces.
 
 ---
 
-## Cross-workspace attachments (Characters, Episodes)
+## Cross-workspace attachments
 
 - Pattern: **link, don't copy.** One source of truth.
-- A Character or Episode entry has an "Attached" section.
-- Picker lets the user attach resolved items from Decisions, Open Questions, Conflicts, Brainstorm, Research.
+- Characters and Episodes entries have an "Attached" section.
+- Picker lets the user attach resolved items from Decisions, Open Questions, Conflicts, Brainstorm, Research, and Source Material.
+- Decisions, Open Questions, and Conflicts can also attach Source Material as supporting reference.
 - Attached items appear as references (title + home workspace + click-through to the original).
 - Removing an attachment unlinks only; the original is untouched.
 - If the original is later edited, superseded, or archived, the attachment reflects that automatically — no sync step.
 - Bi-directional visibility: the original item shows which Characters/Episodes it's linked to, for traceability.
-- Schema details (join tables, multi-attach, etc.) are decided at P28.
+- Schema is in `docs/CANON_SCHEMA_APPROVED.md` — implemented in P31.
+
+---
+
+## Canon Bible rules
+
+- **Canon Bible defaults to Reference Mode** (read-only). Edit Mode requires a deliberate toggle.
+- **Locked canon = currently accepted, not impossible to change.**
+- All canon changes flow through Canon Review proposals — never written directly to canon_entries.
+- Retired / superseded canon stays in a collapsed section on the same page.
+- Downstream corrections are tracked in canon_downstream_corrections (child of locked decisions), not as prose.
+- Tags apply to all canon entries via taggable_tags.
 
 ---
 
@@ -114,26 +138,18 @@ Do not invent new top-level workspaces.
 - Most workspaces support delete (for mistakes).
 - Most workspaces have an archive/retire section, collapsed by default.
 - **No separate global Archive page.**
-- Canon Bible entries are editable.
-- **Locked canon = currently accepted, not impossible to change.**
-- Retired / superseded canon stays in a collapsed section where appropriate.
-
----
-
-## Save / safety
-
+- Canon Bible entries are editable only in Edit Mode, with a warning on locked entries.
 - Autosave is app-wide but means **draft preservation, not silent final approval.**
-- Panic Export exists early and expands over time.
-- Optional Next Step Suggestions are allowed but must be dismissible.
 
 ---
 
 ## Database
 
 - SQLite. Local only.
-- **Do not invent the Canon Bible schema yet.**
-- At the schema phase: inspect the audited worldbuilding knowledge files (which will keep evolving inside this app — they are not frozen) and propose a schema covering categories, tables/entities, relationships, edit/lock/archive/supersede behavior, source provenance, cross-workspace attachments (Characters/Episodes ↔ Decisions/Open Questions/Conflicts/Brainstorm/Research), and future change handling.
-- **Stop for a schema approval checkpoint before implementing.**
+- **Schema is approved and implemented.** See `docs/CANON_SCHEMA_APPROVED.md`.
+- 42 tables + 9 triggers. Migrations live inline in `db.js`.
+- Do not alter the canon schema without a design checkpoint in claude.ai first.
+- Tags are seeded at first launch via migration 029_seed_tags. Do not re-seed.
 
 ---
 
