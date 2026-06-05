@@ -138,11 +138,12 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Quick Capture + Navigation
 
-### PCAP — Global quick-capture
+### PCAP — Global quick-capture ✅
 - Cmd+Shift+N from anywhere opens a minimal modal
 - Title + body, one-click save → drops to Unsorted
 - Dismissable with Escape
-- **Smoke:** Trigger from three different workspaces, save an entry, confirm it appears in Unsorted
+- In-app shortcut (window keydown, not an OS-global accelerator) so it never hijacks the system-wide combo
+- **Smoke passed.**
 
 ### PKEY — Command palette + keyboard navigation
 - Cmd+K opens command palette: jump to any workspace, any recent entry, any action

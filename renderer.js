@@ -2618,4 +2618,80 @@ panicBtn.addEventListener('click', async () => {
   }, 1600);
 });
 
+// --- PCAP global quick-capture ----------------------------------------------
+// Cmd/Ctrl+Shift+N from any workspace opens a minimal modal: title + body,
+// one click saves straight to Unsorted. Escape or Cancel dismisses without
+// saving. The shortcut is in-app only (a window keydown, not an OS-global
+// accelerator) so it never hijacks the system-wide combo. If the user is
+// sitting on the Unsorted workspace, its list refreshes via the existing
+// PUI2 hook so the new entry shows immediately.
+const qcOverlay = document.getElementById('qc-overlay');
+const qcForm = document.getElementById('qc-form');
+const qcTitle = document.getElementById('qc-title');
+const qcBody = document.getElementById('qc-body');
+const qcSave = document.getElementById('qc-save');
+const qcCancel = document.getElementById('qc-cancel');
+const qcClose = document.getElementById('qc-close');
+const qcError = document.getElementById('qc-error');
+
+function openQuickCapture() {
+  if (!qcOverlay.hidden) return;
+  qcTitle.value = '';
+  qcBody.value = '';
+  setStatus(qcError, '');
+  qcSave.disabled = false;
+  qcOverlay.hidden = false;
+  qcTitle.focus();
+}
+
+function closeQuickCapture() {
+  qcOverlay.hidden = true;
+}
+
+qcCancel.addEventListener('click', closeQuickCapture);
+qcClose.addEventListener('click', closeQuickCapture);
+
+// Click on the dimmed backdrop (not the modal itself) dismisses.
+qcOverlay.addEventListener('mousedown', (e) => {
+  if (e.target === qcOverlay) closeQuickCapture();
+});
+
+qcForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (qcTitle.value.trim() === '') {
+    setStatus(qcError, 'Title is required.');
+    qcTitle.focus();
+    return;
+  }
+  qcSave.disabled = true;
+  try {
+    await window.revival.unsorted.create({
+      title: qcTitle.value,
+      body: qcBody.value,
+    });
+    closeQuickCapture();
+    // Reflect the new entry if Unsorted is the workspace on screen.
+    if (currentWorkspaceName === 'Unsorted' && currentWorkspaceRefresh) {
+      currentWorkspaceRefresh();
+    }
+  } catch (err) {
+    setStatus(qcError, err.message || 'Could not save entry.');
+    qcSave.disabled = false;
+  }
+});
+
+window.addEventListener('keydown', (e) => {
+  // Open: Cmd/Ctrl+Shift+N from anywhere in the app.
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
+    e.preventDefault();
+    openQuickCapture();
+    return;
+  }
+  // Escape dismisses while the modal is open.
+  if (e.key === 'Escape' && !qcOverlay.hidden) {
+    e.preventDefault();
+    closeQuickCapture();
+  }
+});
+
 route('Home');
