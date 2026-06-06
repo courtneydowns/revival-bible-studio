@@ -159,6 +159,10 @@ contextBridge.exposeInMainWorld('revival', {
     // in it. Each item is a full getDetail() record so the renderer can diff
     // versions field by field without a second round trip.
     versionChain: (id) => ipcRenderer.invoke('canon:versionChain', id),
+    // PEXPORT — Canon Bible readable export. params = { filterBy, filterId }.
+    // filterBy: 'all' | 'entry_type' | 'character' | 'season'.
+    // filterId: entry_type string or canon_entries.id.
+    export: (params) => ipcRenderer.invoke('canon:export', params),
   },
   // PCONFLICT — on-demand conflict scan + route. scan() is read-only and
   // returns { scannedAt, totalActiveEntries, conflicts: [...] }; each

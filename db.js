@@ -4269,10 +4269,206 @@ const canonConflicts = (() => {
   };
 })();
 
+// PEXPORT — Canon Bible export. Queries non-retired canon entries filtered by
+// all / entry_type / character / season, then renders a markdown string and a
+// minimal HTML page (for PDF generation in the main process). Returns
+// { markdown, html, count, title } — no file I/O here.
+function canonExport(params) {
+  const db = getDb();
+  const { filterBy = 'all', filterId } = params || {};
+  let entries = [];
+  let title = '';
+
+  if (filterBy === 'entry_type' && filterId) {
+    entries = db
+      .prepare(
+        `SELECT ${CANON_LIST_COLUMNS}
+           FROM canon_entries ce
+           LEFT JOIN sessions s ON s.id = ce.origin_session_id
+          WHERE ce.retired = 0 AND ce.entry_type = ?
+          ORDER BY ce.title ASC, ce.id ASC`
+      )
+      .all(String(filterId));
+    const cfg = CANON_TYPE_CONFIG[filterId];
+    title = `Canon Bible — ${cfg ? cfg.label : String(filterId)}`;
+  } else if (filterBy === 'character' && filterId) {
+    const charId = Number(filterId);
+    entries = db
+      .prepare(
+        `SELECT ${CANON_LIST_COLUMNS}
+           FROM canon_entries ce
+           LEFT JOIN sessions s ON s.id = ce.origin_session_id
+          WHERE ce.retired = 0
+            AND (
+              ce.id = ?
+              OR (ce.entry_type = 'locked_line' AND EXISTS (
+                SELECT 1 FROM canon_locked_lines cll
+                 WHERE cll.canon_entry_id = ce.id AND cll.character_entry_id = ?
+              ))
+            )
+          ORDER BY ce.entry_type ASC, ce.title ASC, ce.id ASC`
+      )
+      .all(charId, charId);
+    const charEntry = entries.find(
+      (e) => e.id === charId && e.entry_type === 'character'
+    );
+    title = `Canon Bible — Character: ${charEntry ? charEntry.title : `#${charId}`}`;
+  } else if (filterBy === 'season' && filterId) {
+    const seasonId = Number(filterId);
+    entries = db
+      .prepare(
+        `SELECT ${CANON_LIST_COLUMNS}
+           FROM canon_entries ce
+           LEFT JOIN sessions s ON s.id = ce.origin_session_id
+          WHERE ce.retired = 0
+            AND (
+              ce.id = ?
+              OR (ce.entry_type = 'episode' AND EXISTS (
+                SELECT 1 FROM canon_episodes ep
+                 WHERE ep.canon_entry_id = ce.id AND ep.season_entry_id = ?
+              ))
+            )
+          ORDER BY ce.entry_type ASC, ce.title ASC, ce.id ASC`
+      )
+      .all(seasonId, seasonId);
+    const seasonEntry = entries.find(
+      (e) => e.id === seasonId && e.entry_type === 'season'
+    );
+    title = `Canon Bible — Season: ${seasonEntry ? seasonEntry.title : `#${seasonId}`}`;
+  } else {
+    entries = db
+      .prepare(
+        `SELECT ${CANON_LIST_COLUMNS}
+           FROM canon_entries ce
+           LEFT JOIN sessions s ON s.id = ce.origin_session_id
+          WHERE ce.retired = 0
+          ORDER BY ce.entry_type ASC, ce.title ASC, ce.id ASC`
+      )
+      .all();
+    title = 'Canon Bible — All Approved Entries';
+  }
+
+  entries = attachDetails(attachLegacyIds(entries));
+
+  // --- Markdown ----------------------------------------------------------
+  const today = new Date().toISOString().slice(0, 10);
+  const mdLines = [
+    `# ${title}`,
+    `_Exported: ${today} · ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}_`,
+    '',
+    '---',
+    '',
+  ];
+
+  const byType = new Map();
+  for (const e of entries) {
+    if (!byType.has(e.entry_type)) byType.set(e.entry_type, []);
+    byType.get(e.entry_type).push(e);
+  }
+
+  for (const [type, typeEntries] of byType.entries()) {
+    const cfg = CANON_TYPE_CONFIG[type];
+    mdLines.push(`## ${cfg ? cfg.label : type} (${typeEntries.length})`);
+    mdLines.push('');
+
+    for (const entry of typeEntries) {
+      mdLines.push(`### ${entry.title || '(untitled)'}`);
+      mdLines.push('');
+
+      const meta = [`**Status:** ${entry.canon_status || 'draft'}`];
+      if (entry.certainty) meta.push(`**Certainty:** ${entry.certainty}`);
+      if (entry.locked) meta.push(`**Locked:** ${entry.locked_label || 'yes'}`);
+      if (entry.provisional) meta.push(`**Provisional**`);
+      if (entry.legacy_ids && entry.legacy_ids.length > 0) {
+        const primary = entry.legacy_ids.find((l) => l.isPrimary);
+        if (primary) meta.push(`**Code:** ${primary.scheme}-${primary.code}`);
+      }
+      mdLines.push(meta.join(' · '));
+      mdLines.push('');
+
+      if (entry.detail && cfg && cfg.fields.length > 0) {
+        for (const field of cfg.fields) {
+          const v = entry.detail[field.col];
+          if (v === null || v === undefined || v === '') continue;
+          if (field.kind === 'boolean') {
+            if (v) mdLines.push(`**${field.label}:** Yes`);
+            continue;
+          }
+          if (field.kind === 'textarea') {
+            mdLines.push(`**${field.label}:**`);
+            mdLines.push('');
+            mdLines.push(String(v).trim());
+            mdLines.push('');
+          } else {
+            mdLines.push(`**${field.label}:** ${v}`);
+          }
+        }
+        if (!mdLines[mdLines.length - 1] === '') mdLines.push('');
+      }
+
+      if (entry.body && entry.body.trim()) {
+        mdLines.push('**Notes:**');
+        mdLines.push('');
+        mdLines.push(entry.body.trim());
+        mdLines.push('');
+      }
+
+      mdLines.push('---');
+      mdLines.push('');
+    }
+  }
+
+  const markdown = mdLines.join('\n');
+
+  // --- HTML (for PDF rendering in main process) --------------------------
+  const esc = (s) =>
+    String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  const mdToHtml = (line) =>
+    esc(line)
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/_([^_]+)_/g, '<em>$1</em>');
+
+  const htmlParts = [
+    '<!DOCTYPE html><html><head><meta charset="utf-8">',
+    `<title>${esc(title)}</title>`,
+    '<style>',
+    'body{font-family:Georgia,serif;font-size:13px;line-height:1.6;max-width:780px;margin:40px auto;color:#111;padding:0 20px}',
+    'h1{font-size:22px;border-bottom:2px solid #333;padding-bottom:6px;margin-bottom:4px}',
+    'h2{font-size:16px;margin-top:2.2em;border-bottom:1px solid #bbb;padding-bottom:2px;color:#222}',
+    'h3{font-size:14px;margin-top:1.6em;margin-bottom:2px}',
+    'p{margin:3px 0 8px}',
+    'hr{border:none;border-top:1px solid #ddd;margin:1.4em 0}',
+    '@media print{body{max-width:100%;margin:0.5in;padding:0}h3{page-break-after:avoid}}',
+    '</style></head><body>',
+  ];
+
+  for (const raw of mdLines) {
+    if (raw.startsWith('# ')) {
+      htmlParts.push(`<h1>${esc(raw.slice(2))}</h1>`);
+    } else if (raw.startsWith('## ')) {
+      htmlParts.push(`<h2>${esc(raw.slice(3))}</h2>`);
+    } else if (raw.startsWith('### ')) {
+      htmlParts.push(`<h3>${esc(raw.slice(4))}</h3>`);
+    } else if (raw === '---') {
+      htmlParts.push('<hr>');
+    } else if (raw.trim() !== '') {
+      htmlParts.push(`<p>${mdToHtml(raw)}</p>`);
+    }
+  }
+
+  htmlParts.push('</body></html>');
+
+  return { markdown, html: htmlParts.join('\n'), count: entries.length, title };
+}
+
 module.exports = {
   initDatabase,
   getDb,
   exportAll,
+  canonExport,
   settings,
   dashboard,
   canon,

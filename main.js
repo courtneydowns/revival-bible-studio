@@ -339,6 +339,38 @@ function registerIpc() {
     db.crossWorkspace.candidates(sourceKind)
   );
 
+  // PEXPORT — Canon Bible readable export. Writes markdown + PDF into a
+  // timestamped folder under ~/Documents/revival-bible-studio/canon_exports/.
+  // A hidden BrowserWindow renders the HTML to PDF; the temp HTML file is
+  // deleted immediately after the PDF buffer is written.
+  ipcMain.handle('canon:export', async (_event, params) => {
+    const result = db.canonExport(params);
+    const folder = path.join(
+      app.getPath('documents'),
+      'revival-bible-studio',
+      'canon_exports',
+      `canon-export-${timestampSlug()}`
+    );
+    fs.mkdirSync(folder, { recursive: true });
+
+    fs.writeFileSync(path.join(folder, 'canon_export.md'), result.markdown, 'utf8');
+
+    const htmlPath = path.join(folder, '_tmp_export.html');
+    fs.writeFileSync(htmlPath, result.html, 'utf8');
+    const pdfWin = new BrowserWindow({
+      show: false,
+      webPreferences: { contextIsolation: true },
+    });
+    await pdfWin.loadFile(htmlPath);
+    const pdfData = await pdfWin.webContents.printToPDF({ pageSize: 'Letter' });
+    pdfWin.destroy();
+    fs.unlinkSync(htmlPath);
+    fs.writeFileSync(path.join(folder, 'canon_export.pdf'), pdfData);
+
+    shell.openPath(folder);
+    return { folder, count: result.count, title: result.title };
+  });
+
   ipcMain.handle('settings:getProjectRules', () => db.settings.getProjectRules());
   ipcMain.handle('settings:setProjectRules', (_event, text) =>
     db.settings.setProjectRules(text)

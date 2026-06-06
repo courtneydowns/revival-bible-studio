@@ -4729,6 +4729,7 @@ function renderSettingsPage(section) {
 
   renderManageTags(section);
   renderPanicExport(section);
+  renderCanonExport(section);
 }
 
 // --- Settings: Manage Tags (PTAGDEL) ---------------------------------------
@@ -5010,6 +5011,160 @@ function renderPanicExport(section) {
   });
 
   block.append(heading, desc, btn, status);
+  section.appendChild(block);
+}
+
+// --- Canon Bible Export (PEXPORT) ------------------------------------------
+// Generates a clean readable export of approved canon filtered by entry type,
+// character, or season — or all at once. Writes markdown + PDF into a
+// timestamped folder under ~/Documents/revival-bible-studio/canon_exports/.
+// Filter dropdowns are populated lazily from canon.list() the first time the
+// user changes the filter-by selector.
+function renderCanonExport(section) {
+  const block = document.createElement('div');
+  block.className = 'entry-form settings-block';
+
+  const heading = document.createElement('h2');
+  heading.className = 'settings-heading';
+  heading.textContent = 'Canon Bible Export';
+
+  const desc = document.createElement('p');
+  desc.className = 'settings-desc';
+  desc.textContent =
+    'Export a clean, readable copy of approved canon entries as Markdown and PDF. ' +
+    'Filter by entry type, character, or season, or export everything at once. ' +
+    'Files are saved to Documents/revival-bible-studio/canon_exports/.';
+
+  // Filter-by selector
+  const filterRow = document.createElement('div');
+  filterRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;';
+
+  const filterLabel = document.createElement('label');
+  filterLabel.textContent = 'Filter by:';
+  filterLabel.style.fontWeight = 'bold';
+
+  const filterBy = document.createElement('select');
+  ['all', 'entry_type', 'character', 'season'].forEach((v) => {
+    const opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = { all: 'All entries', entry_type: 'Entry type', character: 'Character', season: 'Season' }[v];
+    filterBy.appendChild(opt);
+  });
+
+  const filterValue = document.createElement('select');
+  filterValue.style.display = 'none';
+
+  filterRow.append(filterLabel, filterBy, filterValue);
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = 'Export (Markdown + PDF)…';
+
+  const status = document.createElement('p');
+  status.className = 'draft-status';
+
+  // Populated once, on first non-"all" selection.
+  let canonEntries = null;
+
+  const ENTRY_TYPES = [
+    'character', 'season', 'episode', 'locked_scene', 'locked_line',
+    'locked_decision', 'knowledge_state', 'timeline_event', 'viral_phase',
+    'virus_rule', 'institution', 'location', 'motif', 'theme',
+    'production_rule', 'principle', 'rewatch_beat', 'relationship',
+  ];
+  const TYPE_LABELS = {
+    character: 'Character', season: 'Season', episode: 'Episode',
+    locked_scene: 'Locked Scene', locked_line: 'Locked Line',
+    locked_decision: 'Locked Decision', knowledge_state: 'Knowledge State',
+    timeline_event: 'Timeline Event', viral_phase: 'Viral Phase',
+    virus_rule: 'Virus Rule', institution: 'Institution', location: 'Location',
+    motif: 'Motif', theme: 'Theme', production_rule: 'Production Rule',
+    principle: 'Principle', rewatch_beat: 'Rewatch Beat', relationship: 'Relationship',
+  };
+
+  async function populateFilterValue(kind) {
+    filterValue.innerHTML = '';
+    if (kind === 'all') {
+      filterValue.style.display = 'none';
+      return;
+    }
+    filterValue.style.display = '';
+
+    if (kind === 'entry_type') {
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = '— pick a type —';
+      filterValue.appendChild(placeholder);
+      ENTRY_TYPES.forEach((t) => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = TYPE_LABELS[t] || t;
+        filterValue.appendChild(opt);
+      });
+      return;
+    }
+
+    // character or season — need the live list
+    if (!canonEntries) {
+      try {
+        canonEntries = await window.revival.canon.list();
+      } catch {
+        canonEntries = [];
+      }
+    }
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = kind === 'character' ? '— pick a character —' : '— pick a season —';
+    filterValue.appendChild(placeholder);
+
+    const filtered = canonEntries.filter((e) => e.entry_type === kind);
+    if (filtered.length === 0) {
+      const empty = document.createElement('option');
+      empty.disabled = true;
+      empty.textContent = `No ${kind} entries in Canon Bible yet`;
+      filterValue.appendChild(empty);
+    }
+    for (const e of filtered) {
+      const opt = document.createElement('option');
+      opt.value = String(e.id);
+      const displayName =
+        (kind === 'character' && e.detail && e.detail.display_name)
+          ? `${e.title} (${e.detail.display_name})`
+          : kind === 'season' && e.detail && e.detail.season_number != null
+          ? `Season ${e.detail.season_number} — ${e.title}`
+          : e.title || `#${e.id}`;
+      opt.textContent = displayName;
+      filterValue.appendChild(opt);
+    }
+  }
+
+  filterBy.addEventListener('change', () => populateFilterValue(filterBy.value));
+
+  btn.addEventListener('click', async () => {
+    const kind = filterBy.value;
+    const id = (kind !== 'all') ? filterValue.value : null;
+    if (kind !== 'all' && !id) {
+      setStatus(status, 'Pick a filter value before exporting.');
+      return;
+    }
+    btn.disabled = true;
+    setStatus(status, 'Exporting…');
+    try {
+      const params = { filterBy: kind, filterId: id || null };
+      const res = await window.revival.canon.export(params);
+      setStatus(
+        status,
+        `Exported "${res.title}" — ${res.count} entr${res.count === 1 ? 'y' : 'ies'}. ` +
+        `Folder: ${res.folder}`
+      );
+    } catch (err) {
+      setStatus(status, `Export failed: ${err.message || err}`);
+    }
+    btn.disabled = false;
+  });
+
+  block.append(heading, desc, filterRow, btn, status);
   section.appendChild(block);
 }
 
