@@ -1,4 +1,4 @@
-# Revival Studio — Polish Notes
+# Revival Studio — Polish Notes Ongoing
 
 Running log of UI/UX observations from smoke tests. Addressed in PPOL1 (pre-import) and PPOL2 (pre-AI).
 
@@ -12,20 +12,18 @@ Running log of UI/UX observations from smoke tests. Addressed in PPOL1 (pre-impo
 
 ## Format
 
-```
-- [ ] [Phase noticed] Description of issue
-```
+	- [ ] [Phase noticed] Description of issue
 
 ---
 
 ## Active items
 
-<!-- Add items below as you smoke test each phase -->
+<!-- Add items below as you smoke test each phase-->
 
 ### PPOL1 — UI Polish: pre-import
 - Work through all items logged in `POLISH_NOTES.md` up to this point
 - No new features. Fixes, consistency, rough edges only.
-- **Smoke:** Every item in POLISH_NOTES.md marked resolved
+- **Smoke:** Every item in POLISH\_NOTES.md marked resolved
 
 - [ ] PPOL1-01 [P32] Canon Bible archived section: per-entry checkbox + "Delete Selected" + "Delete All" bulk actions
 - [ ] PPOL1-02 [P26] Characters archived section: per-entry checkbox + "Delete Selected" + "Delete All" bulk actions
@@ -42,4 +40,3 @@ Running log of UI/UX observations from smoke tests. Addressed in PPOL1 (pre-impo
 - [ ] PPOL1-13 [PUI1] Left list card previews: title text overflows — add truncation
 - [ ] PPOL1-14 [PUI1] Nav menu: add notification badges to Canon Review, Conflicts, and Open Questions (matching existing badge pattern)
 - [ ] PPOL1-15 [P28] Home page: remove "Recently Viewed" section — Recent Activity already covers this
-
