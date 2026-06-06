@@ -2317,8 +2317,6 @@
         display: flex;
         gap: 8px;
         align-items: flex-end;
-        padding: 14px 18px;
-        border-top: 1px solid var(--border);
       }
       .chat-input {
         flex: 1;
@@ -2331,9 +2329,19 @@
         resize: none;
       }
       .chat-input:disabled { opacity: 0.7; cursor: not-allowed; }
-      .chat-composer { flex-direction: column; align-items: stretch; gap: 8px; }
-      .chat-composer-actions { display: flex; gap: 8px; justify-content: flex-end; }
-      .chat-composer-actions .btn-primary { padding: 8px 16px; }
+      .chat-composer .btn-primary { padding: 8px 16px; }
+      /* P39: bar wraps the Preview button (outside the form) + the form itself */
+      .chat-composer-bar {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 14px 18px;
+        border-top: 1px solid var(--border);
+      }
+      .chat-composer-bar .chat-preview-btn-row {
+        display: flex;
+        justify-content: flex-end;
+      }
 
       /* P39 — request preview panel */
       .chat-preview-wrap {
@@ -3054,19 +3062,19 @@
         </div>
         <pre class=”chat-preview-body” id=”chat-preview-body”></pre>
       </div>
-      <!-- P39: composer now includes a Preview toggle alongside Send. -->
-      <form class=”chat-composer” id=”chat-composer”>
-        <textarea
-          id=”chat-input”
-          class=”chat-input”
-          rows=”2”
-          placeholder=”Message Claude — attach Source Material above to include reference content.”
-        ></textarea>
-        <div class=”chat-composer-actions”>
-          <button id=”chat-preview-btn” type=”button” class=”btn-secondary btn-sm”>Preview</button>
+      <!-- P39: Preview button lives outside the form so it never triggers submit. -->
+      <div class=”chat-composer-bar”>
+        <button id=”chat-preview-btn” type=”button” class=”btn-secondary btn-sm”>Preview</button>
+        <form class=”chat-composer” id=”chat-composer”>
+          <textarea
+            id=”chat-input”
+            class=”chat-input”
+            rows=”2”
+            placeholder=”Message Claude — attach Source Material above to include reference content.”
+          ></textarea>
           <button id=”chat-send” type=”submit” class=”btn-primary”>Send</button>
-        </div>
-      </form>
+        </form>
+      </div>
     </aside>
 
     <!-- P38 — Propose Canon Change modal. Opened from Character/Episode detail

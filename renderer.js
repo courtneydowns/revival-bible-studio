@@ -7908,7 +7908,6 @@ chatPreviewBtn.addEventListener('click', async () => {
     chatPreviewBtn.textContent = _previewOpen ? 'Hide preview' : 'Preview';
     if (_previewOpen) {
       await refreshPreview();
-      chatPreviewWrap.scrollIntoView({ block: 'nearest' });
     }
   } catch (err) {
     console.error('[preview] click handler error:', err);
