@@ -1889,7 +1889,91 @@ async function exportAll(destFolder) {
     fs.writeFileSync(path.join(sourcesDir, fname), s.body || '', 'utf8');
   }
 
-  return { db: DB_FILENAME, tables: tables.length, sources: sources.length };
+  // 4. Each Canon entry as its own .txt — one file per entry, grouped by type.
+  const canonEntries = db
+    .prepare(
+      `SELECT id, entry_type, title, body, canon_status, certainty, review_state,
+              locked, locked_label, provisional, retired, created_at, updated_at
+         FROM canon_entries
+        ORDER BY entry_type ASC, id ASC`
+    )
+    .all();
+  const canonDir = path.join(destFolder, 'canon');
+  fs.mkdirSync(canonDir, { recursive: true });
+  for (const ce of canonEntries) {
+    const safeTitle =
+      String(ce.title || 'untitled')
+        .replace(/[^a-z0-9-_ ]/gi, '_')
+        .trim()
+        .slice(0, 80) || 'untitled';
+    const fname = `${ce.entry_type}_${String(ce.id).padStart(4, '0')}_${safeTitle}.txt`;
+    const meta = [
+      `Type:   ${ce.entry_type}`,
+      `Title:  ${ce.title || ''}`,
+      `Status: ${ce.canon_status || ''}${ce.certainty ? ` (${ce.certainty})` : ''}`,
+      ce.review_state ? `Review: ${ce.review_state}` : null,
+      ce.locked ? `Locked: ${ce.locked_label || 'yes'}` : null,
+      ce.provisional ? 'Provisional: yes' : null,
+      ce.retired ? 'Retired: yes' : null,
+      `Created: ${ce.created_at}`,
+      `Updated: ${ce.updated_at}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+    fs.writeFileSync(
+      path.join(canonDir, fname),
+      `${meta}\n\n${ce.body || ''}`,
+      'utf8'
+    );
+  }
+
+  // 5. All Canon proposals as proposals.json.
+  const proposals = db
+    .prepare(
+      `SELECT id, created_at, updated_at, target_entry_id, proposal_intent,
+              proposed_fields_json, source_kind, source_entry_id, proposer_note,
+              status, reviewed_at, review_note
+         FROM canon_proposals
+        ORDER BY status ASC, id ASC`
+    )
+    .all()
+    .map((p) => ({
+      ...p,
+      proposed_fields: (() => {
+        try { return JSON.parse(p.proposed_fields_json); } catch { return {}; }
+      })(),
+    }));
+  fs.writeFileSync(
+    path.join(destFolder, 'proposals.json'),
+    JSON.stringify(proposals, null, 2),
+    'utf8'
+  );
+
+  // 6. All tags + their usage counts as tags.json.
+  const tags = db
+    .prepare(
+      `SELECT t.id, t.name, t.category, t.is_seed,
+              COUNT(tt.id) AS usage_count
+         FROM tags t
+         LEFT JOIN taggable_tags tt ON tt.tag_id = t.id
+        GROUP BY t.id
+        ORDER BY t.category ASC, t.name ASC`
+    )
+    .all();
+  fs.writeFileSync(
+    path.join(destFolder, 'tags.json'),
+    JSON.stringify(tags, null, 2),
+    'utf8'
+  );
+
+  return {
+    db: DB_FILENAME,
+    tables: tables.length,
+    sources: sources.length,
+    canonEntries: canonEntries.length,
+    proposals: proposals.length,
+    tags: tags.length,
+  };
 }
 
 // --- Home dashboard (P27) --------------------------------------------------
@@ -1964,6 +2048,9 @@ const dashboard = {
         .prepare(
           `SELECT COUNT(*) AS n FROM open_questions WHERE archived_at IS NULL AND tier = 1`
         )
+        .get().n,
+      conflicts: db
+        .prepare(`SELECT COUNT(*) AS n FROM conflicts WHERE archived_at IS NULL`)
         .get().n,
     };
   },

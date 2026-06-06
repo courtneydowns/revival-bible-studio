@@ -1182,6 +1182,10 @@
         display: flex;
         flex-direction: column;
         gap: 3px;
+        width: 100%;
+        min-width: 0;
+        overflow: hidden;
+        box-sizing: border-box;
       }
       .tc-list-item:hover { background: var(--hover); border-color: var(--accent); }
       .tc-list-item.active {
@@ -1234,6 +1238,54 @@
       }
       .tc-archived-section > summary:hover { color: var(--text); }
       .tc-archived-section .tc-list { margin-top: 6px; }
+      /* PPOL1: Bulk delete toolbar inside archived/retired sections */
+      .tc-archive-bulk-bar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 0 2px;
+        flex-wrap: wrap;
+      }
+      .tc-archive-bulk-bar .confirm-text {
+        font-size: 11px;
+        color: var(--muted);
+        flex: 1;
+        min-width: 0;
+      }
+      /* PPOL1: Row wrapper for checkbox + list item in archived sections */
+      .tc-archived-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+      }
+      .tc-archived-row .tc-list-item {
+        flex: 1;
+        min-width: 0;
+        width: auto;
+      }
+      .tc-archive-check {
+        flex-shrink: 0;
+        margin-top: 13px;
+        cursor: pointer;
+        accent-color: var(--accent);
+      }
+      /* Canon Bible retired section row — cards are taller so align center */
+      .tc-archived-row--canon {
+        align-items: flex-start;
+      }
+      .tc-archived-row--canon .tc-archive-check {
+        margin-top: 16px;
+      }
+      /* PPOL1: Small variant for bulk action buttons */
+      .btn-sm {
+        font: inherit;
+        font-size: 11px;
+        padding: 3px 9px;
+        border-radius: 4px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .btn-sm:disabled { opacity: 0.45; cursor: default; }
       .tc-empty {
         display: flex;
         flex-direction: column;

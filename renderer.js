@@ -648,6 +648,80 @@ function makeEntryWorkspace(config) {
   archived.className = 'tc-archived-section';
   const archivedSummary = document.createElement('summary');
   archived.appendChild(archivedSummary);
+
+  // PPOL1: Bulk delete toolbar for archived section
+  const archiveBulkBar = document.createElement('div');
+  archiveBulkBar.className = 'tc-archive-bulk-bar';
+  const deleteSelectedBtn = document.createElement('button');
+  deleteSelectedBtn.type = 'button';
+  deleteSelectedBtn.className = 'btn-danger btn-sm';
+  deleteSelectedBtn.textContent = 'Delete Selected';
+  deleteSelectedBtn.disabled = true;
+  const deleteAllBtn = document.createElement('button');
+  deleteAllBtn.type = 'button';
+  deleteAllBtn.className = 'btn-danger btn-sm';
+  deleteAllBtn.textContent = 'Delete All';
+  deleteAllBtn.disabled = true;
+
+  function renderBulkBar() {
+    archiveBulkBar.innerHTML = '';
+    archiveBulkBar.append(deleteSelectedBtn, deleteAllBtn);
+  }
+  renderBulkBar();
+
+  function showBulkDeleteConfirm(getIds, label) {
+    archiveBulkBar.innerHTML = '';
+    const text = document.createElement('span');
+    text.className = 'confirm-text';
+    text.textContent = `Delete ${label}? This cannot be undone.`;
+    const yesBtn = document.createElement('button');
+    yesBtn.type = 'button';
+    yesBtn.className = 'btn-danger btn-sm';
+    yesBtn.textContent = 'Delete';
+    const noBtn = document.createElement('button');
+    noBtn.type = 'button';
+    noBtn.className = 'btn-secondary btn-sm';
+    noBtn.textContent = 'Cancel';
+    noBtn.addEventListener('click', renderBulkBar);
+    yesBtn.addEventListener('click', async () => {
+      yesBtn.disabled = true;
+      noBtn.disabled = true;
+      try {
+        const ids = getIds();
+        for (const id of ids) {
+          await api.delete(id);
+          if (id === selectedId) selectedId = null;
+        }
+        await loadList();
+      } catch {
+        renderBulkBar();
+      }
+    });
+    archiveBulkBar.append(text, yesBtn, noBtn);
+  }
+
+  deleteSelectedBtn.addEventListener('click', () => {
+    const ids = Array.from(archivedListEl.querySelectorAll('.tc-archive-check:checked'))
+      .map((cb) => Number(cb.dataset.id));
+    if (!ids.length) return;
+    showBulkDeleteConfirm(
+      () => Array.from(archivedListEl.querySelectorAll('.tc-archive-check:checked')).map((cb) => Number(cb.dataset.id)),
+      `${ids.length} archived ${ids.length === 1 ? 'entry' : 'entries'}`
+    );
+  });
+
+  deleteAllBtn.addEventListener('click', () => {
+    const ids = Array.from(archivedListEl.querySelectorAll('.tc-archive-check'))
+      .map((cb) => Number(cb.dataset.id));
+    if (!ids.length) return;
+    showBulkDeleteConfirm(
+      () => Array.from(archivedListEl.querySelectorAll('.tc-archive-check')).map((cb) => Number(cb.dataset.id)),
+      `all ${ids.length} archived ${ids.length === 1 ? 'entry' : 'entries'}`
+    );
+  });
+
+  archived.appendChild(archiveBulkBar);
+
   const archivedListEl = document.createElement('div');
   archivedListEl.className = 'tc-list';
   archived.appendChild(archivedListEl);
@@ -744,8 +818,25 @@ function makeEntryWorkspace(config) {
     archivedListEl.innerHTML = '';
     archivedSummary.textContent = `Archived (${filteredArchived.length})`;
     archived.style.display = filteredArchived.length === 0 ? 'none' : '';
+    // PPOL1: Reset bulk bar and update button states
+    renderBulkBar();
+    deleteSelectedBtn.disabled = true;
+    deleteSelectedBtn.textContent = 'Delete Selected';
+    deleteAllBtn.disabled = filteredArchived.length === 0;
     for (const item of filteredArchived) {
-      archivedListEl.appendChild(buildListItem(item, true));
+      const row = document.createElement('div');
+      row.className = 'tc-archived-row';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'tc-archive-check';
+      cb.dataset.id = item.id;
+      cb.addEventListener('change', () => {
+        const n = archivedListEl.querySelectorAll('.tc-archive-check:checked').length;
+        deleteSelectedBtn.disabled = n === 0;
+        deleteSelectedBtn.textContent = n > 0 ? `Delete Selected (${n})` : 'Delete Selected';
+      });
+      row.append(cb, buildListItem(item, true));
+      archivedListEl.appendChild(row);
     }
   }
 
@@ -2230,6 +2321,80 @@ function renderCanonBiblePage(section) {
   retired.className = 'archived-section';
   const retiredSummary = document.createElement('summary');
   retired.appendChild(retiredSummary);
+
+  // PPOL1: Bulk delete toolbar for Canon Bible retired section
+  const retiredBulkBar = document.createElement('div');
+  retiredBulkBar.className = 'tc-archive-bulk-bar';
+  const retiredDeleteSelectedBtn = document.createElement('button');
+  retiredDeleteSelectedBtn.type = 'button';
+  retiredDeleteSelectedBtn.className = 'btn-danger btn-sm';
+  retiredDeleteSelectedBtn.textContent = 'Delete Selected';
+  retiredDeleteSelectedBtn.disabled = true;
+  const retiredDeleteAllBtn = document.createElement('button');
+  retiredDeleteAllBtn.type = 'button';
+  retiredDeleteAllBtn.className = 'btn-danger btn-sm';
+  retiredDeleteAllBtn.textContent = 'Delete All';
+  retiredDeleteAllBtn.disabled = true;
+
+  function renderRetiredBulkBar() {
+    retiredBulkBar.innerHTML = '';
+    retiredBulkBar.append(retiredDeleteSelectedBtn, retiredDeleteAllBtn);
+  }
+  renderRetiredBulkBar();
+
+  function showRetiredBulkDeleteConfirm(getIds, label) {
+    retiredBulkBar.innerHTML = '';
+    const text = document.createElement('span');
+    text.className = 'confirm-text';
+    text.textContent = `Delete ${label}? This cannot be undone.`;
+    const yesBtn = document.createElement('button');
+    yesBtn.type = 'button';
+    yesBtn.className = 'btn-danger btn-sm';
+    yesBtn.textContent = 'Delete';
+    const noBtn = document.createElement('button');
+    noBtn.type = 'button';
+    noBtn.className = 'btn-secondary btn-sm';
+    noBtn.textContent = 'Cancel';
+    noBtn.addEventListener('click', renderRetiredBulkBar);
+    yesBtn.addEventListener('click', async () => {
+      yesBtn.disabled = true;
+      noBtn.disabled = true;
+      try {
+        for (const id of getIds()) {
+          await window.revival.canon.delete(id);
+        }
+        setStatus(status, 'Deleted retired entries.');
+        await refresh();
+      } catch (err) {
+        setStatus(status, `Delete failed: ${err.message || err}`);
+        renderRetiredBulkBar();
+      }
+    });
+    retiredBulkBar.append(text, yesBtn, noBtn);
+  }
+
+  retiredDeleteSelectedBtn.addEventListener('click', () => {
+    const ids = Array.from(retiredList.querySelectorAll('.tc-archive-check:checked'))
+      .map((cb) => Number(cb.dataset.id));
+    if (!ids.length) return;
+    showRetiredBulkDeleteConfirm(
+      () => Array.from(retiredList.querySelectorAll('.tc-archive-check:checked')).map((cb) => Number(cb.dataset.id)),
+      `${ids.length} retired ${ids.length === 1 ? 'entry' : 'entries'}`
+    );
+  });
+
+  retiredDeleteAllBtn.addEventListener('click', () => {
+    const ids = Array.from(retiredList.querySelectorAll('.tc-archive-check'))
+      .map((cb) => Number(cb.dataset.id));
+    if (!ids.length) return;
+    showRetiredBulkDeleteConfirm(
+      () => Array.from(retiredList.querySelectorAll('.tc-archive-check')).map((cb) => Number(cb.dataset.id)),
+      `all ${ids.length} retired ${ids.length === 1 ? 'entry' : 'entries'}`
+    );
+  });
+
+  retired.appendChild(retiredBulkBar);
+
   const retiredList = document.createElement('div');
   retiredList.className = 'entry-list';
   retired.appendChild(retiredList);
@@ -2988,6 +3153,11 @@ function renderCanonBiblePage(section) {
 
     retiredSummary.textContent = `Retired / Archived (${filteredRetired.length})`;
     retiredList.innerHTML = '';
+    // PPOL1: Reset bulk bar and update button states
+    renderRetiredBulkBar();
+    retiredDeleteSelectedBtn.disabled = true;
+    retiredDeleteSelectedBtn.textContent = 'Delete Selected';
+    retiredDeleteAllBtn.disabled = filteredRetired.length === 0;
     if (retiredCache.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'placeholder';
@@ -3000,16 +3170,26 @@ function renderCanonBiblePage(section) {
       retiredList.appendChild(empty);
     } else {
       for (const e of filteredRetired) {
-        retiredList.appendChild(
-          buildCanonCard(
-            e,
-            typeConfig,
-            editMode ? onCanonTagChange : undefined,
-            editMode ? retiredActions : null,
-            chainHelper,
-            !editMode
-          )
-        );
+        const row = document.createElement('div');
+        row.className = 'tc-archived-row tc-archived-row--canon';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.className = 'tc-archive-check';
+        cb.dataset.id = e.id;
+        cb.addEventListener('change', () => {
+          const n = retiredList.querySelectorAll('.tc-archive-check:checked').length;
+          retiredDeleteSelectedBtn.disabled = n === 0;
+          retiredDeleteSelectedBtn.textContent = n > 0 ? `Delete Selected (${n})` : 'Delete Selected';
+        });
+        row.append(cb, buildCanonCard(
+          e,
+          typeConfig,
+          editMode ? onCanonTagChange : undefined,
+          editMode ? retiredActions : null,
+          chainHelper,
+          !editMode
+        ));
+        retiredList.appendChild(row);
       }
     }
   }
@@ -4310,46 +4490,6 @@ function renderHomePage(section) {
     }
     renderSuggestions();
 
-    // --- Recently viewed (PHOME) ---
-    // Session list of entries the user actually opened (distinct from "Recent
-    // activity" below, which is DB-driven by last edit). One click returns to
-    // the exact entry, pre-selected in its workspace.
-    const viewed = getRecentlyViewed();
-    const rvLabel = document.createElement('div');
-    rvLabel.className = 'home-section-label';
-    rvLabel.textContent = 'Recently viewed';
-    section.appendChild(rvLabel);
-
-    if (viewed.length === 0) {
-      const hint = document.createElement('p');
-      hint.className = 'placeholder';
-      hint.textContent =
-        'Entries you open will appear here for one-click return (cleared when the app restarts).';
-      section.appendChild(hint);
-    } else {
-      const rvWrap = document.createElement('div');
-      rvWrap.className = 'home-recent-viewed';
-      for (const it of viewed) {
-        const card = document.createElement('button');
-        card.type = 'button';
-        card.className = 'rv-card';
-        card.title = `Return to ${it.title} in ${it.workspace}`;
-        card.addEventListener('click', () => route(it.workspace, it.id));
-
-        const rvTitle = document.createElement('div');
-        rvTitle.className = 'rv-title';
-        rvTitle.textContent = it.title;
-
-        const rvWs = document.createElement('div');
-        rvWs.className = 'rv-ws';
-        rvWs.textContent = it.workspace;
-
-        card.append(rvTitle, rvWs);
-        rvWrap.appendChild(card);
-      }
-      section.appendChild(rvWrap);
-    }
-
     // --- Counts per workspace ---
     const countsLabel = document.createElement('div');
     countsLabel.className = 'home-section-label';
@@ -4820,10 +4960,11 @@ function renderManageTags(section) {
   reload();
 }
 
-// --- Panic Export (P21) ----------------------------------------------------
-// One click saves a complete copy of everything — the full database plus every
-// Source Material entry as a text file — into a timestamped folder the user
-// chooses. Copy-only: nothing in the app is deleted, archived, or finalized.
+// --- Panic Export (P21 / P20v2) --------------------------------------------
+// One click saves a complete copy of everything — the full database, every
+// Source Material entry as a .txt, every Canon entry as a .txt, all proposals
+// as proposals.json, and all tags as tags.json — into a timestamped folder.
+// Copy-only: nothing in the app is deleted, archived, or finalized.
 function renderPanicExport(section) {
   const block = document.createElement('div');
   block.className = 'entry-form settings-block';
@@ -4835,8 +4976,9 @@ function renderPanicExport(section) {
   const desc = document.createElement('p');
   desc.className = 'settings-desc';
   desc.textContent =
-    'Save a complete copy of everything — the full database plus every Source ' +
-    'Material entry as a text file — into a timestamped folder under ' +
+    'Save a complete copy of everything — the full database, every Source ' +
+    'Material entry as a text file, every Canon entry as a text file, all ' +
+    'proposals, and all tags — into a timestamped folder under ' +
     'Documents/revival-bible-studio/panic_exports. This only copies: nothing ' +
     'here is deleted or changed.';
 
@@ -4857,7 +4999,8 @@ function renderPanicExport(section) {
       } else {
         setStatus(
           status,
-          `Exported the database + ${res.sources} source file(s) to: ${res.folder}`
+          `Exported: ${res.sources} source(s), ${res.canonEntries} canon entry(s), ` +
+          `${res.proposals} proposal(s), ${res.tags} tag(s). Folder: ${res.folder}`
         );
       }
     } catch (err) {
@@ -4965,6 +5108,80 @@ function renderWritingLabPage(section) {
   archived.className = 'tc-archived-section';
   const archivedSummary = document.createElement('summary');
   archived.appendChild(archivedSummary);
+
+  // PPOL1: Bulk delete toolbar for Writing Lab archived section
+  const archiveBulkBar = document.createElement('div');
+  archiveBulkBar.className = 'tc-archive-bulk-bar';
+  const deleteSelectedBtn = document.createElement('button');
+  deleteSelectedBtn.type = 'button';
+  deleteSelectedBtn.className = 'btn-danger btn-sm';
+  deleteSelectedBtn.textContent = 'Delete Selected';
+  deleteSelectedBtn.disabled = true;
+  const deleteAllBtn = document.createElement('button');
+  deleteAllBtn.type = 'button';
+  deleteAllBtn.className = 'btn-danger btn-sm';
+  deleteAllBtn.textContent = 'Delete All';
+  deleteAllBtn.disabled = true;
+
+  function renderBulkBar() {
+    archiveBulkBar.innerHTML = '';
+    archiveBulkBar.append(deleteSelectedBtn, deleteAllBtn);
+  }
+  renderBulkBar();
+
+  function showBulkDeleteConfirm(getIds, label) {
+    archiveBulkBar.innerHTML = '';
+    const text = document.createElement('span');
+    text.className = 'confirm-text';
+    text.textContent = `Delete ${label}? This cannot be undone.`;
+    const yesBtn = document.createElement('button');
+    yesBtn.type = 'button';
+    yesBtn.className = 'btn-danger btn-sm';
+    yesBtn.textContent = 'Delete';
+    const noBtn = document.createElement('button');
+    noBtn.type = 'button';
+    noBtn.className = 'btn-secondary btn-sm';
+    noBtn.textContent = 'Cancel';
+    noBtn.addEventListener('click', renderBulkBar);
+    yesBtn.addEventListener('click', async () => {
+      yesBtn.disabled = true;
+      noBtn.disabled = true;
+      try {
+        const ids = getIds();
+        for (const id of ids) {
+          if (id === selectedId) { selectedId = null; showEmpty(); }
+          await api.delete(id);
+        }
+        await loadList();
+      } catch {
+        renderBulkBar();
+      }
+    });
+    archiveBulkBar.append(text, yesBtn, noBtn);
+  }
+
+  deleteSelectedBtn.addEventListener('click', () => {
+    const ids = Array.from(archivedListEl.querySelectorAll('.tc-archive-check:checked'))
+      .map((cb) => Number(cb.dataset.id));
+    if (!ids.length) return;
+    showBulkDeleteConfirm(
+      () => Array.from(archivedListEl.querySelectorAll('.tc-archive-check:checked')).map((cb) => Number(cb.dataset.id)),
+      `${ids.length} archived ${ids.length === 1 ? 'draft' : 'drafts'}`
+    );
+  });
+
+  deleteAllBtn.addEventListener('click', () => {
+    const ids = Array.from(archivedListEl.querySelectorAll('.tc-archive-check'))
+      .map((cb) => Number(cb.dataset.id));
+    if (!ids.length) return;
+    showBulkDeleteConfirm(
+      () => Array.from(archivedListEl.querySelectorAll('.tc-archive-check')).map((cb) => Number(cb.dataset.id)),
+      `all ${ids.length} archived ${ids.length === 1 ? 'draft' : 'drafts'}`
+    );
+  });
+
+  archived.appendChild(archiveBulkBar);
+
   const archivedListEl = document.createElement('div');
   archivedListEl.className = 'tc-list';
   archived.appendChild(archivedListEl);
@@ -5047,8 +5264,25 @@ function renderWritingLabPage(section) {
     archivedListEl.innerHTML = '';
     archivedSummary.textContent = `Archived (${filteredArchived.length})`;
     archived.style.display = filteredArchived.length === 0 ? 'none' : '';
+    // PPOL1: Reset bulk bar and update button states
+    renderBulkBar();
+    deleteSelectedBtn.disabled = true;
+    deleteSelectedBtn.textContent = 'Delete Selected';
+    deleteAllBtn.disabled = filteredArchived.length === 0;
     for (const item of filteredArchived) {
-      archivedListEl.appendChild(buildListItem(item, true));
+      const row = document.createElement('div');
+      row.className = 'tc-archived-row';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'tc-archive-check';
+      cb.dataset.id = item.id;
+      cb.addEventListener('change', () => {
+        const n = archivedListEl.querySelectorAll('.tc-archive-check:checked').length;
+        deleteSelectedBtn.disabled = n === 0;
+        deleteSelectedBtn.textContent = n > 0 ? `Delete Selected (${n})` : 'Delete Selected';
+      });
+      row.append(cb, buildListItem(item, true));
+      archivedListEl.appendChild(row);
     }
   }
 
@@ -5501,8 +5735,9 @@ function renderCharGraph(container, chars, rels, onBack, onNodeClick) {
     line.setAttribute('y1', fp.y);
     line.setAttribute('x2', tp.x);
     line.setAttribute('y2', tp.y);
-    line.setAttribute('stroke', 'var(--border)');
-    line.setAttribute('stroke-width', '1.5');
+    line.setAttribute('stroke', 'var(--accent)');
+    line.setAttribute('stroke-width', '2.5');
+    line.setAttribute('opacity', '0.6');
     svg.appendChild(line);
 
     // Combined label at midpoint — truncate if too long
@@ -6061,6 +6296,7 @@ const NAV_BADGE_KEYS = {
   'Unsorted': 'unsorted',
   'Canon Review': 'canonReview',
   'Open Questions': 'openQuestions',
+  'Conflicts': 'conflicts',
 };
 const navBadgeEls = {};
 
