@@ -4,7 +4,7 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 **Phase completion ritual:** Claude Code finishes → user runs smoke test → user reports pass → commit + push → user says "go" → next phase. No exceptions.
 
-**Polish log:** Add observations to `POLISH_NOTES.md` during every smoke test. Polish phases consume that log.
+**Polish log:** Add observations to `POLISH_NOTES_ONGOING.md` during every smoke test. Polish phases consume that log.
 
 ---
 
@@ -117,20 +117,20 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Left: title, type/status badge, preview line
 - Right: full content, editable, actions
 - Retrofit all existing workspaces (Unsorted, Open Questions, Conflicts, Decisions, Brainstorm, Research, Characters, Episodes, Documents, Source Material, Writing Lab)
-- **Smoke passed.**
+- **Smoke:** Open every workspace, confirm two-column layout, click an entry, detail panel opens
 
 ### PUI2 — Full-screen popout window ✅
 - Global popout available from any entry detail panel
 - Full edit, rename, delete, archive/restore all available within the popout
 - Independent window — rest of app remains usable
 - Opens in Reference Mode by default (see PCBREF for Canon Bible; same principle applies)
-- **Smoke passed.**
+- **Smoke:** Open a popout from three different workspaces, edit and save from within it, confirm changes persist
 
 ### PUI3 — Highlight + extract + route ✅
 - Select any text in a detail panel or popout → extract menu appears
 - Route extracted text to: Unsorted, Brainstorm, Open Questions, Decisions, Conflicts, Research, Canon Review
 - Creates a new entry in the target workspace pre-filled with the selection and a source attribution
-- **Smoke passed.**
+- **Smoke:** Highlight text in a Source Material entry, route to Brainstorm, confirm new entry exists with attribution
 
 ---
 
@@ -140,9 +140,9 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Cmd+Shift+N from anywhere opens a minimal modal
 - Title + body, one-click save → drops to Unsorted
 - Dismissable with Escape
-- **Smoke passed.**
+- **Smoke:** Trigger from three different workspaces, save an entry, confirm it appears in Unsorted
 
-### PKEY — Command palette + keyboard navigation
+### PKEY — Command palette + keyboard navigation ✅
 - Cmd+K opens command palette: jump to any workspace, any recent entry, any action
 - Full keyboard navigation throughout: tab through list items, Enter to open detail, keyboard shortcuts for approve/defer/route/archive in queues
 - **Smoke:** Navigate to three workspaces, open three entries, perform two actions — all without mouse
@@ -153,24 +153,10 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ### PTAG — Tag UI ✅
 - Apply and remove tags on any entry across all workspaces and canon
-- Remove a tag from an entry (unlinks only; tag still exists; no confirmation needed)
-- Tag picker shows seeded tags + user-created tags, grouped by category; inline "Create new tag" when search has no exact match
-- Browse by tag: filter any workspace or Canon Bible by one or more tags (AND semantics)
-- Tags visible as badges on list items and as chips on detail panels (and in popouts)
-- **Smoke passed.**
-
-### PTAG+ — Tag quality: autocomplete, normalization, duplicate prevention ✅
-- Tag input autocompletes against all existing tags (seeded + user-created), case-insensitive
-- Tags normalized: lowercased and trimmed on save
-- Creating a duplicate tag (after normalization) is blocked; input selects existing tag instead
-- Clear all tags from a single entry (bulk remove on that entry only; no global effect)
-- **Smoke passed.**
-
-### PTAGDEL — Tag delete + rename (user-created tags only) ✅
-- Delete a user-created tag: shows usage count before confirmation ("used on N entries across X workspaces"); on confirm, tag unlinked from all entries and deleted; seeded tags have no delete affordance
-- Rename a user-created tag: renames in place across all entries; no unlinking
-- Settings → Manage Tags is collapsed by default; expanding reveals a search box that filters the tag list
-- **Smoke passed.**
+- Tag picker shows seeded tags + user-created tags, grouped by category
+- Browse by tag: filter any workspace or Canon Bible by one or more tags
+- Tags visible as badges on list items and detail panels
+- **Smoke:** Tag an entry in three different workspaces, filter by that tag, confirm correct results
 
 ---
 
@@ -180,52 +166,46 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Search across all workspaces, canon entries, chats, tags
 - Filterable by: workspace, entry type, tag, canon status, lock status
 - Results grouped by source
-- Always-on top bar with Cmd/Ctrl+Shift+F shortcut; tag filter is a searchable combobox
-- **Smoke passed.**
+- **Smoke:** Search a term that exists in three different workspaces, confirm results from each; filter by workspace, confirm narrowing
 
 ---
 
 ## Home + Navigation upgrades
 
-### PHOME — Home upgrade
+### PHOME — Home upgrade ✅
 - Nav badge counts: Unsorted (total active), Canon Review (pending proposals), Open Questions (open tier-1)
 - Recently viewed: last 8 entries opened across any workspace, session-persistent, one-click return
 - **Smoke:** Open 8 entries across different workspaces, confirm recently viewed list; confirm badge counts match reality
-- **Smoke passed.**
 
 ---
 
 ## Passive UI layer
 
-### PPASSIVE — Status bar + linked entries indicator
+### PPASSIVE — Status bar + linked entries indicator ✅
 - Thin persistent status bar at bottom of every detail panel: workspace, entry type, created date, last edited, lock status
 - Linked entries indicator on every detail panel: passive count ("3 attachments / 2 canon links"), expandable on click
 - **Smoke:** Open entries with and without links, confirm counts are correct and expandable
-- **Smoke passed.**
 
 ---
 
 ## Canon Bible UI
 
-### P32 — Canon entries: create + edit + archive + delete ✅
+### P32 — Canon entries: create + edit ✅
 - Entry-type picker (all 18 types from schema)
 - Detail table fields rendered per entry type
-- View mode default; Edit button to enter edit state; autosave preserves draft; deliberate Save to confirm
-- Delete: confirmation required; hard delete
-- Archive: collapsed retired section at bottom of Canon Bible page; restore available
-- **Smoke passed.**
+- **Smoke:** Create one entry of three different types, edit each, changes persist
 
 ### P33 — Canon lock / unlock ✅
 - Lock = currently accepted, edits still allowed but warn user
 - Deliberate mode switch required to edit locked entries
-- **Smoke passed.**
+- **Smoke:** Lock an entry, attempt edit, warning appears, proceed, change saved; unlock and edit without warning
 
-### P34 — Canon supersede + retired section
+### P34 — Canon supersede + retired section ✅
 - Superseding creates new entry, marks prior retired, sets chain pointers
 - Retired entries visible in collapsed section with full prior content
 - **Smoke:** Supersede an entry, find old version in collapsed retired section, confirm chain is navigable
 
-### P35 — Canon Review queue
+### P35 — Canon Review queue ✅
 - Two-column layout: left = proposal list with status badges; right = full proposed content
 - Edit proposed content before approving
 - Actions: Approve / Send Back / Defer / Delete / Reject
@@ -234,29 +214,29 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Full edit and actions available in popout
 - **Smoke:** Submit a proposal, edit it in queue, approve it, confirm it appears in Canon Bible; defer one, confirm it collapses; filter by status
 
-### P35b — Canon Bible filter + browse
+### P35b — Canon Bible filter + browse ✅
 - Filter Canon Bible by: entry type, tag, lock status, character, season
 - Filters combinable
 - **Smoke:** Filter by entry type, confirm results; combine with tag filter, confirm narrowing
 
-### PCBREF — Canon Bible reference mode
+### PCBREF — Canon Bible reference mode ✅
 - Default mode on Canon Bible page: read-only, no edit affordances, clean layout
 - Edit Mode toggle (top right): deliberate switch, reveals all edit affordances
 - Popout has independent mode state
 - **Smoke:** Confirm Canon Bible opens in Reference Mode; toggle Edit Mode, confirm affordances appear; open popout, confirm independent state
 
-### PHIST — Canon entry version history
+### PHIST — Canon entry version history ✅
 - Walk back through supersede chain from any canon entry
 - View prior versions side by side with current
 - **Smoke:** Supersede an entry twice, walk back through all three versions, view two side by side
 
-### PCONFLICT — Conflict detection UI
+### PCONFLICT — Conflict detection UI ✅
 - Surface canon entries that appear to contradict each other
 - Route flagged pairs to Conflicts workspace or Canon Review
 - Runs on demand, not automatically
 - **Smoke:** Create two contradicting entries, run conflict detection, confirm pair is surfaced, route to Conflicts
 
-### PCONFLICT-2 — Auto-route detected conflicts + re-check nudges
+### PCONFLICT-2 — Auto-route detected conflicts + re-check nudges ✅
 - **Auto-route on scan:** "Run conflict detection" in Canon Bible (and "Re-check resolved conflicts" on the Conflicts page) now auto-creates a Conflicts row for every detected collision. Dedup is by signature: a second click never piles up duplicate rows for the same collision.
 - Per-card "Route to Conflicts" button is gone — replaced by a passive label per group: *"Routed → Conflicts #N (new)"* for rows created by this scan, *"Tracked → Conflicts #N"* for ones that were already open.
 - Canon Bible scan status line summarizes: *"N conflicts found · M newly routed · K already tracked · J auto-archived."*
@@ -265,8 +245,9 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Canon Bible: toast after editing / archiving / superseding / deleting a canon entry that is currently referenced by an open Conflicts row, reminding the user to re-run detection so the now-resolved flag clears.
 - New IPCs: `canonConflicts.scanAndRoute()` (scan + dedup auto-route + auto-archive in one call), `canonConflicts.openFlagEntryIds()` (canon ids referenced by any open flag — backs the toast).
 - **Smoke:** Create two contradicting canon entries; click "Run conflict detection" in Canon Bible; confirm a Conflicts row was auto-created and the card shows "Routed → Conflicts #N (new)"; re-run the scan, confirm the same group now shows "Tracked → Conflicts #N" (no duplicate row). Resolve the collision in Canon Bible (edit/archive/supersede); confirm the re-run toast fires. Switch to Conflicts; click "Re-check resolved conflicts"; confirm the row auto-archives.
+- **Smoke passed.**
 
-### PCONFLICT-3 — Canon Bible contradiction scan + conflict lifecycle
+### PCONFLICT-3 — Canon Bible contradiction scan + conflict lifecycle ✅
 - On-demand scan button in Canon Bible checks all canon entries for direct contradictions against each other
 - Results surface in Conflicts workspace with source attribution (which two entries conflict)
 - Re-running the scan: toast notification confirms scan complete + count of new conflicts found (matching PCONFLICT-2 toast pattern)
@@ -274,6 +255,7 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Re-running the continuity scan from Conflicts page archives resolved/stale conflicts and updates the list
 - Model the surface + interaction after PCONFLICT-2: same toast helper, same hint-bar pattern, same scoping (canon → toast, conflicts → scan button + status)
 - **Smoke:** Create two contradicting canon entries; run scan from Canon Bible, confirm toast fires and conflict appears in Conflicts workspace; re-run scan, confirm toast updates with new count; resolve the conflict in Canon Bible; re-run from Conflicts page, confirm it archives
+- **Smoke passed.**
 
 ---
 
@@ -309,20 +291,9 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 ## UI Polish (pre-import)
 
 ### PPOL1 — UI Polish: pre-import
-- Work through all items logged in `POLISH_NOTES.md` up to this point
+- Work through all items logged in `POLISH_NOTES_ONGOING.md` up to this point
 - No new features. Fixes, consistency, rough edges only.
-- **Smoke:** Every item in POLISH_NOTES.md marked resolved
-
-
-
-### PCONFLICT3 — Canon Bible contradiction scan + conflict lifecycle
-- On-demand scan button in Canon Bible checks all canon entries for direct contradictions against each other
-- Results surface in Conflicts workspace with source attribution (which two entries conflict)
-- Re-running the scan: toast notification confirms scan complete + count of new conflicts found + reminder to use the recan button (matching PCONFLICT2 toast pattern + add to the PCONFLICT2 toast notification that confirms scan complete + count of new conflicts found + reminder to use the recan button)
-- Inline reminder visible in Canon Bible after scan if unresolved conflicts exist
-- Re-running the continuity scan from Conflicts page archives resolved/stale conflicts and updates the list
-- **Smoke:** Create two contradicting canon entries; run scan from Canon Bible, confirm toast fires and conflict appears in Conflicts workspace; re-run scan, confirm toast updates; resolve conflict, re-run from Conflicts page, confirm it archives
-
+- **Smoke:** Every item in POLISH_NOTES_ONGOING.md marked resolved
 
 ---
 
@@ -360,9 +331,9 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 ## UI Polish (pre-AI)
 
 ### PPOL2 — UI Polish: pre-AI
-- Work through all items logged in `POLISH_NOTES.md` since PPOL1
+- Work through all items logged in `POLISH_NOTES_ONGOING.md` since PPOL1
 - No new features. Fixes, consistency, rough edges only.
-- **Smoke:** Every item in POLISH_NOTES.md marked resolved
+- **Smoke:** Every item in POLISH_NOTES_ONGOING.md marked resolved
 
 ---
 

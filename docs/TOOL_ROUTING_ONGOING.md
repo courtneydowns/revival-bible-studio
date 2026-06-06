@@ -28,35 +28,35 @@
 |---|---|---|
 | P0–P31 | ✅ Complete | — |
 | PR1–PR6 | ✅ Complete | — |
-| **PUI1 Two-column layout** | **CLI** | Touches every workspace |
-| **PUI2 Full-screen popout** | **CLI** | New window module |
-| **PUI3 Highlight + extract + route** | **CLI** | Cross-module wiring |
-| **PCAP Quick-capture** | **VS Code ext** | Small modal + Unsorted write |
-| **PKEY Command palette + keyboard nav** | **CLI** | Global, touches every workspace |
-| **PTAG Tag UI** | **CLI** | New component + touches all workspaces |
-| **PTAG+ Tag quality** | **VS Code ext** | Additions to existing tag component |
-| **PTAGDEL Tag delete + rename** | **VS Code ext** | Additions to tag management UI |
-| **PSEARCH Global search** | **CLI** | New module, cross-table queries |
-| **PHOME Home upgrade** | **VS Code ext** | Badge counts + recently viewed on existing page |
-| **PPASSIVE Status bar + linked indicator** | **VS Code ext** | Small additions to detail panel component |
-| **P32 Canon entries create/edit** | **CLI** | New UI, entry-type picker, detail tables |
-| **P33 Canon lock/unlock** | **CLI** | Touches canon entry + warning system |
-| **P34 Canon supersede + retired** | **CLI** | Chain logic, multi-file |
-| **P35 Canon Review queue** | **CLI** | Complex UI, multi-action |
-| **P35b Canon Bible filter/browse** | **VS Code ext** | Filter UI on existing Canon Bible page |
-| **PCBREF Canon Bible reference mode** | **VS Code ext** | Mode toggle on existing page |
-| **PHIST Canon entry version history** | **CLI** | Chain traversal + side-by-side view |
-| **PCONFLICT Conflict detection UI** | **CLI** | Cross-entry analysis + routing |
+| **PUI1 | ✅ Complete | — |
+| **PUI2 Full-screen popout** | **CLI** ✅ | New window module |
+| **PUI3 Highlight + extract + route** | **CLI** ✅ | Cross-module wiring |
+| **PCAP Quick-capture** | **VS Code ext** ✅ | Small modal + Unsorted write |
+| **PKEY Command palette + keyboard nav** | **CLI** ✅ | Global, touches every workspace |
+| **PTAG Tag UI** | **CLI** ✅ | New component + touches all workspaces |
+| **PSEARCH Global search** | **CLI** ✅ | New module, cross-table queries |
+| **PHOME Home upgrade** | **VS Code ext** ✅ | Badge counts + recently viewed on existing page |
+| **PPASSIVE Status bar + linked indicator** | **VS Code ext** ✅ | Small additions to detail panel component |
+| **P32 Canon entries create/edit** | **CLI** ✅ | New UI, entry-type picker, detail tables |
+| **P33 Canon lock/unlock** | **CLI** ✅ | Touches canon entry + warning system |
+| **P34 Canon supersede + retired** | **CLI** ✅ | Chain logic, multi-file |
+| **P35 Canon Review queue** | **CLI** ✅ | Complex UI, multi-action |
+| **P35b Canon Bible filter/browse** | **VS Code ext** ✅ | Filter UI on existing Canon Bible page |
+| **PCBREF Canon Bible reference mode** | **VS Code ext** ✅ | Mode toggle on existing page |
+| **PHIST Canon entry version history** | **CLI** ✅ | Chain traversal + side-by-side view |
+| **PCONFLICT Conflict detection UI** | **CLI** ✅ | Cross-entry analysis + routing |
+| **PCONFLICT-2 Auto-route + re-check nudges** | **CLI** ✅ | New IPCs (scanAndRoute, openFlagEntryIds) + multi-file (Canon Bible + Conflicts) |
+| **PCONFLICT-3 Contradiction scan + conflict lifecycle** | **CLI** ✅ | Scan + lifecycle wiring across Canon Bible + Conflicts, reuses PCONFLICT-2 helpers |
 | **P36 Cross-workspace attachments** | **CLI** | Cross-module wiring, join tables |
 | **P37 Characters relational view** | **CLI** | New visual component |
 | **P38 Characters/Episodes → Canon Review** | **CLI** | Cross-module flow |
 | **PWLAB Writing Lab → Canon Review** | **VS Code ext** | Action on existing Writing Lab page |
-| **PPOL1 UI Polish: pre-import** | **VS Code ext / CLI** | Per item in POLISH_NOTES.md |
+| **PPOL1 UI Polish: pre-import** | **VS Code ext / CLI** | Per item in POLISH_NOTES_ONGOING.md |
 | **P20v2 Panic Export v2** | **VS Code ext** | Extend existing export module |
 | **PEXPORT Canon Bible export** | **CLI** | New export module, markdown + PDF |
 | **PImp1 Worldbuilding file import** | **CLI** | New module, file picker, parser |
 | **PImp2 Import review tools** | **CLI** | Bulk actions, keyboard nav in queue |
-| **PPOL2 UI Polish: pre-AI** | **VS Code ext / CLI** | Per item in POLISH_NOTES.md |
+| **PPOL2 UI Polish: pre-AI** | **VS Code ext / CLI** | Per item in POLISH_NOTES_ONGOING.md |
 | **P39 Claude API config** | **CLI** | New module + settings UI |
 | **P40 Chat AI send/receive** | **CLI** | API wiring |
 | **P41 AI → Canon Review pipeline** | **CLI** | Cross-module flow |
@@ -70,11 +70,11 @@
 
 ## Polish phase rules
 
-- Work through `POLISH_NOTES.md` in order
+- Work through `POLISH_NOTES_ONGOING.md` in order
 - One Claude Code session per polish phase
 - No new features — fixes and consistency only
 - Tool choice per item: VS Code ext for single-file fixes, CLI for anything touching multiple files
-- Mark each item resolved in POLISH_NOTES.md as you go
+- Mark each item resolved in POLISH_NOTES_ONGOING.md as you go
 
 ---
 
@@ -103,11 +103,11 @@ Opus burns the Max weekly limit much faster. Don't run brainstorm/chat sessions 
 ## Token-saving habits
 
 1. **One phase = one Claude Code session.** Start a fresh session per phase so context stays small.
-2. **Don't paste BUILD_PLAN.md into Claude Code.** It already has CLAUDE.md. Just say: "Do PUI1 per docs/BUILD_PLAN.md."
+2. **Don't paste BUILD_PLAN_ONGOING.md into Claude Code.** It already has CLAUDE_ONGOING.md. Just say: "Do PUI1 per docs/BUILD_PLAN_ONGOING.md."
 3. **Don't write code in claude.ai that Claude Code will rewrite.** Either claude.ai produces a tight brief for Claude Code, or Claude Code does the work — not both.
 4. **Use the VS Code extension for fixes under ~15 lines.** Faster, no session overhead.
 5. **Review smoke test results in claude.ai (Sonnet)** before next phase — keeps Claude Code sessions short.
-6. **Log polish items during smoke tests.** Don't fix them inline — add to POLISH_NOTES.md and address in PPOL1/PPOL2.
+6. **Log polish items during smoke tests.** Don't fix them inline — add to POLISH_NOTES_ONGOING.md and address in PPOL1/PPOL2.
 
 ---
 
@@ -125,10 +125,10 @@ Opus burns the Max weekly limit much faster. Don't run brainstorm/chat sessions 
 
 ## Setup checklist (one-time) ✅
 
-- [x] `CLAUDE.md` lives at repo root
-- [x] `CLAUDE.md` is also in this claude.ai Project's knowledge files
+- [x] `CLAUDE_ONGOING.md` lives at repo root (as `CLAUDE.md`)
+- [x] `CLAUDE_ONGOING.md` is also in this claude.ai Project's knowledge files
 - [x] `PROJECT_INSTRUCTIONS.md` contents pasted into claude.ai Project's custom instructions
-- [x] `docs/BUILD_PLAN.md` and `docs/TOOL_ROUTING.md` committed
-- [x] `POLISH_NOTES.md` lives at repo root and uploaded to this claude.ai Project
+- [x] `docs/BUILD_PLAN_ONGOING.md` and `docs/TOOL_ROUTING_ONGOING.md` committed
+- [x] `POLISH_NOTES_ONGOING.md` lives at repo root and uploaded to this claude.ai Project
 - [x] Claude Code CLI logged into the right Anthropic account (Max plan)
 - [x] VS Code extension logged in

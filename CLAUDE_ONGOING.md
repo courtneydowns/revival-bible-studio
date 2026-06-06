@@ -23,7 +23,7 @@ Local-first creative/editorial workspace for the **Revival project only**. Not a
 - No commits to `main` and no marking a phase done without that confirmation.
 - Never start the next phase without explicit go-ahead.
 - Avoid large rewrites. Preserve simple workflow over feature complexity.
-- **Polish items noticed during smoke tests go in `POLISH_NOTES.md` at repo root.** Do not fix them inline during a feature phase. They are addressed in PPOL1 and PPOL2.
+- **Polish items noticed during smoke tests go in `POLISH_NOTES_ONGOING.md` at repo root.** Do not fix them inline during a feature phase. They are addressed in PPOL1 and PPOL2.
 
 ---
 
@@ -45,6 +45,8 @@ Local-first creative/editorial workspace for the **Revival project only**. Not a
 - **Status bar:** thin persistent bar at bottom of every detail panel showing workspace, entry type, created date, last edited, lock status.
 - **Linked entries indicator:** passive count on every detail panel ("3 attachments / 2 canon links"), expandable on click.
 - **Collapsed archive/retired sections:** at bottom of the same page. No separate archive page anywhere.
+- **Global quick-capture:** Cmd+Shift+N from anywhere opens a minimal modal — title + body, saves to Unsorted. Dismissable with Escape.
+- **Command palette:** Cmd+K opens palette for jumping to any workspace, recent entry, or action. Full keyboard navigation throughout: tab through list items, Enter to open detail, keyboard shortcuts for approve/defer/route/archive in queues.
 
 ---
 
@@ -129,19 +131,7 @@ Do not invent new top-level workspaces.
 - Retired / superseded canon stays in a collapsed section on the same page.
 - Downstream corrections are tracked in canon_downstream_corrections (child of locked decisions), not as prose.
 - Tags apply to all canon entries via taggable_tags.
-
----
-
-## Tag rules
-
-- **Seeded tags cannot be deleted.** Only user-created tags can be deleted.
-- **Remove-tag-from-entry:** any tag can be removed from any individual entry at any time. The tag still exists; only the link between that entry and that tag is removed. This is not destructive — no confirmation required.
-- **Tag filter semantics:** AND (must have all selected tags). Multi-tag filter shows only entries that carry every selected tag.
-- **Tag normalization:** tags are lowercased and trimmed on save. `Canon`, `canon`, and `canon ` are the same tag.
-- **Duplicate prevention:** creating a tag that already exists (after normalization) is blocked. The input selects the existing tag instead.
-- **Autocomplete:** tag input autocompletes against all existing tags (seeded + user-created), case-insensitive.
-- **Delete a user-created tag (PTAGDEL):** shows usage count before confirmation ("used on N entries across X workspaces"). On confirm, tag is unlinked from all entries everywhere and deleted. Seeded tags have no delete affordance.
-- **Rename a user-created tag (PTAGDEL):** renames the tag in place across all entries. No unlinking occurs.
+- **Conflict detection (PCONFLICT-2 / PCONFLICT-3 — complete):** on-demand scan from Canon Bible checks all canon entries for direct contradictions. Detected collisions auto-route to the Conflicts workspace (dedup by signature — no duplicate rows on re-scan). Scan never runs automatically. Re-running the scan from the Conflicts page auto-archives resolved/stale conflicts. Editing/archiving/superseding/deleting a canon entry referenced by an open Conflicts row fires a toast reminding the user to re-run detection. IPCs: `canonConflicts.scanAndRoute()`, `canonConflicts.openFlagEntryIds()`.
 
 ---
 
