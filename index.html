@@ -827,6 +827,90 @@
         100% { box-shadow: 0 0 0 2px transparent; }
       }
 
+      /* PHIST — inline version-history panel under a canon card's action row.
+         Hidden until the History button is clicked; shows the full supersede
+         chain as a compact table with two radio columns for picking a Left
+         and Right version, then a field-by-field diff below. Rows whose left
+         and right cells differ get the highlight color so changes pop. */
+      .canon-history {
+        margin-top: 8px;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: rgba(176, 140, 74, 0.06);
+        font-size: 13px;
+      }
+      .canon-history-heading {
+        font-weight: 600;
+        margin-bottom: 6px;
+        color: var(--muted);
+        letter-spacing: 0.02em;
+      }
+      .canon-history-list {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 10px;
+      }
+      .canon-history-list th,
+      .canon-history-list td {
+        padding: 4px 6px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        font-size: 12px;
+      }
+      .canon-history-list th {
+        color: var(--muted);
+        font-weight: 500;
+        letter-spacing: 0.02em;
+      }
+      .canon-history-list tr.canon-history-self td { font-weight: 600; }
+      .canon-history-state {
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-size: 11px;
+      }
+      .canon-history-state-current { color: #b08c4a; }
+      .canon-history-state-retired { color: var(--muted); }
+
+      .canon-history-diff-heading {
+        font-weight: 600;
+        margin: 6px 0;
+        color: var(--muted);
+      }
+      .canon-history-diff-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .canon-history-diff-table th,
+      .canon-history-diff-table td {
+        padding: 4px 8px;
+        text-align: left;
+        vertical-align: top;
+        border-bottom: 1px solid var(--border);
+        font-size: 12px;
+      }
+      .canon-history-diff-table th {
+        color: var(--muted);
+        font-weight: 500;
+      }
+      .canon-history-diff-label {
+        white-space: nowrap;
+        color: var(--muted);
+        width: 1%;
+      }
+      .canon-history-diff-val {
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .canon-history-diff-changed {
+        background: rgba(214, 161, 79, 0.10);
+      }
+      .canon-history-diff-changed .canon-history-diff-label {
+        color: #d6a14f;
+        font-weight: 600;
+      }
+      .canon-history-diff-mark { color: #d6a14f; }
+
       /* P32 — canon form fields. Each field has a label above its input;
          the status-row keeps status/certainty/review/provisional inline. */
       .canon-form {

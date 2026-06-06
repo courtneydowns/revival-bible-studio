@@ -3187,6 +3187,53 @@ const canon = {
     return canon.getDetail(newId);
   },
 
+  // PHIST — walk the full supersede chain from any entry id and return every
+  // version oldest → newest, each as a full canon.getDetail() record. P34 only
+  // exposed adjacent links (Replaces / Replaced by); PHIST surfaces the whole
+  // chain so a History UI can render the lineage and pick any two versions to
+  // compare side by side.
+  //
+  // Walk backward via replaces_entry_id, then forward via replaced_by_entry_id,
+  // dedupe through a visited set as belt-and-suspenders against any malformed
+  // pointer cycle. Each version is hydrated through getDetail() so the caller
+  // gets the same shape (detail, legacy_ids, origin_session_label, …) as the
+  // list view — no second fetch needed to render the comparison.
+  versionChain: (id) => {
+    const eid = Number(id);
+    if (!Number.isFinite(eid)) throw new Error('canon id is required');
+    const db = getDb();
+    const ptr = db.prepare(
+      `SELECT id, replaces_entry_id, replaced_by_entry_id
+         FROM canon_entries
+        WHERE id = ?`
+    );
+    const start = ptr.get(eid);
+    if (!start) return [];
+
+    const visited = new Set([start.id]);
+    const ids = [start.id];
+
+    let backId = start.replaces_entry_id;
+    while (backId && !visited.has(backId)) {
+      const row = ptr.get(backId);
+      if (!row) break;
+      visited.add(row.id);
+      ids.unshift(row.id);
+      backId = row.replaces_entry_id;
+    }
+
+    let fwdId = start.replaced_by_entry_id;
+    while (fwdId && !visited.has(fwdId)) {
+      const row = ptr.get(fwdId);
+      if (!row) break;
+      visited.add(row.id);
+      ids.push(row.id);
+      fwdId = row.replaced_by_entry_id;
+    }
+
+    return ids.map((vid) => canon.getDetail(vid)).filter(Boolean);
+  },
+
   // P32 — archive == retire flag. We reuse the existing retired/retired_at
   // columns rather than inventing a parallel archived state, because the read
   // view already collapses retired entries to the bottom of the page (and

@@ -1992,6 +1992,8 @@ function renderCanonBiblePage(section) {
     });
     actions.appendChild(deleteBtn);
 
+    addHistoryAffordance(actions, e);
+
     return actions;
   }
 
@@ -2025,7 +2027,260 @@ function renderCanonBiblePage(section) {
     });
     actions.appendChild(deleteBtn);
 
+    addHistoryAffordance(actions, e);
+
     return actions;
+  }
+
+  // PHIST — append a History button + inline panel to a card's action row.
+  // Only shown when the entry has a chain neighbour in either direction;
+  // entries that were never superseded skip the affordance so unsuperseded
+  // cards stay clean.
+  //
+  // The panel is appended as a sibling of the action row inside the card and
+  // toggled hidden/visible — first open fires canon.versionChain(e.id), then
+  // the same chain is reused for every compare action until the card
+  // re-renders. Two radio columns (Left / Right) pick versions; the diff table
+  // below highlights any row where the two values differ. Field set:
+  // title/body/canon_status/certainty/review_state/provisional/locked, plus
+  // every detail-table column from typeConfig[e.entry_type] so the comparison
+  // includes type-specific data (full_name, episode_code, …).
+  function addHistoryAffordance(actions, e) {
+    if (!e.replaces_entry_id && !e.replaced_by_entry_id) return;
+
+    const panel = document.createElement('div');
+    panel.className = 'canon-history';
+    panel.hidden = true;
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-secondary';
+    btn.textContent = 'History';
+    let loaded = false;
+    btn.addEventListener('click', async () => {
+      if (panel.hidden) {
+        panel.hidden = false;
+        btn.textContent = 'Hide history';
+        if (!loaded) {
+          loaded = true;
+          await loadHistoryInto(panel, e);
+        }
+      } else {
+        panel.hidden = true;
+        btn.textContent = 'History';
+      }
+    });
+    actions.appendChild(btn);
+
+    // Defer attaching the panel to the card until the action row itself is
+    // attached. This keeps the panel directly below the actions row regardless
+    // of where the card chooses to insert the actions block.
+    queueMicrotask(() => {
+      const card = actions.parentNode;
+      if (!card) return;
+      if (actions.nextSibling) {
+        card.insertBefore(panel, actions.nextSibling);
+      } else {
+        card.appendChild(panel);
+      }
+    });
+  }
+
+  function fmtCanonHistoryDate(iso) {
+    if (!iso) return '—';
+    try { return new Date(iso).toLocaleString(); }
+    catch { return iso; }
+  }
+
+  function canonHistoryState(version, isNewest) {
+    if (version.retired) return 'retired';
+    if (isNewest) return 'current';
+    return 'active';
+  }
+
+  async function loadHistoryInto(panel, e) {
+    panel.innerHTML = '';
+    const loading = document.createElement('div');
+    loading.className = 'placeholder';
+    loading.textContent = 'Loading history…';
+    panel.appendChild(loading);
+
+    let chain;
+    try {
+      chain = await window.revival.canon.versionChain(e.id);
+    } catch (err) {
+      panel.innerHTML = '';
+      const msg = document.createElement('div');
+      msg.className = 'placeholder';
+      msg.textContent = `Failed to load history: ${err.message || err}`;
+      panel.appendChild(msg);
+      return;
+    }
+
+    panel.innerHTML = '';
+    if (!chain || chain.length < 2) {
+      const msg = document.createElement('div');
+      msg.className = 'placeholder';
+      msg.textContent = 'No prior versions in chain.';
+      panel.appendChild(msg);
+      return;
+    }
+
+    const heading = document.createElement('div');
+    heading.className = 'canon-history-heading';
+    heading.textContent =
+      `Version history — ${chain.length} versions, oldest → newest`;
+    panel.appendChild(heading);
+
+    // Default selection: previous version vs current. If `e` isn't the newest
+    // version (e.g. user opened History from a retired row), default Right to
+    // `e` and Left to whichever neighbour exists.
+    const selfIdx = chain.findIndex((v) => v.id === e.id);
+    let rightIdx = selfIdx >= 0 ? selfIdx : chain.length - 1;
+    let leftIdx = rightIdx > 0 ? rightIdx - 1 : (rightIdx + 1 < chain.length ? rightIdx + 1 : rightIdx);
+
+    const list = document.createElement('table');
+    list.className = 'canon-history-list';
+    const thead = list.createTHead();
+    const headerRow = thead.insertRow();
+    for (const t of ['L', 'R', 'Version', 'State', 'Date', 'Title']) {
+      const th = document.createElement('th');
+      th.textContent = t;
+      headerRow.appendChild(th);
+    }
+    const tbody = list.createTBody();
+
+    const leftName = `canon-history-left-${e.id}`;
+    const rightName = `canon-history-right-${e.id}`;
+
+    chain.forEach((v, i) => {
+      const row = tbody.insertRow();
+      if (v.id === e.id) row.classList.add('canon-history-self');
+
+      const lc = row.insertCell();
+      const lr = document.createElement('input');
+      lr.type = 'radio'; lr.name = leftName;
+      lr.checked = i === leftIdx;
+      lr.setAttribute('aria-label', `Pick v${i + 1} as Left`);
+      lr.addEventListener('change', () => {
+        if (lr.checked) { leftIdx = i; renderDiff(); }
+      });
+      lc.appendChild(lr);
+
+      const rc = row.insertCell();
+      const rr = document.createElement('input');
+      rr.type = 'radio'; rr.name = rightName;
+      rr.checked = i === rightIdx;
+      rr.setAttribute('aria-label', `Pick v${i + 1} as Right`);
+      rr.addEventListener('change', () => {
+        if (rr.checked) { rightIdx = i; renderDiff(); }
+      });
+      rc.appendChild(rr);
+
+      row.insertCell().textContent = `v${i + 1}`;
+      const stateCell = row.insertCell();
+      const state = canonHistoryState(v, i === chain.length - 1);
+      stateCell.textContent = state;
+      stateCell.className = `canon-history-state canon-history-state-${state}`;
+      row.insertCell().textContent =
+        fmtCanonHistoryDate(v.retired_at || v.updated_at || v.created_at);
+      row.insertCell().textContent = v.title;
+    });
+    panel.appendChild(list);
+
+    const diffHost = document.createElement('div');
+    diffHost.className = 'canon-history-diff';
+    panel.appendChild(diffHost);
+
+    function diffRows(entryType) {
+      const rows = [
+        { label: 'Title',         get: (v) => v.title },
+        { label: 'Body',          get: (v) => v.body },
+        { label: 'Status',        get: (v) => v.canon_status },
+        { label: 'Certainty',     get: (v) => v.certainty },
+        { label: 'Review state',  get: (v) => v.review_state },
+        { label: 'Provisional',   get: (v) => v.provisional ? 'yes' : 'no' },
+        { label: 'Locked',        get: (v) =>
+            v.locked ? (v.locked_label ? `yes (${v.locked_label})` : 'yes') : 'no' },
+      ];
+      const cfg = typeConfig[entryType];
+      if (cfg && Array.isArray(cfg.fields)) {
+        for (const f of cfg.fields) {
+          rows.push({
+            label: f.label || f.col,
+            get: (v) => (v.detail && v.detail[f.col] != null
+              ? String(v.detail[f.col]) : ''),
+          });
+        }
+      }
+      return rows;
+    }
+
+    function fmtCell(val) {
+      if (val == null) return '—';
+      const s = String(val);
+      return s === '' ? '—' : s;
+    }
+
+    function renderDiff() {
+      diffHost.innerHTML = '';
+      if (leftIdx === rightIdx) {
+        const msg = document.createElement('div');
+        msg.className = 'placeholder';
+        msg.textContent = 'Select two different versions to compare.';
+        diffHost.appendChild(msg);
+        return;
+      }
+      const left = chain[leftIdx];
+      const right = chain[rightIdx];
+
+      const sub = document.createElement('div');
+      sub.className = 'canon-history-diff-heading';
+      sub.textContent = `Compare v${leftIdx + 1} ↔ v${rightIdx + 1}`;
+      diffHost.appendChild(sub);
+
+      const table = document.createElement('table');
+      table.className = 'canon-history-diff-table';
+      const dthead = table.createTHead();
+      const dh = dthead.insertRow();
+      for (const t of ['Field', `v${leftIdx + 1}`, `v${rightIdx + 1}`]) {
+        const th = document.createElement('th');
+        th.textContent = t;
+        dh.appendChild(th);
+      }
+      const dbody = table.createTBody();
+
+      // Use the entry_type of the right (newer-side) version; supersede keeps
+      // entry_type stable across the chain so either is fine, but defending
+      // against a hypothetical mismatch by preferring the side the user is
+      // most likely thinking of as "now".
+      const rows = diffRows(right.entry_type);
+      for (const r of rows) {
+        const lv = r.get(left);
+        const rv = r.get(right);
+        const changed = (lv == null ? '' : String(lv)) !== (rv == null ? '' : String(rv));
+        const tr = dbody.insertRow();
+        if (changed) tr.classList.add('canon-history-diff-changed');
+        const labelCell = tr.insertCell();
+        labelCell.className = 'canon-history-diff-label';
+        labelCell.textContent = r.label;
+        if (changed) {
+          const mark = document.createElement('span');
+          mark.className = 'canon-history-diff-mark';
+          mark.textContent = ' ⚠';
+          labelCell.appendChild(mark);
+        }
+        const lCell = tr.insertCell();
+        lCell.className = 'canon-history-diff-val';
+        lCell.textContent = fmtCell(lv);
+        const rCell = tr.insertCell();
+        rCell.className = 'canon-history-diff-val';
+        rCell.textContent = fmtCell(rv);
+      }
+      diffHost.appendChild(table);
+    }
+
+    renderDiff();
   }
 
   // P33 — locked entries are editable but require a deliberate confirm before

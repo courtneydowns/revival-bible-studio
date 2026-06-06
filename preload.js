@@ -144,6 +144,10 @@ contextBridge.exposeInMainWorld('revival', {
     // the same shape as canon.update() — overrides only.
     supersede: (id, payload) =>
       ipcRenderer.invoke('canon:supersede', id, payload),
+    // PHIST — return the full supersede chain (oldest → newest) for any entry
+    // in it. Each item is a full getDetail() record so the renderer can diff
+    // versions field by field without a second round trip.
+    versionChain: (id) => ipcRenderer.invoke('canon:versionChain', id),
   },
   // PUI3 + P35: extract-and-route stages snippets; the queue surface reads/
   // edits the JSON payload and resolves each proposal via approve/sendBack/

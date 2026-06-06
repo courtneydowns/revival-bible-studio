@@ -216,6 +216,11 @@ function registerIpc() {
   ipcMain.handle('canon:supersede', (_event, id, payload) =>
     db.canon.supersede(id, payload)
   );
+  // PHIST — full supersede chain (oldest → newest) for any entry in the chain.
+  // Each item is a full getDetail() record so the renderer can diff them.
+  ipcMain.handle('canon:versionChain', (_event, id) =>
+    db.canon.versionChain(id)
+  );
 
   // PUI3: Canon Review's only write path for now — accept an extracted
   // snippet and stage it as a pending proposal. The full review UI lands in
