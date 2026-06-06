@@ -358,6 +358,7 @@
       #nav #nav-toggle:hover { color: var(--text); border-color: var(--accent); }
 
       #nav button {
+        position: relative;
         display: flex;
         align-items: center;
         gap: 12px;
@@ -403,6 +404,35 @@
         justify-content: center;
         gap: 0;
         padding: 9px 0;
+      }
+
+      /* PHOME: count badge on Unsorted / Canon Review / Open Questions nav
+         items. Sits at the row's right edge when expanded; pins to the top-right
+         corner of the icon when the rail is collapsed. */
+      .nav-badge {
+        margin-left: auto;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        box-sizing: border-box;
+        border-radius: 9px;
+        background: var(--accent);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 18px;
+        text-align: center;
+      }
+      #nav.collapsed .nav-badge {
+        position: absolute;
+        top: 3px;
+        right: 7px;
+        margin: 0;
+        min-width: 15px;
+        height: 15px;
+        padding: 0 3px;
+        line-height: 15px;
+        font-size: 9px;
       }
 
       /* Theme toggle (P4): a small sun/moon icon sitting just to the right of
@@ -1052,6 +1082,41 @@
         white-space: nowrap;
       }
       .recent-meta { font-size: 11px; color: var(--muted); }
+
+      /* PHOME: recently-viewed strip — what the user opened this session, with
+         one-click return. Distinct from .home-recent (DB last-edit feed). */
+      .home-recent-viewed {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 8px;
+      }
+      .rv-card {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        text-align: left;
+        font: inherit;
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--accent);
+        border-radius: 6px;
+        padding: 7px 10px;
+        cursor: pointer;
+      }
+      .rv-card:hover { border-color: var(--accent); background: var(--hover); }
+      .rv-title {
+        font-size: 13px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .rv-ws {
+        font-size: 10px;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
 
       /* --- Global Chat drawer (P14) ----------------------------------- */
       /* Fixed toggle in the top-right corner — a chat bubble icon that mirrors

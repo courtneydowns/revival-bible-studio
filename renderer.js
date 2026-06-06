@@ -57,6 +57,38 @@ function renderWorkspacePage(name) {
 // signal's workspace matches the one currently mounted.
 let currentWorkspaceName = null;
 let currentWorkspaceRefresh = null;
+
+// --- PHOME recently-viewed + one-click return -------------------------------
+// Session-persistent (sessionStorage, cleared on app restart) list of the last
+// entries the user actually opened, newest first, deduped by workspace+id and
+// capped at RECENT_VIEWED_CAP. Home renders it; clicking an item routes to its
+// workspace AND pre-selects the entry. pendingEntrySelection carries that
+// pre-selection across route() until the target workspace's loadList applies it.
+const RECENT_VIEWED_KEY = 'revival.recentlyViewed';
+const RECENT_VIEWED_CAP = 8;
+let pendingEntrySelection = null;
+
+function getRecentlyViewed() {
+  try {
+    const arr = JSON.parse(sessionStorage.getItem(RECENT_VIEWED_KEY));
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+function recordRecentlyViewed(workspace, id, title) {
+  if (!workspace || id == null) return;
+  const rest = getRecentlyViewed().filter(
+    (e) => !(e.workspace === workspace && e.id === id)
+  );
+  rest.unshift({ workspace, id, title: title || '(untitled)' });
+  sessionStorage.setItem(
+    RECENT_VIEWED_KEY,
+    JSON.stringify(rest.slice(0, RECENT_VIEWED_CAP))
+  );
+}
+
 function setActiveWorkspaceRefresh(name, refresh) {
   currentWorkspaceName = name || null;
   currentWorkspaceRefresh = typeof refresh === 'function' ? refresh : null;
@@ -449,6 +481,9 @@ function makeEntryWorkspace(config) {
     rightCol.innerHTML = '';
     const archivedFlag = isArchived(item);
 
+    // PHOME: opening an entry records it in the session recently-viewed list.
+    if (workspaceName) recordRecentlyViewed(workspaceName, item.id, item.title);
+
     const h = document.createElement('h2');
     h.className = 'tc-detail-header';
     h.textContent = item.title;
@@ -749,8 +784,18 @@ function makeEntryWorkspace(config) {
     if (selectedId !== null && selectedId !== 'new' && !findItem(selectedId)) {
       selectedId = null;
     }
+    // PHOME: one-click return — a recently-viewed click routed here with a
+    // pending entry id. Select it if it still exists, then consume the request.
+    if (pendingEntrySelection && pendingEntrySelection.workspace === workspaceName) {
+      const target = pendingEntrySelection.id;
+      pendingEntrySelection = null;
+      if (findItem(target)) selectedId = target;
+    }
     renderList();
     renderDetail();
+
+    // PHOME: keep the nav badges in sync with create/archive/delete/restore.
+    refreshNavBadges();
 
     // Let a workspace react to its own changes elsewhere in the app. Source
     // Material uses this to refresh the Chat drawer's always-visible active
@@ -1364,6 +1409,46 @@ function renderHomePage(section) {
       suggestionsWrap.appendChild(cards);
     }
     renderSuggestions();
+
+    // --- Recently viewed (PHOME) ---
+    // Session list of entries the user actually opened (distinct from "Recent
+    // activity" below, which is DB-driven by last edit). One click returns to
+    // the exact entry, pre-selected in its workspace.
+    const viewed = getRecentlyViewed();
+    const rvLabel = document.createElement('div');
+    rvLabel.className = 'home-section-label';
+    rvLabel.textContent = 'Recently viewed';
+    section.appendChild(rvLabel);
+
+    if (viewed.length === 0) {
+      const hint = document.createElement('p');
+      hint.className = 'placeholder';
+      hint.textContent =
+        'Entries you open will appear here for one-click return (cleared when the app restarts).';
+      section.appendChild(hint);
+    } else {
+      const rvWrap = document.createElement('div');
+      rvWrap.className = 'home-recent-viewed';
+      for (const it of viewed) {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'rv-card';
+        card.title = `Return to ${it.title} in ${it.workspace}`;
+        card.addEventListener('click', () => route(it.workspace, it.id));
+
+        const rvTitle = document.createElement('div');
+        rvTitle.className = 'rv-title';
+        rvTitle.textContent = it.title;
+
+        const rvWs = document.createElement('div');
+        rvWs.className = 'rv-ws';
+        rvWs.textContent = it.workspace;
+
+        card.append(rvTitle, rvWs);
+        rvWrap.appendChild(card);
+      }
+      section.appendChild(rvWrap);
+    }
 
     // --- Counts per workspace ---
     const countsLabel = document.createElement('div');
@@ -2521,7 +2606,11 @@ themeToggle.addEventListener('click', () => {
 });
 applyTheme(loadTheme());
 
-function route(name) {
+function route(name, entryId) {
+  // PHOME: an optional entryId pre-selects an entry once the target workspace
+  // mounts (one-click return from Home's recently-viewed). A plain navigation
+  // clears any stale request so it can't leak into the wrong page.
+  pendingEntrySelection = entryId != null ? { workspace: name, id: entryId } : null;
   for (const key in buttons) {
     buttons[key].classList.toggle('active', key === name);
   }
@@ -2531,6 +2620,7 @@ function route(name) {
   clearActiveWorkspaceRefresh();
   content.innerHTML = '';
   content.appendChild(renderWorkspacePage(name));
+  refreshNavBadges();
 }
 
 // PUI2: listen for popout commits in other windows and refresh the active
@@ -2564,6 +2654,14 @@ const NAV_ICONS = {
   'Settings': '⚙️',
 };
 
+// PHOME: which nav items carry a count badge, mapped to the navBadges key.
+const NAV_BADGE_KEYS = {
+  'Unsorted': 'unsorted',
+  'Canon Review': 'canonReview',
+  'Open Questions': 'openQuestions',
+};
+const navBadgeEls = {};
+
 for (const name of WORKSPACES) {
   const btn = document.createElement('button');
   // title doubles as the collapsed-rail tooltip; harmless when expanded.
@@ -2576,10 +2674,40 @@ for (const name of WORKSPACES) {
   label.className = 'nav-label';
   label.textContent = name;
   btn.append(icon, label);
+  // PHOME: count badge for the three queue-style workspaces. Hidden until the
+  // count is > 0 (refreshNavBadges manages visibility).
+  if (NAV_BADGE_KEYS[name]) {
+    const badge = document.createElement('span');
+    badge.className = 'nav-badge';
+    badge.style.display = 'none';
+    btn.appendChild(badge);
+    navBadgeEls[name] = badge;
+  }
   btn.addEventListener('click', () => route(name));
   buttons[name] = btn;
   nav.appendChild(btn);
 }
+
+// PHOME: pull the three counts and update the badges. Hoisted so loadList and
+// route() (defined earlier) can call it. Silent on failure — a stale badge is
+// better than a thrown overview.
+async function refreshNavBadges() {
+  let counts;
+  try {
+    counts = await window.revival.dashboard.navBadges();
+  } catch {
+    return;
+  }
+  for (const [ws, key] of Object.entries(NAV_BADGE_KEYS)) {
+    const el = navBadgeEls[ws];
+    if (!el) continue;
+    const n = counts[key] || 0;
+    el.textContent = n > 99 ? '99+' : String(n);
+    el.style.display = n > 0 ? '' : 'none';
+    el.title = `${n} ${n === 1 ? 'item' : 'items'}`;
+  }
+}
+refreshNavBadges();
 
 // --- Collapsible nav --------------------------------------------------------
 // Collapsed = icon-only rail; expanded = full labels. The choice persists

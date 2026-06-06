@@ -191,6 +191,7 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Nav badge counts: Unsorted (total active), Canon Review (pending proposals), Open Questions (open tier-1)
 - Recently viewed: last 8 entries opened across any workspace, session-persistent, one-click return
 - **Smoke:** Open 8 entries across different workspaces, confirm recently viewed list; confirm badge counts match reality
+- **Smoke passed.**
 
 ---
 

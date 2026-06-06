@@ -177,6 +177,10 @@ function registerIpc() {
     db.dashboard.summary(limit)
   );
 
+  // PHOME: nav badge counts (Unsorted active / Canon Review pending / Open
+  // Questions tier-1). Read-only.
+  ipcMain.handle('dashboard:navBadges', () => db.dashboard.navBadges());
+
   // Canon Bible (P31): read-only list + a one-shot dev seed used solely by the
   // P31 smoke test. devSeed is idempotent and visible in the UI — it does NOT
   // bypass Canon Review for real entries; it just primes an empty DB so the

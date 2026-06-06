@@ -1722,6 +1722,25 @@ const dashboard = {
     counts: dashboard.counts(),
     recent: dashboard.recent(limit),
   }),
+  // PHOME: the three nav badge counts. Unsorted = total active items; Canon
+  // Review = proposals still awaiting a decision (pending); Open Questions =
+  // active tier-1 questions (the highest-importance tier). Read-only.
+  navBadges: () => {
+    const db = getDb();
+    return {
+      unsorted: db
+        .prepare(`SELECT COUNT(*) AS n FROM unsorted_items WHERE archived_at IS NULL`)
+        .get().n,
+      canonReview: db
+        .prepare(`SELECT COUNT(*) AS n FROM canon_proposals WHERE status = 'pending'`)
+        .get().n,
+      openQuestions: db
+        .prepare(
+          `SELECT COUNT(*) AS n FROM open_questions WHERE archived_at IS NULL AND tier = 1`
+        )
+        .get().n,
+    };
+  },
 };
 
 // --- Canon Bible (P31, read-only) ------------------------------------------

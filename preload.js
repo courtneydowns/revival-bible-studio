@@ -119,6 +119,7 @@ contextBridge.exposeInMainWorld('revival', {
   },
   dashboard: {
     summary: (limit) => ipcRenderer.invoke('dashboard:summary', limit),
+    navBadges: () => ipcRenderer.invoke('dashboard:navBadges'),
   },
   canon: {
     list: () => ipcRenderer.invoke('canon:list'),
