@@ -122,6 +122,23 @@ function registerIpc() {
   ipcMain.handle('characters:archive', (_event, id) => db.characters.archive(id));
   ipcMain.handle('characters:restore', (_event, id) => db.characters.restore(id));
 
+  // P37 — character relationship edges (workspace-level, not canon)
+  ipcMain.handle('characterRelationships:listAll', () =>
+    db.characterRelationships.listAll()
+  );
+  ipcMain.handle('characterRelationships:listForChar', (_event, charId) =>
+    db.characterRelationships.listForChar(charId)
+  );
+  ipcMain.handle('characterRelationships:create', (_event, fromId, toId, relType, note) =>
+    db.characterRelationships.create(fromId, toId, relType, note)
+  );
+  ipcMain.handle('characterRelationships:update', (_event, id, relType, note) =>
+    db.characterRelationships.update(id, relType, note)
+  );
+  ipcMain.handle('characterRelationships:delete', (_event, id) =>
+    db.characterRelationships.delete(id)
+  );
+
   ipcMain.handle('episodes:list', () => db.episodes.list());
   ipcMain.handle('episodes:listArchived', () => db.episodes.listArchived());
   ipcMain.handle('episodes:create', (_event, entry) => db.episodes.create(entry));

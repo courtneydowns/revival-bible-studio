@@ -1067,6 +1067,10 @@ function makeEntryWorkspace(config) {
     } else {
       mountLinkedIndicator(rightCol, entityKind, item.id);
     }
+
+    // P37 — optional workspace-specific detail-panel extension (e.g. relationships section)
+    if (config.detailExtra) config.detailExtra(rightCol, item, archivedFlag);
+
     rightCol.appendChild(buildStatusBar(workspaceName, item, archivedFlag));
   }
 
@@ -1254,6 +1258,21 @@ function makeEntryWorkspace(config) {
     // sources, so deleting a source (cascade-removes the attachment) or
     // archiving one (flags it) updates the chips live instead of going stale.
     if (config.onChange) config.onChange();
+  }
+
+  // P37 — optional workspace-specific left-column setup (e.g. relational view toggle).
+  // Called after all DOM and handlers are wired so the hook can safely reference
+  // addBtn, list, archived, and the internal state accessors.
+  if (config.leftColExtra) {
+    config.leftColExtra(leftCol, rightCol, {
+      addBtn,
+      list,
+      archived,
+      getSelectedId: () => selectedId,
+      setSelectedId: (id) => { selectedId = id; renderList(); renderDetail(); },
+      getActiveItems: () => activeItems,
+      reloadList: loadList,
+    });
   }
 
   // PUI2: register this workspace as the live refresh target so popout
@@ -5351,6 +5370,427 @@ function renderWritingLabPage(section) {
   loadList();
 }
 
+// --- P37: Character relational view helpers --------------------------------
+
+// Renders an SVG graph of all active characters and their relationships.
+// Nodes are placed on a circle; edges show relation_type labels.
+// onNodeClick(charId) is called when a node is clicked.
+// onBack: called when the "← Back to List" button is clicked.
+// onNodeClick: called with charId when a node is clicked.
+function renderCharGraph(container, chars, rels, onBack, onNodeClick) {
+  container.innerHTML = '';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'char-graph-container';
+
+  // Header row: back button + title
+  const header = document.createElement('div');
+  header.className = 'char-graph-header';
+
+  const backBtn = document.createElement('button');
+  backBtn.type = 'button';
+  backBtn.className = 'btn-secondary char-graph-back';
+  backBtn.textContent = '← Back to List';
+  backBtn.addEventListener('click', onBack);
+
+  const title = document.createElement('div');
+  title.className = 'char-graph-title';
+  title.textContent = 'Character Relational View';
+
+  header.append(backBtn, title);
+  wrap.appendChild(header);
+
+  if (chars.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'char-graph-empty';
+    empty.textContent = 'No characters yet. Go back and add characters first.';
+    wrap.appendChild(empty);
+    container.appendChild(wrap);
+    return;
+  }
+
+  // Use a larger viewBox and bigger nodes now that the graph gets full-width
+  const W = 800, H = 520;
+  const cx = W / 2, cy = H / 2;
+  const padding = 80, nodeR = 36;
+  const maxR = Math.min(W / 2 - padding - nodeR, H / 2 - padding - nodeR - 16);
+  const r = Math.max(100, Math.min(280, maxR));
+
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('class', 'char-graph-svg');
+
+  // Position nodes in a circle (single node = center)
+  const positions = chars.map((c, i) => {
+    if (chars.length === 1) return { x: cx, y: cy };
+    const angle = (2 * Math.PI / chars.length) * i - Math.PI / 2;
+    return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+  });
+  const posMap = new Map(chars.map((c, i) => [c.id, i]));
+
+  // Group edges by pair (treat direction as undirected for display) so that
+  // multiple types between the same two characters show on one line as
+  // "mentor / rival" rather than drawing duplicate overlapping edges.
+  const edgeMap = new Map();
+  for (const rel of rels) {
+    const a = Math.min(rel.from_char_id, rel.to_char_id);
+    const b = Math.max(rel.from_char_id, rel.to_char_id);
+    const key = `${a}-${b}`;
+    if (!edgeMap.has(key)) edgeMap.set(key, { fromId: a, toId: b, types: [] });
+    edgeMap.get(key).types.push(rel.relation_type);
+  }
+
+  // Draw edges behind nodes
+  for (const edge of edgeMap.values()) {
+    const fi = posMap.get(edge.fromId);
+    const ti = posMap.get(edge.toId);
+    if (fi == null || ti == null) continue;
+    const fp = positions[fi], tp = positions[ti];
+
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('x1', fp.x);
+    line.setAttribute('y1', fp.y);
+    line.setAttribute('x2', tp.x);
+    line.setAttribute('y2', tp.y);
+    line.setAttribute('stroke', 'var(--border)');
+    line.setAttribute('stroke-width', '1.5');
+    svg.appendChild(line);
+
+    // Combined label at midpoint — truncate if too long
+    const mx = (fp.x + tp.x) / 2, my = (fp.y + tp.y) / 2;
+    const combined = edge.types.join(' / ');
+    const labelText = combined.length > 20 ? combined.slice(0, 19) + '…' : combined;
+    const labelW = labelText.length * 6 + 10;
+    const labelH = 14;
+
+    const textBg = document.createElementNS(ns, 'rect');
+    textBg.setAttribute('x', mx - labelW / 2);
+    textBg.setAttribute('y', my - labelH / 2 - 1);
+    textBg.setAttribute('width', labelW);
+    textBg.setAttribute('height', labelH);
+    textBg.setAttribute('rx', '3');
+    textBg.setAttribute('fill', 'var(--panel)');
+    textBg.setAttribute('stroke', 'var(--border)');
+    textBg.setAttribute('stroke-width', '0.5');
+    svg.appendChild(textBg);
+
+    const edgeLabel = document.createElementNS(ns, 'text');
+    edgeLabel.setAttribute('x', mx);
+    edgeLabel.setAttribute('y', my + 4);
+    edgeLabel.setAttribute('text-anchor', 'middle');
+    edgeLabel.setAttribute('font-size', '12');
+    edgeLabel.setAttribute('fill', 'var(--muted)');
+    edgeLabel.textContent = labelText;
+    svg.appendChild(edgeLabel);
+  }
+
+  // Draw nodes on top of edges
+  for (let i = 0; i < chars.length; i++) {
+    const c = chars[i], p = positions[i];
+    const g = document.createElementNS(ns, 'g');
+    g.style.cursor = 'pointer';
+
+    const circle = document.createElementNS(ns, 'circle');
+    circle.setAttribute('cx', p.x);
+    circle.setAttribute('cy', p.y);
+    circle.setAttribute('r', nodeR);
+    circle.setAttribute('fill', '#3a2e4a');
+    circle.setAttribute('stroke', '#9b7fd6');
+    circle.setAttribute('stroke-width', '2.5');
+
+    const initials = c.title.slice(0, 2).toUpperCase();
+    const inLabel = document.createElementNS(ns, 'text');
+    inLabel.setAttribute('x', p.x);
+    inLabel.setAttribute('y', p.y);
+    inLabel.setAttribute('text-anchor', 'middle');
+    inLabel.setAttribute('dominant-baseline', 'central');
+    inLabel.setAttribute('font-size', '16');
+    inLabel.setAttribute('font-weight', '700');
+    inLabel.setAttribute('fill', '#c5a8f0');
+    inLabel.setAttribute('pointer-events', 'none');
+    inLabel.textContent = initials;
+
+    const nameLabel = document.createElementNS(ns, 'text');
+    nameLabel.setAttribute('x', p.x);
+    nameLabel.setAttribute('y', p.y + nodeR + 16);
+    nameLabel.setAttribute('text-anchor', 'middle');
+    nameLabel.setAttribute('font-size', '13');
+    nameLabel.setAttribute('fill', 'var(--text)');
+    nameLabel.setAttribute('pointer-events', 'none');
+    nameLabel.textContent = c.title.length > 16 ? c.title.slice(0, 15) + '…' : c.title;
+
+    g.addEventListener('mouseenter', () => {
+      circle.setAttribute('fill', '#4e3d6a');
+      circle.setAttribute('stroke', '#c98b5e');
+    });
+    g.addEventListener('mouseleave', () => {
+      circle.setAttribute('fill', '#3a2e4a');
+      circle.setAttribute('stroke', '#9b7fd6');
+    });
+    g.addEventListener('click', () => onNodeClick(c.id));
+
+    g.append(circle, inLabel, nameLabel);
+    svg.appendChild(g);
+  }
+
+  wrap.appendChild(svg);
+
+  const hint = document.createElement('div');
+  hint.className = 'char-graph-hint';
+  hint.textContent = edgeMap.size === 0
+    ? 'No relationships defined yet. Select a character and add one in the detail panel.'
+    : 'Click a character node to view their detail and manage relationships. Multiple types between the same pair are combined on one edge.';
+  wrap.appendChild(hint);
+
+  container.appendChild(wrap);
+}
+
+// Sets up the Relational View toggle in the Characters left column.
+// Hides the ENTIRE left column so the graph gets the full workspace width.
+// The back button lives inside the graph view; clicking a node exits too.
+function setupCharRelationalView(leftCol, rightCol, ctx) {
+  const { list, setSelectedId, reloadList } = ctx;
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'btn-secondary char-relview-toggle';
+  toggle.textContent = 'Relational View';
+  leftCol.insertBefore(toggle, list);
+
+  let relViewMode = false;
+
+  function exitRelView(selectId) {
+    relViewMode = false;
+    leftCol.style.display = '';
+    if (selectId != null) {
+      setSelectedId(selectId);
+    } else {
+      reloadList();
+    }
+  }
+
+  async function enterRelView() {
+    relViewMode = true;
+    leftCol.style.display = 'none';
+    try {
+      const [chars, rels] = await Promise.all([
+        window.revival.characters.list(),
+        window.revival.characterRelationships.listAll(),
+      ]);
+      renderCharGraph(
+        rightCol, chars, rels,
+        () => exitRelView(null),
+        (charId) => exitRelView(charId)
+      );
+    } catch (err) {
+      rightCol.innerHTML = '';
+      const errMsg = document.createElement('div');
+      errMsg.className = 'char-graph-empty';
+      errMsg.textContent = `Could not load graph: ${err.message || err}`;
+      rightCol.appendChild(errMsg);
+    }
+  }
+
+  toggle.addEventListener('click', () => {
+    if (relViewMode) exitRelView(null);
+    else enterRelView();
+  });
+}
+
+// Mounts the "Relationships" section in a character's detail panel.
+// Shows existing relationships and an "Add Relationship" form.
+async function mountCharRelationships(container, charId) {
+  const section = document.createElement('div');
+  section.className = 'char-rel-section';
+
+  const heading = document.createElement('div');
+  heading.className = 'char-rel-heading';
+  heading.textContent = 'Relationships';
+  section.appendChild(heading);
+
+  const listEl = document.createElement('div');
+  section.appendChild(listEl);
+
+  const addRelBtn = document.createElement('button');
+  addRelBtn.type = 'button';
+  addRelBtn.className = 'btn-secondary char-rel-add-btn';
+  addRelBtn.textContent = '+ Add Relationship';
+  section.appendChild(addRelBtn);
+
+  container.appendChild(section);
+
+  let rels = [];
+  let allChars = [];
+
+  async function loadData() {
+    [rels, allChars] = await Promise.all([
+      window.revival.characterRelationships.listForChar(charId),
+      window.revival.characters.list(),
+    ]);
+    renderRelList();
+  }
+
+  function renderRelList() {
+    listEl.innerHTML = '';
+    if (rels.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'char-rel-empty';
+      empty.textContent = 'No relationships defined yet.';
+      listEl.appendChild(empty);
+      return;
+    }
+    for (const rel of rels) {
+      const isFrom = rel.from_char_id === charId;
+      const otherName = isFrom ? rel.to_name : rel.from_name;
+
+      const row = document.createElement('div');
+      row.className = 'char-rel-row';
+
+      const typeTag = document.createElement('span');
+      typeTag.className = 'char-rel-type';
+      typeTag.textContent = rel.relation_type;
+
+      const otherEl = document.createElement('span');
+      otherEl.className = 'char-rel-other';
+      otherEl.textContent = otherName;
+
+      row.append(typeTag, otherEl);
+
+      if (rel.note) {
+        const noteEl = document.createElement('span');
+        noteEl.className = 'char-rel-note';
+        noteEl.textContent = rel.note;
+        row.appendChild(noteEl);
+      }
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'char-rel-delete';
+      delBtn.textContent = 'Remove';
+      delBtn.addEventListener('click', async () => {
+        delBtn.disabled = true;
+        try {
+          await window.revival.characterRelationships.delete(rel.id);
+          await loadData();
+        } catch {
+          delBtn.disabled = false;
+        }
+      });
+      row.appendChild(delBtn);
+      listEl.appendChild(row);
+    }
+  }
+
+  let formOpen = false;
+  let formEl = null;
+
+  addRelBtn.addEventListener('click', () => {
+    if (formOpen) {
+      formOpen = false;
+      if (formEl) { formEl.remove(); formEl = null; }
+      addRelBtn.textContent = '+ Add Relationship';
+      return;
+    }
+    formOpen = true;
+    addRelBtn.textContent = 'Cancel';
+
+    formEl = document.createElement('div');
+    formEl.className = 'char-rel-form';
+
+    const otherChars = allChars.filter(c => c.id !== charId);
+
+    const charSelect = document.createElement('select');
+    const defOpt = document.createElement('option');
+    defOpt.value = '';
+    defOpt.textContent = '— Select character —';
+    charSelect.appendChild(defOpt);
+    for (const c of otherChars) {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.title;
+      charSelect.appendChild(opt);
+    }
+    if (otherChars.length === 0) {
+      const noOpt = document.createElement('option');
+      noOpt.disabled = true;
+      noOpt.textContent = 'No other characters yet';
+      charSelect.appendChild(noOpt);
+    }
+
+    // Datalist of common types — user can also free-type anything else
+    const listId = `char-rel-types-${charId}`;
+    const dl = document.createElement('datalist');
+    dl.id = listId;
+    for (const t of [
+      'ally', 'rival', 'mentor', 'mentee', 'friend', 'enemy',
+      'family', 'parent', 'sibling', 'spouse', 'cousin',
+      'colleague', 'foil', 'nemesis', 'accomplice', 'love interest', 'ex',
+    ]) {
+      const o = document.createElement('option');
+      o.value = t;
+      dl.appendChild(o);
+    }
+    formEl.appendChild(dl);
+
+    const typeInput = document.createElement('input');
+    typeInput.type = 'text';
+    typeInput.setAttribute('list', listId);
+    typeInput.placeholder = 'Relationship type — pick or type your own';
+    typeInput.maxLength = 100;
+
+    const noteInput = document.createElement('input');
+    noteInput.type = 'text';
+    noteInput.placeholder = 'Note (optional)';
+    noteInput.maxLength = 200;
+
+    const actionsRow = document.createElement('div');
+    actionsRow.className = 'char-rel-form-actions';
+
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'btn-primary';
+    saveBtn.textContent = 'Add';
+    saveBtn.style.fontSize = '12px';
+    saveBtn.style.padding = '3px 10px';
+
+    const errSpan = document.createElement('span');
+    errSpan.style.fontSize = '11px';
+    errSpan.style.color = '#e05252';
+
+    actionsRow.append(saveBtn, errSpan);
+    formEl.append(charSelect, typeInput, noteInput, actionsRow);
+    section.insertBefore(formEl, addRelBtn);
+
+    typeInput.focus();
+
+    saveBtn.addEventListener('click', async () => {
+      const toId = parseInt(charSelect.value, 10);
+      const relType = typeInput.value.trim();
+      if (!toId) { errSpan.textContent = 'Select a character.'; return; }
+      if (!relType) { errSpan.textContent = 'Enter a relationship type.'; return; }
+      saveBtn.disabled = true;
+      try {
+        await window.revival.characterRelationships.create(
+          charId, toId, relType, noteInput.value.trim() || null
+        );
+        formOpen = false;
+        formEl.remove();
+        formEl = null;
+        addRelBtn.textContent = '+ Add Relationship';
+        await loadData();
+      } catch (e) {
+        errSpan.textContent = e.message || 'Could not save.';
+        saveBtn.disabled = false;
+      }
+    });
+  });
+
+  await loadData();
+}
+
+// --- End P37 helpers -------------------------------------------------------
+
 const CONTENT_RENDERERS = {
   'Home': renderHomePage,
   'Writing Lab': renderWritingLabPage,
@@ -5426,10 +5866,10 @@ const CONTENT_RENDERERS = {
     titlePlaceholder: 'What was researched?',
     bodyPlaceholder: 'Findings, and where they came from — source/link (optional)',
   }),
-  // Characters (P26): basic create/edit/delete/archive/restore on character
-  // entries (name + development notes). Relational view, attachments, and canon
-  // flow are later phases. Distinct violet accent so it never reads like a
-  // generic queue.
+  // Characters (P26+P37): CRUD lifecycle + relational view.
+  // P37 adds character relationship edges and the SVG graph via config hooks
+  // so the base makeEntryWorkspace handles list/CRUD and the hooks inject
+  // the relationships section + relational view toggle.
   'Characters': makeEntryWorkspace({
     apiName: 'characters',
     entityKind: 'characters',
@@ -5438,6 +5878,12 @@ const CONTENT_RENDERERS = {
     sectionClass: 'ws-characters',
     titlePlaceholder: 'Character name',
     bodyPlaceholder: 'Who they are — role, traits, arc, open threads (optional)',
+    detailExtra(rightCol, item, archivedFlag) {
+      if (!archivedFlag) mountCharRelationships(rightCol, item.id);
+    },
+    leftColExtra(leftCol, rightCol, ctx) {
+      setupCharRelationalView(leftCol, rightCol, ctx);
+    },
   }),
   // Episodes (P27): basic create/edit/delete/archive/restore on episode entries
   // (name + outline/scene list/beats/draft notes). Attachments and canon flow

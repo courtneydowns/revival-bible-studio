@@ -84,6 +84,17 @@ contextBridge.exposeInMainWorld('revival', {
     archive: (id) => ipcRenderer.invoke('characters:archive', id),
     restore: (id) => ipcRenderer.invoke('characters:restore', id),
   },
+  // P37 — directed typed edges between characters (workspace-level)
+  characterRelationships: {
+    listAll: () => ipcRenderer.invoke('characterRelationships:listAll'),
+    listForChar: (charId) =>
+      ipcRenderer.invoke('characterRelationships:listForChar', charId),
+    create: (fromId, toId, relType, note) =>
+      ipcRenderer.invoke('characterRelationships:create', fromId, toId, relType, note),
+    update: (id, relType, note) =>
+      ipcRenderer.invoke('characterRelationships:update', id, relType, note),
+    delete: (id) => ipcRenderer.invoke('characterRelationships:delete', id),
+  },
   episodes: {
     list: () => ipcRenderer.invoke('episodes:list'),
     listArchived: () => ipcRenderer.invoke('episodes:listArchived'),

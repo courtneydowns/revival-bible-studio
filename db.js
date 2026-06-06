@@ -1298,6 +1298,62 @@ const MIGRATIONS = [
       `);
     },
   },
+
+  {
+    name: '036_character_relationships',
+    up(db) {
+      // P37 — directed typed edges between characters_workspace entries.
+      // relation_type is free text (e.g. "ally", "rival", "mentor", "family")
+      // and intentionally NOT CHECK-constrained so the vocabulary can grow
+      // without migrations. The UNIQUE constraint is on (from, to) — one edge
+      // per ordered pair; the UI treats the pair as undirected for display but
+      // preserves direction so "A is mentor of B" stays distinct from "B is
+      // mentor of A". ON DELETE CASCADE keeps the table clean when a character
+      // is deleted.
+      db.exec(`
+        CREATE TABLE character_relationships (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          from_char_id INTEGER NOT NULL REFERENCES characters_workspace(id) ON DELETE CASCADE,
+          to_char_id   INTEGER NOT NULL REFERENCES characters_workspace(id) ON DELETE CASCADE,
+          relation_type TEXT NOT NULL DEFAULT 'related',
+          note         TEXT,
+          created_at   TEXT NOT NULL,
+          updated_at   TEXT NOT NULL,
+          UNIQUE(from_char_id, to_char_id)
+        );
+        CREATE INDEX character_relationships_from_idx ON character_relationships(from_char_id);
+        CREATE INDEX character_relationships_to_idx   ON character_relationships(to_char_id);
+      `);
+    },
+  },
+
+  {
+    name: '037_character_relationships_multi',
+    up(db) {
+      // Remove UNIQUE(from_char_id, to_char_id) so the same pair can carry
+      // multiple relationship types (e.g. "mentor" AND "rival" as separate
+      // rows, each with its own note). SQLite can't drop a constraint
+      // in-place, so we recreate the table and copy existing data.
+      db.exec(`
+        CREATE TABLE character_relationships_new (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          from_char_id INTEGER NOT NULL REFERENCES characters_workspace(id) ON DELETE CASCADE,
+          to_char_id   INTEGER NOT NULL REFERENCES characters_workspace(id) ON DELETE CASCADE,
+          relation_type TEXT NOT NULL DEFAULT 'related',
+          note         TEXT,
+          created_at   TEXT NOT NULL,
+          updated_at   TEXT NOT NULL
+        );
+        INSERT INTO character_relationships_new
+          SELECT id, from_char_id, to_char_id, relation_type, note, created_at, updated_at
+          FROM   character_relationships;
+        DROP TABLE character_relationships;
+        ALTER TABLE character_relationships_new RENAME TO character_relationships;
+        CREATE INDEX character_relationships_from_idx ON character_relationships(from_char_id);
+        CREATE INDEX character_relationships_to_idx   ON character_relationships(to_char_id);
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -1501,6 +1557,97 @@ const research = makeEntryRepo('research_items');
 // research → brainstorm_items / research_items.)
 const characters = makeEntryRepo('characters_workspace');
 const episodes = makeEntryRepo('episodes_workspace');
+
+// --- Character relationships repository (P37) ------------------------------
+// Typed edges between characters_workspace entries. Queries join both sides
+// so the renderer gets character names without a second round-trip.
+const characterRelationships = {
+  _rowWithNames: (db) =>
+    db.prepare(`
+      SELECT cr.*,
+             fa.title AS from_name,
+             ta.title AS to_name
+      FROM   character_relationships cr
+      JOIN   characters_workspace fa ON fa.id = cr.from_char_id
+      JOIN   characters_workspace ta ON ta.id = cr.to_char_id
+    `),
+
+  listAll() {
+    return getDb()
+      .prepare(`
+        SELECT cr.*,
+               fa.title AS from_name,
+               ta.title AS to_name
+        FROM   character_relationships cr
+        JOIN   characters_workspace fa ON fa.id = cr.from_char_id
+        JOIN   characters_workspace ta ON ta.id = cr.to_char_id
+        ORDER  BY cr.created_at
+      `)
+      .all();
+  },
+
+  listForChar(charId) {
+    return getDb()
+      .prepare(`
+        SELECT cr.*,
+               fa.title AS from_name,
+               ta.title AS to_name
+        FROM   character_relationships cr
+        JOIN   characters_workspace fa ON fa.id = cr.from_char_id
+        JOIN   characters_workspace ta ON ta.id = cr.to_char_id
+        WHERE  cr.from_char_id = ? OR cr.to_char_id = ?
+        ORDER  BY cr.created_at
+      `)
+      .all(charId, charId);
+  },
+
+  create(fromId, toId, relationType, note) {
+    const now = new Date().toISOString();
+    const info = getDb()
+      .prepare(
+        `INSERT INTO character_relationships
+           (from_char_id, to_char_id, relation_type, note, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+      .run(fromId, toId, relationType || 'related', note || null, now, now);
+    return getDb()
+      .prepare(`
+        SELECT cr.*, fa.title AS from_name, ta.title AS to_name
+        FROM   character_relationships cr
+        JOIN   characters_workspace fa ON fa.id = cr.from_char_id
+        JOIN   characters_workspace ta ON ta.id = cr.to_char_id
+        WHERE  cr.id = ?
+      `)
+      .get(info.lastInsertRowid);
+  },
+
+  update(id, relationType, note) {
+    const now = new Date().toISOString();
+    getDb()
+      .prepare(
+        `UPDATE character_relationships
+         SET    relation_type = ?, note = ?, updated_at = ?
+         WHERE  id = ?`
+      )
+      .run(relationType, note || null, now, id);
+    return getDb()
+      .prepare(`
+        SELECT cr.*, fa.title AS from_name, ta.title AS to_name
+        FROM   character_relationships cr
+        JOIN   characters_workspace fa ON fa.id = cr.from_char_id
+        JOIN   characters_workspace ta ON ta.id = cr.to_char_id
+        WHERE  cr.id = ?
+      `)
+      .get(id);
+  },
+
+  delete(id) {
+    const info = getDb()
+      .prepare('DELETE FROM character_relationships WHERE id = ?')
+      .run(id);
+    return { deleted: info.changes > 0 };
+  },
+};
 
 // --- Writing Lab repository ------------------------------------------------
 // Long-form drafting (P28). Same shape as the entry workspaces, but bespoke
@@ -4059,6 +4206,7 @@ module.exports = {
   brainstorm,
   research,
   characters,
+  characterRelationships,
   episodes,
   writingLab,
   chats,

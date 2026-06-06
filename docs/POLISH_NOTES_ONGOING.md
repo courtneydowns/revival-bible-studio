@@ -40,3 +40,4 @@ Running log of UI/UX observations from smoke tests. Addressed in PPOL1 (pre-impo
 - [ ] PPOL1-13 [PUI1] Left list card previews: title text overflows — add truncation
 - [ ] PPOL1-14 [PUI1] Nav menu: add notification badges to Canon Review, Conflicts, and Open Questions (matching existing badge pattern)
 - [ ] PPOL1-15 [P28] Home page: remove "Recently Viewed" section — Recent Activity already covers this
+- [ ] PPOL1-16 [P37] Characters relational view: relationship lines between nodes are too light in both dark and light mode — increase stroke weight and/or use a more visible color so the connection is legible at a glance
