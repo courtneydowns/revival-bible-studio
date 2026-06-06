@@ -7836,6 +7836,7 @@ chatComposer.addEventListener('submit', (e) => {
     renderActiveSources();
   }
   // Collapse preview on send so the next draft starts clean.
+  _previewOpen = false;
   chatPreviewWrap.hidden = true;
   chatPreviewBtn.textContent = 'Preview';
 });
@@ -7892,17 +7893,28 @@ async function refreshPreview() {
   if (!_previewOpen) return;
   chatPreviewBody.textContent = 'Building…';
   try {
-    chatPreviewBody.textContent = await buildPreviewPayload();
+    const payload = await buildPreviewPayload();
+    chatPreviewBody.textContent = payload;
   } catch (err) {
+    console.error('[preview] build error:', err);
     chatPreviewBody.textContent = `Error: ${err.message || err}`;
   }
 }
 
 chatPreviewBtn.addEventListener('click', async () => {
-  _previewOpen = !_previewOpen;
-  chatPreviewWrap.hidden = !_previewOpen;
-  chatPreviewBtn.textContent = _previewOpen ? 'Hide preview' : 'Preview';
-  if (_previewOpen) await refreshPreview();
+  try {
+    _previewOpen = !_previewOpen;
+    chatPreviewWrap.hidden = !_previewOpen;
+    chatPreviewBtn.textContent = _previewOpen ? 'Hide preview' : 'Preview';
+    if (_previewOpen) {
+      await refreshPreview();
+      chatPreviewWrap.scrollIntoView({ block: 'nearest' });
+    }
+  } catch (err) {
+    console.error('[preview] click handler error:', err);
+    chatPreviewBody.textContent = `Preview error: ${err.message || err}`;
+    chatPreviewWrap.hidden = false;
+  }
 });
 
 // Live-update preview as user types.
