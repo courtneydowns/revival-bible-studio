@@ -4953,6 +4953,100 @@ function renderHomePage(section) {
   })();
 }
 
+// --- Settings: Claude API key (P39) ----------------------------------------
+// Key stored in SQLite settings row. Displayed masked by default; a show/hide
+// toggle reveals it. Never logged or transmitted except to claude.ai API calls.
+function renderApiKeyBlock(section) {
+  const api = window.revival.settings;
+
+  const block = document.createElement('div');
+  block.className = 'entry-form settings-block';
+
+  const heading = document.createElement('h2');
+  heading.className = 'settings-heading';
+  heading.textContent = 'Claude API Key';
+
+  const desc = document.createElement('p');
+  desc.className = 'settings-desc';
+  desc.textContent =
+    'Required for Claude messaging (P40+). Stored locally in the database — never shared anywhere except outgoing Claude API calls.';
+
+  const row = document.createElement('div');
+  row.className = 'settings-apikey-row';
+
+  const input = document.createElement('input');
+  input.type = 'password';
+  input.className = 'settings-apikey-input';
+  input.placeholder = 'sk-ant-…';
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  input.disabled = true;
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'settings-apikey-toggle';
+  toggle.title = 'Show / hide key';
+  toggle.textContent = '👁';
+  toggle.addEventListener('click', () => {
+    input.type = input.type === 'password' ? 'text' : 'password';
+  });
+
+  const save = document.createElement('button');
+  save.type = 'button';
+  save.className = 'btn-secondary';
+  save.textContent = 'Save Key';
+  save.disabled = true;
+
+  row.append(input, toggle, save);
+
+  const status = document.createElement('p');
+  status.className = 'draft-status';
+
+  let savedKey = '';
+
+  function refreshDirty() {
+    save.disabled = input.value === savedKey;
+  }
+
+  input.addEventListener('input', refreshDirty);
+
+  save.addEventListener('click', async () => {
+    save.disabled = true;
+    try {
+      await api.setClaudeApiKey(input.value);
+      savedKey = input.value.trim();
+      input.value = savedKey;
+      const masked = savedKey
+        ? savedKey.slice(0, 10) + '…' + savedKey.slice(-4)
+        : '(empty)';
+      setStatus(status, `Saved. Key: ${masked}`);
+    } catch (err) {
+      setStatus(status, `Could not save: ${err.message || err}`);
+    }
+    refreshDirty();
+  });
+
+  block.append(heading, desc, row, status);
+  section.appendChild(block);
+
+  (async () => {
+    try {
+      savedKey = (await api.getClaudeApiKey()) || '';
+      input.value = savedKey;
+      if (savedKey) {
+        const masked = savedKey.slice(0, 10) + '…' + savedKey.slice(-4);
+        setStatus(status, `Key on file: ${masked}`);
+      } else {
+        setStatus(status, 'No key saved yet.');
+      }
+    } catch (err) {
+      setStatus(status, `Could not load key: ${err.message || err}`);
+    }
+    input.disabled = false;
+    refreshDirty();
+  })();
+}
+
 // --- Settings: Project Rules (P20) -----------------------------------------
 // Always-on, always-visible guidance Claude receives. Stored in SQLite (via the
 // settings IPC) so it survives restarts — there is no hidden project memory.
@@ -5026,6 +5120,9 @@ function renderSettingsPage(section) {
     textarea.disabled = false;
     refreshDirty();
   })();
+
+  // P39 — Claude API key block.
+  renderApiKeyBlock(section);
 
   renderManageTags(section);
   renderPanicExport(section);
@@ -7330,6 +7427,10 @@ const chatSourcePicker = document.getElementById('chat-source-picker');
 const chatComposer = document.getElementById('chat-composer');
 const chatInput = document.getElementById('chat-input');
 const chatSend = document.getElementById('chat-send');
+// P39 — request preview
+const chatPreviewBtn = document.getElementById('chat-preview-btn');
+const chatPreviewWrap = document.getElementById('chat-preview-wrap');
+const chatPreviewBody = document.getElementById('chat-preview-body');
 
 const ACTIVE_CHAT_KEY = 'revival.chat.active';
 const CHAT_EXPANDED_KEY = 'revival.chat.expanded';
@@ -7496,6 +7597,8 @@ function renderActiveSources() {
   chatAttachBtn.disabled = !hasChat;
   chatInput.disabled = !hasChat;
   chatSend.disabled = !hasChat;
+  // P39: keep preview in sync when sources change.
+  refreshPreview();
 
   if (!hasChat) {
     const p = document.createElement('p');
@@ -7721,9 +7824,9 @@ chatAttachBtn.addEventListener('click', () => {
   }
 });
 
-// Draft send (P19): no AI, nothing stored or sent. Its only job this phase is
-// to clear the composer and drop the chat's "next message only" sources, so
-// that single-use mode behaves as named. Keep-active sources are untouched.
+// Draft send (P19/P40): clears the composer and drops "next message only"
+// sources. In P39 also collapses the preview panel so it doesn't show a stale
+// payload after the message is gone.
 chatComposer.addEventListener('submit', (e) => {
   e.preventDefault();
   if (activeChatId == null) return;
@@ -7732,7 +7835,78 @@ chatComposer.addEventListener('submit', (e) => {
     nextSourcesByChat.set(activeChatId, []);
     renderActiveSources();
   }
+  // Collapse preview on send so the next draft starts clean.
+  chatPreviewWrap.hidden = true;
+  chatPreviewBtn.textContent = 'Preview';
 });
+
+// P39 — Request preview: assembles the exact Claude API payload from the
+// current composer state (user message + Project Rules + active sources) and
+// displays it in a collapsible panel above the composer. No API call is made.
+// Project Rules are fetched once per open and cached for the session; they
+// change only when the user saves in Settings.
+let _cachedProjectRules = null;
+let _previewOpen = false;
+
+async function buildPreviewPayload() {
+  // Fetch project rules once per session.
+  if (_cachedProjectRules === null) {
+    try {
+      _cachedProjectRules = (await window.revival.settings.getProjectRules()) || '';
+    } catch {
+      _cachedProjectRules = '';
+    }
+  }
+
+  const userText = chatInput.value;
+  const keptSrcs = activeSources;
+  const nextSrcs = activeChatId != null ? nextSourcesFor(activeChatId) : [];
+  const allSrcs = [...keptSrcs, ...nextSrcs];
+
+  // Build messages array matching the shape that will be sent to Claude.
+  // Sources are included as separate user-turn blocks (one per source) so
+  // Claude sees them clearly separated from the actual message.
+  const messages = [];
+  for (const src of allSrcs) {
+    const label = nextSrcs.includes(src) ? ' (next message only)' : ' (keep active)';
+    messages.push({
+      role: 'user',
+      content: `[Source: ${src.title}${label}]\n\n${src.body || '(no content)'}`,
+    });
+  }
+  if (userText.trim()) {
+    messages.push({ role: 'user', content: userText });
+  }
+
+  const payload = {
+    model: 'claude-opus-4-7',
+    max_tokens: 8192,
+    ...(  _cachedProjectRules ? { system: _cachedProjectRules } : {}),
+    messages,
+  };
+
+  return JSON.stringify(payload, null, 2);
+}
+
+async function refreshPreview() {
+  if (!_previewOpen) return;
+  chatPreviewBody.textContent = 'Building…';
+  try {
+    chatPreviewBody.textContent = await buildPreviewPayload();
+  } catch (err) {
+    chatPreviewBody.textContent = `Error: ${err.message || err}`;
+  }
+}
+
+chatPreviewBtn.addEventListener('click', async () => {
+  _previewOpen = !_previewOpen;
+  chatPreviewWrap.hidden = !_previewOpen;
+  chatPreviewBtn.textContent = _previewOpen ? 'Hide preview' : 'Preview';
+  if (_previewOpen) await refreshPreview();
+});
+
+// Live-update preview as user types.
+chatInput.addEventListener('input', () => { if (_previewOpen) refreshPreview(); });
 
 chatRenameBtn.addEventListener('click', showRename);
 chatRenameCancel.addEventListener('click', hideRename);

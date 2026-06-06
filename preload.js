@@ -221,6 +221,9 @@ contextBridge.exposeInMainWorld('revival', {
     getProjectRules: () => ipcRenderer.invoke('settings:getProjectRules'),
     setProjectRules: (text) =>
       ipcRenderer.invoke('settings:setProjectRules', text),
+    // P39 — Claude API key
+    getClaudeApiKey: () => ipcRenderer.invoke('settings:getClaudeApiKey'),
+    setClaudeApiKey: (key) => ipcRenderer.invoke('settings:setClaudeApiKey', key),
   },
   // PSEARCH — read-only global search. Renderer passes { q, workspace,
   // tagId, entryType, canonStatus, lockStatus }; main returns groups by source.

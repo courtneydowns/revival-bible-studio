@@ -1354,6 +1354,15 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '038_api_key',
+    up(db) {
+      // P39 — store the Claude API key in the settings singleton row so it
+      // persists across restarts. Stored as plain text (local-only app);
+      // never transmitted anywhere except outgoing Claude API calls.
+      db.exec(`ALTER TABLE settings ADD COLUMN claude_api_key TEXT NOT NULL DEFAULT ''`);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -1836,6 +1845,23 @@ const settings = {
       )
       .run(value, new Date().toISOString());
     return { value };
+  },
+  // P39 — Claude API key. Stored as plain text in the settings singleton;
+  // it is local-only and only leaves the machine in outgoing Claude API calls.
+  getClaudeApiKey: () => {
+    const row = getDb()
+      .prepare('SELECT claude_api_key FROM settings WHERE id = 1')
+      .get();
+    return row ? row.claude_api_key : '';
+  },
+  setClaudeApiKey: (key) => {
+    const value = typeof key === 'string' ? key.trim() : '';
+    getDb()
+      .prepare(
+        'UPDATE settings SET claude_api_key = ?, updated_at = ? WHERE id = 1'
+      )
+      .run(value, new Date().toISOString());
+    return { ok: true };
   },
 };
 

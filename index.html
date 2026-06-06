@@ -2331,7 +2331,69 @@
         resize: none;
       }
       .chat-input:disabled { opacity: 0.7; cursor: not-allowed; }
-      .chat-composer .btn-primary { padding: 8px 16px; }
+      .chat-composer { flex-direction: column; align-items: stretch; gap: 8px; }
+      .chat-composer-actions { display: flex; gap: 8px; justify-content: flex-end; }
+      .chat-composer-actions .btn-primary { padding: 8px 16px; }
+
+      /* P39 — request preview panel */
+      .chat-preview-wrap {
+        margin: 0 18px 0;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        overflow: hidden;
+        font-size: 12px;
+      }
+      .chat-preview-head {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        padding: 6px 10px;
+        background: rgba(214, 161, 79, 0.1);
+        border-bottom: 1px solid var(--border);
+      }
+      .chat-preview-label { font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #d6a14f; }
+      .chat-preview-hint { font-size: 11px; color: var(--muted); }
+      .chat-preview-body {
+        margin: 0;
+        padding: 10px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+        font-size: 11px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-height: 260px;
+        overflow-y: auto;
+      }
+
+      /* Settings: API key block */
+      .settings-apikey-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-top: 8px;
+      }
+      .settings-apikey-input {
+        flex: 1;
+        font: inherit;
+        font-size: 13px;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 7px 10px;
+      }
+      .settings-apikey-toggle {
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 9px;
+        cursor: pointer;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .settings-apikey-toggle:hover { color: var(--text); }
 
       /* --- PUI3 extract-and-route menu + toast ------------------------------
          Floating menu anchored to the user's text selection inside any detail
@@ -2982,17 +3044,28 @@
         <div class="chat-sources-list" id="chat-sources-list"></div>
         <div class="chat-source-picker" id="chat-source-picker" hidden></div>
       </section>
-      <!-- Draft send (P19): no AI yet. Send clears the box and any "next message
-           only" sources so that mode can be demonstrated. Nothing is stored or
-           sent to Claude — real messaging arrives in a later phase. -->
-      <form class="chat-composer" id="chat-composer">
+      <!-- P39 — Request preview: shows exact Claude API payload that would be
+           sent (user msg + Project Rules + active sources, nothing else).
+           Hidden until the user clicks “Preview”. -->
+      <div class=”chat-preview-wrap” id=”chat-preview-wrap” hidden>
+        <div class=”chat-preview-head”>
+          <span class=”chat-preview-label”>Request preview</span>
+          <span class=”chat-preview-hint”>Exact payload that will be sent to Claude</span>
+        </div>
+        <pre class=”chat-preview-body” id=”chat-preview-body”></pre>
+      </div>
+      <!-- P39: composer now includes a Preview toggle alongside Send. -->
+      <form class=”chat-composer” id=”chat-composer”>
         <textarea
-          id="chat-input"
-          class="chat-input"
-          rows="2"
-          placeholder="Draft send only — clears the box and any “next message only” sources. Claude messaging comes later; nothing is saved or sent."
+          id=”chat-input”
+          class=”chat-input”
+          rows=”2”
+          placeholder=”Message Claude — attach Source Material above to include reference content.”
         ></textarea>
-        <button id="chat-send" type="submit" class="btn-primary">Send</button>
+        <div class=”chat-composer-actions”>
+          <button id=”chat-preview-btn” type=”button” class=”btn-secondary btn-sm”>Preview</button>
+          <button id=”chat-send” type=”submit” class=”btn-primary”>Send</button>
+        </div>
       </form>
     </aside>
 

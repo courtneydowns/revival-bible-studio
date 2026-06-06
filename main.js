@@ -402,6 +402,11 @@ function registerIpc() {
   ipcMain.handle('settings:setProjectRules', (_event, text) =>
     db.settings.setProjectRules(text)
   );
+  // P39 — Claude API key storage.
+  ipcMain.handle('settings:getClaudeApiKey', () => db.settings.getClaudeApiKey());
+  ipcMain.handle('settings:setClaudeApiKey', (_event, key) =>
+    db.settings.setClaudeApiKey(key)
+  );
 
   // PUI2 popout wiring.
   //  • popout:open spawns a new BrowserWindow for a single entry.
