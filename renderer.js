@@ -58,6 +58,9 @@ function renderWorkspacePage(name) {
 // signal's workspace matches the one currently mounted.
 let currentWorkspaceName = null;
 let currentWorkspaceRefresh = null;
+// PImp2: scoped keydown handler for Canon Review keyboard navigation.
+// Replaced (not accumulated) each time Canon Review mounts.
+let _canonReviewKeyHandler = null;
 
 // --- PHOME recently-viewed + one-click return -------------------------------
 // Session-persistent (sessionStorage, cleared on app restart) list of the last
@@ -3594,8 +3597,30 @@ function renderCanonReviewPage(section, workspaceName) {
     filter = filterSelect.value;
     renderList();
   });
-  filterBar.append(filterLabel, filterSelect);
+
+  // PImp2: Entry-type filter — "All types" + one option per distinct type
+  // found in proposals' proposed_fields.entry_type. Rebuilt in renderList.
+  const typeFilterLabel = document.createElement('span');
+  typeFilterLabel.className = 'cr-filter-label';
+  typeFilterLabel.style.marginLeft = '10px';
+  typeFilterLabel.textContent = 'Type:';
+  const typeFilterSelect = document.createElement('select');
+  typeFilterSelect.className = 'cr-filter-select';
+  let typeFilter = '';
+  typeFilterSelect.addEventListener('change', () => {
+    typeFilter = typeFilterSelect.value;
+    renderList();
+  });
+
+  filterBar.append(filterLabel, filterSelect, typeFilterLabel, typeFilterSelect);
   leftCol.appendChild(filterBar);
+
+  // PImp2: Bulk-actions bar — defer or approve all proposals of a given type.
+  // Rebuilt by renderList whenever proposals or filter changes.
+  const bulkBar = document.createElement('div');
+  bulkBar.className = 'cr-bulk-bar';
+  bulkBar.style.display = 'none';
+  leftCol.appendChild(bulkBar);
 
   const list = document.createElement('div');
   list.className = 'tc-list';
@@ -3669,19 +3694,190 @@ function renderCanonReviewPage(section, workspaceName) {
     return btn;
   }
 
+  function getProposalType(p) {
+    return (p.proposed_fields && p.proposed_fields.entry_type) || '';
+  }
+
+  function rebuildTypeFilter(visibleProposals) {
+    const prev = typeFilterSelect.value;
+    typeFilterSelect.innerHTML = '';
+    const all = document.createElement('option');
+    all.value = '';
+    all.textContent = 'All types';
+    typeFilterSelect.appendChild(all);
+    const types = [...new Set(visibleProposals.map(getProposalType).filter(Boolean))].sort();
+    for (const t of types) {
+      const opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t.replace(/_/g, ' ');
+      typeFilterSelect.appendChild(opt);
+    }
+    // Restore selection if still valid; otherwise reset to "all"
+    if (types.includes(prev)) {
+      typeFilterSelect.value = prev;
+    } else {
+      typeFilter = '';
+      typeFilterSelect.value = '';
+    }
+  }
+
+  // PImp2: Rebuild the bulk-actions bar from the currently-active (main) proposals.
+  // Groups by entry_type and shows Defer-all / Approve-all per group.
+  function rebuildBulkBar(mainProposals) {
+    bulkBar.innerHTML = '';
+    // Only show when there are proposals and at least some have a typed entry_type
+    const typed = mainProposals.filter((p) => getProposalType(p));
+    if (typed.length === 0) {
+      bulkBar.style.display = 'none';
+      return;
+    }
+    // Group by type
+    const groups = {};
+    for (const p of typed) {
+      const t = getProposalType(p);
+      if (!groups[t]) groups[t] = [];
+      groups[t].push(p);
+    }
+    const sortedTypes = Object.keys(groups).sort();
+    if (sortedTypes.length === 0) {
+      bulkBar.style.display = 'none';
+      return;
+    }
+
+    bulkBar.style.display = '';
+    const label = document.createElement('span');
+    label.className = 'cr-filter-label';
+    label.textContent = 'Bulk:';
+    bulkBar.appendChild(label);
+
+    for (const t of sortedTypes) {
+      const grp = groups[t];
+      const label = t.replace(/_/g, ' ');
+
+      // Defer-all button
+      const deferAllBtn = document.createElement('button');
+      deferAllBtn.type = 'button';
+      deferAllBtn.className = 'btn-secondary btn-sm cr-bulk-btn';
+      deferAllBtn.textContent = `Defer all ${label} (${grp.length})`;
+      deferAllBtn.addEventListener('click', () => {
+        showBulkConfirm(bulkBar, {
+          message: `Defer all ${grp.length} "${label}" proposal${grp.length !== 1 ? 's' : ''}?`,
+          confirmLabel: 'Defer all',
+          danger: false,
+          run: async () => {
+            for (const p of grp) {
+              await window.revival.canonProposals.defer(p.id, {});
+            }
+            if (grp.some((p) => p.id === selectedId)) selectedId = null;
+            await loadList();
+          },
+        });
+      });
+      bulkBar.appendChild(deferAllBtn);
+
+      // Approve-all button — only for proposals that have an entry_type set
+      // so the bulk approve can skip the type-picker form.
+      const approveAllBtn = document.createElement('button');
+      approveAllBtn.type = 'button';
+      approveAllBtn.className = 'btn-primary btn-sm cr-bulk-btn';
+      approveAllBtn.textContent = `Approve all ${label} (${grp.length})`;
+      approveAllBtn.addEventListener('click', () => {
+        showBulkConfirm(bulkBar, {
+          message:
+            `Approve all ${grp.length} "${label}" proposal${grp.length !== 1 ? 's' : ''}? ` +
+            `Each becomes a Canon Bible entry (type: ${label}, status: draft). ` +
+            'This cannot be undone.',
+          confirmLabel: `Approve ${grp.length}`,
+          danger: false,
+          run: async () => {
+            for (const p of grp) {
+              const fields = p.proposed_fields || {};
+              await window.revival.canonProposals.approve(p.id, {
+                entry_type: fields.entry_type,
+                title: fields.title || '(untitled)',
+                body: fields.body || '',
+                canon_status: 'draft',
+              });
+            }
+            if (grp.some((p) => p.id === selectedId)) selectedId = null;
+            await loadList();
+          },
+        });
+      });
+      bulkBar.appendChild(approveAllBtn);
+    }
+  }
+
+  // Inline confirm for bulk actions — replaces the bulkBar content temporarily.
+  function showBulkConfirm(host, { message, confirmLabel, danger, run }) {
+    const saved = host.innerHTML;
+    host.innerHTML = '';
+
+    const msg = document.createElement('span');
+    msg.className = 'confirm-text';
+    msg.style.cssText = 'font-size:0.85em;flex:1;';
+    msg.textContent = message;
+
+    const yes = document.createElement('button');
+    yes.type = 'button';
+    yes.className = danger ? 'btn-danger btn-sm' : 'btn-primary btn-sm';
+    yes.textContent = confirmLabel;
+    yes.addEventListener('click', async () => {
+      yes.disabled = true;
+      no.disabled = true;
+      try {
+        await run();
+      } catch (err) {
+        msg.textContent = `Error: ${err.message || err}`;
+        yes.disabled = false;
+        no.disabled = false;
+      }
+    });
+
+    const no = document.createElement('button');
+    no.type = 'button';
+    no.className = 'btn-secondary btn-sm';
+    no.textContent = 'Cancel';
+    no.addEventListener('click', () => {
+      host.innerHTML = saved;
+      // Re-attach listeners by triggering a re-render of the bulk bar
+      rebuildBulkBar(
+        proposals.filter((p) => {
+          if (filter === 'active')    return p.status === 'pending' || p.status === 'sent_back';
+          if (filter === 'pending')   return p.status === 'pending';
+          if (filter === 'sent_back') return p.status === 'sent_back';
+          if (filter === 'deferred')  return p.status === 'deferred';
+          return true;
+        }).filter((p) => !typeFilter || getProposalType(p) === typeFilter)
+      );
+    });
+
+    host.append(msg, yes, no);
+  }
+
   function renderList() {
     list.innerHTML = '';
     deferredList.innerHTML = '';
 
-    const showDeferredInMain = filter === 'deferred';
     const showDeferredSection = filter === 'active';
-    const main = proposals.filter((p) => {
+    const statusFiltered = proposals.filter((p) => {
       if (filter === 'active')    return p.status === 'pending' || p.status === 'sent_back';
       if (filter === 'pending')   return p.status === 'pending';
       if (filter === 'sent_back') return p.status === 'sent_back';
       if (filter === 'deferred')  return p.status === 'deferred';
       return true;
     });
+
+    // Rebuild type filter from status-filtered set so only relevant types appear
+    rebuildTypeFilter(statusFiltered);
+
+    const main = typeFilter
+      ? statusFiltered.filter((p) => getProposalType(p) === typeFilter)
+      : statusFiltered;
+
+    // Rebuild bulk bar from the full status-filtered set (not type-filtered)
+    rebuildBulkBar(statusFiltered);
+
     const deferredItems = showDeferredSection
       ? proposals.filter((p) => p.status === 'deferred')
       : [];
@@ -4206,6 +4402,87 @@ function renderCanonReviewPage(section, workspaceName) {
   // PUI2 cross-window refresh: another window approving / editing a
   // proposal fans 'Canon Review' to us, and we reload.
   setActiveWorkspaceRefresh(workspaceName, loadList);
+
+  // PImp2: Keyboard navigation. j/↓ → next, k/↑ → prev, a → quick-approve,
+  // d → quick-defer. Active only while Canon Review is the current workspace.
+  // Quick-approve uses the entry_type already in proposed_fields (import path);
+  // without it the full approve form is opened via the Approve button.
+  if (_canonReviewKeyHandler) {
+    window.removeEventListener('keydown', _canonReviewKeyHandler);
+  }
+  _canonReviewKeyHandler = function crKeyHandler(e) {
+    if (currentWorkspaceName !== workspaceName) return;
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    const statusFiltered = proposals.filter((p) => {
+      if (filter === 'active')    return p.status === 'pending' || p.status === 'sent_back';
+      if (filter === 'pending')   return p.status === 'pending';
+      if (filter === 'sent_back') return p.status === 'sent_back';
+      if (filter === 'deferred')  return p.status === 'deferred';
+      return true;
+    });
+    const visible = typeFilter
+      ? statusFiltered.filter((p) => getProposalType(p) === typeFilter)
+      : statusFiltered;
+    if (visible.length === 0) return;
+
+    const curIdx = selectedId == null ? -1 : visible.findIndex((p) => p.id === selectedId);
+
+    if (e.key === 'ArrowDown' || e.key === 'j') {
+      e.preventDefault();
+      const next = curIdx < visible.length - 1 ? curIdx + 1 : 0;
+      selectedId = visible[next].id;
+      renderList();
+      renderDetail();
+      const btn = list.querySelector('.tc-list-item.active');
+      if (btn) btn.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp' || e.key === 'k') {
+      e.preventDefault();
+      const prev = curIdx > 0 ? curIdx - 1 : visible.length - 1;
+      selectedId = visible[prev].id;
+      renderList();
+      renderDetail();
+      const btn = list.querySelector('.tc-list-item.active');
+      if (btn) btn.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'a' && selectedId != null) {
+      const p = findProposal(selectedId);
+      if (!p) return;
+      const fields = p.proposed_fields || {};
+      if (fields.entry_type) {
+        e.preventDefault();
+        (async () => {
+          try {
+            await window.revival.canonProposals.approve(p.id, {
+              entry_type: fields.entry_type,
+              title: fields.title || '(untitled)',
+              body: fields.body || '',
+              canon_status: 'draft',
+            });
+            selectedId = null;
+            await loadList();
+          } catch (_) { /* fall through — user can retry via the button */ }
+        })();
+      } else {
+        e.preventDefault();
+        const approveBtn = rightCol.querySelector('.btn-primary');
+        if (approveBtn) approveBtn.click();
+      }
+    } else if (e.key === 'd' && selectedId != null) {
+      const p = findProposal(selectedId);
+      if (!p || p.status === 'deferred') return;
+      e.preventDefault();
+      (async () => {
+        try {
+          await window.revival.canonProposals.defer(p.id, {});
+          selectedId = null;
+          await loadList();
+        } catch (_) { /* ignore */ }
+      })();
+    }
+  };
+  window.addEventListener('keydown', _canonReviewKeyHandler);
+
   loadList();
 }
 
@@ -5422,17 +5699,69 @@ function renderImportPage(section) {
     }
     div.appendChild(fileBar);
 
+    // PImp2: Type filter for the preview list. Filtering is display-only;
+    // Stage always stages all currentEntries regardless of what's visible.
+    const distinctTypes = [...new Set(
+      currentEntries.map((e) => e.entry_type).filter(Boolean)
+    )].sort();
+    let previewTypeFilter = '';
+
+    const previewFilterRow = document.createElement('div');
+    previewFilterRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;';
+    if (distinctTypes.length > 0) {
+      const fLabel = document.createElement('span');
+      fLabel.style.cssText = 'font-size:0.85em;opacity:0.7;';
+      fLabel.textContent = 'Show:';
+      previewFilterRow.appendChild(fLabel);
+
+      const allChip = document.createElement('button');
+      allChip.type = 'button';
+      allChip.className = 'status-badge cr-type-chip cr-type-chip-active';
+      allChip.textContent = `All (${currentEntries.length})`;
+      allChip.dataset.type = '';
+      previewFilterRow.appendChild(allChip);
+
+      for (const t of distinctTypes) {
+        const count = currentEntries.filter((e) => e.entry_type === t).length;
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'status-badge cr-type-chip';
+        chip.textContent = `${t.replace(/_/g, ' ')} (${count})`;
+        chip.dataset.type = t;
+        previewFilterRow.appendChild(chip);
+      }
+
+      // Untyped chip if any entries lack a detected type
+      const untypedCount = currentEntries.filter((e) => !e.entry_type).length;
+      if (untypedCount > 0) {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'status-badge cr-type-chip';
+        chip.textContent = `untyped (${untypedCount})`;
+        chip.dataset.type = '__untyped__';
+        previewFilterRow.appendChild(chip);
+      }
+
+      previewFilterRow.addEventListener('click', (e) => {
+        const chip = e.target.closest('.cr-type-chip');
+        if (!chip) return;
+        previewTypeFilter = chip.dataset.type;
+        for (const c of previewFilterRow.querySelectorAll('.cr-type-chip')) {
+          c.classList.toggle('cr-type-chip-active', c.dataset.type === previewTypeFilter);
+        }
+        renderCards();
+      });
+    }
+    div.appendChild(previewFilterRow);
+
     const list = document.createElement('div');
     list.style.cssText =
       'border:1px solid var(--border,#444);border-radius:6px;max-height:420px;' +
       'overflow-y:auto;margin-bottom:10px;';
 
-    for (let i = 0; i < currentEntries.length; i++) {
-      const entry = currentEntries[i];
+    function buildCard(entry) {
       const card = document.createElement('div');
-      card.style.cssText =
-        'padding:10px 12px;border-bottom:1px solid var(--border,#333);' +
-        (i === currentEntries.length - 1 ? 'border-bottom:none;' : '');
+      card.style.cssText = 'padding:10px 12px;border-bottom:1px solid var(--border,#333);';
 
       const titleRow = document.createElement('div');
       titleRow.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
@@ -5469,9 +5798,23 @@ function renderImportPage(section) {
         preview.textContent = entry.body.length > 200 ? entry.body.slice(0, 200) + '…' : entry.body;
         card.appendChild(preview);
       }
-
-      list.appendChild(card);
+      return card;
     }
+
+    function renderCards() {
+      list.innerHTML = '';
+      const filtered = previewTypeFilter === ''
+        ? currentEntries
+        : previewTypeFilter === '__untyped__'
+          ? currentEntries.filter((e) => !e.entry_type)
+          : currentEntries.filter((e) => e.entry_type === previewTypeFilter);
+      for (let i = 0; i < filtered.length; i++) {
+        const card = buildCard(filtered[i]);
+        if (i === filtered.length - 1) card.style.borderBottom = 'none';
+        list.appendChild(card);
+      }
+    }
+    renderCards();
     div.appendChild(list);
 
     const btnRow = document.createElement('div');

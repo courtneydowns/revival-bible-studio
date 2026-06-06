@@ -1746,6 +1746,32 @@
       .cr-verb-actions { margin-top: 14px; }
       .cr-note-row .canon-field-input { flex: 1 1 240px; }
       .cr-approve-host { margin-top: 8px; }
+
+      /* PImp2: bulk-actions bar */
+      .cr-bulk-bar {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 6px 0 4px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 4px;
+        font-size: 12px;
+      }
+      .cr-bulk-btn { font-size: 11px; padding: 3px 8px; }
+
+      /* PImp2: type-filter chips in Import Phase 2 preview */
+      .cr-type-chip {
+        cursor: pointer;
+        opacity: 0.65;
+        font-size: 11px;
+        padding: 2px 8px;
+      }
+      .cr-type-chip-active {
+        opacity: 1;
+        border-color: var(--accent, #6fb88c);
+        color: var(--accent, #6fb88c);
+      }
       .cr-approve-banner {
         margin: 0 0 12px;
         padding: 8px 12px;
