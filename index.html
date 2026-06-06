@@ -1306,6 +1306,77 @@
         border-bottom: 1px solid var(--border);
       }
       .tc-linked-src { color: var(--muted); font-size: 11px; white-space: nowrap; }
+      /* tc-linked-goto — clickable title in the passive linked indicator (P36). */
+      .tc-linked-goto {
+        background: none; border: none; padding: 0;
+        font-size: 13px; color: var(--accent); cursor: pointer; text-align: left;
+      }
+      .tc-linked-goto:hover { text-decoration: underline; }
+      /* P36 — interactive cross-workspace attachment section. */
+      .cwa-section { margin-top: 16px; }
+      .cwa-header {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 4px 0; border-bottom: 1px solid var(--border); margin-bottom: 4px;
+      }
+      .cwa-heading {
+        font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+        color: var(--muted);
+      }
+      .cwa-attach-btn {
+        font-size: 11px; padding: 2px 8px; border: 1px solid var(--border);
+        border-radius: 4px; cursor: pointer; background: transparent; color: var(--accent);
+      }
+      .cwa-attach-btn:hover { background: var(--hover); }
+      .cwa-empty { font-size: 12px; color: var(--muted); padding: 4px 0; }
+      .cwa-row {
+        font-size: 13px; padding: 4px 0; display: flex;
+        justify-content: space-between; align-items: center; gap: 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      .cwa-row-title {
+        background: none; border: none; padding: 0; font-size: 13px;
+        color: var(--accent); cursor: pointer; text-align: left;
+        flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .cwa-row-title:hover { text-decoration: underline; }
+      .cwa-row-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+      .cwa-row-src { color: var(--muted); font-size: 11px; white-space: nowrap; }
+      .cwa-unlink {
+        font-size: 11px; padding: 1px 6px; border: 1px solid var(--border);
+        border-radius: 3px; cursor: pointer; background: transparent; color: var(--muted);
+      }
+      .cwa-unlink:hover { color: #e05252; border-color: #e05252; }
+      .cwa-picker {
+        margin-top: 8px; border: 1px solid var(--border); border-radius: 6px;
+        padding: 10px; background: var(--panel);
+      }
+      .cwa-picker-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+      .cwa-picker-tab {
+        font-size: 11px; padding: 2px 8px; border: 1px solid var(--border);
+        border-radius: 4px; cursor: pointer; background: transparent; color: var(--muted);
+      }
+      .cwa-picker-tab.active { border-color: var(--accent); color: var(--accent); }
+      .cwa-picker-tab:hover { color: var(--accent); }
+      .cwa-picker-search {
+        width: 100%; box-sizing: border-box; font-size: 12px; padding: 4px 8px;
+        border: 1px solid var(--border); border-radius: 4px; margin-bottom: 6px;
+        background: var(--bg); color: var(--text);
+      }
+      .cwa-picker-search:focus { outline: none; border-color: var(--accent); }
+      .cwa-picker-list { max-height: 180px; overflow-y: auto; }
+      .cwa-picker-msg { font-size: 12px; color: var(--muted); padding: 4px 0; }
+      .cwa-picker-item {
+        font-size: 13px; padding: 5px 6px; cursor: pointer; border-radius: 4px;
+      }
+      .cwa-picker-item:hover { background: var(--hover); }
+      .cwa-picker-item.attached { color: var(--muted); cursor: default; }
+      .cwa-picker-item.attaching { opacity: 0.5; }
+      .cwa-picker-done {
+        display: block; margin-top: 8px; font-size: 11px; padding: 2px 8px;
+        border: 1px solid var(--border); border-radius: 4px; cursor: pointer;
+        background: transparent; color: var(--muted); width: 100%;
+      }
+      .cwa-picker-done:hover { color: var(--text); }
       /* PPASSIVE — thin persistent status bar pinned at the bottom. */
       .tc-statusbar {
         margin-top: 18px;

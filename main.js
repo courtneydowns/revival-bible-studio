@@ -311,6 +311,17 @@ function registerIpc() {
   // attachments and canon entries that reference a given workspace entry.
   ipcMain.handle('links:for', (_event, kind, id) => db.links.for(kind, id));
 
+  // P36 — cross-workspace attachment writes and picker data.
+  ipcMain.handle('crossWorkspace:attach', (_event, hostKind, hostId, sourceKind, sourceId) =>
+    db.crossWorkspace.attach(hostKind, hostId, sourceKind, sourceId)
+  );
+  ipcMain.handle('crossWorkspace:detach', (_event, hostKind, hostId, sourceKind, sourceId) =>
+    db.crossWorkspace.detach(hostKind, hostId, sourceKind, sourceId)
+  );
+  ipcMain.handle('crossWorkspace:candidates', (_event, sourceKind) =>
+    db.crossWorkspace.candidates(sourceKind)
+  );
+
   ipcMain.handle('settings:getProjectRules', () => db.settings.getProjectRules());
   ipcMain.handle('settings:setProjectRules', (_event, text) =>
     db.settings.setProjectRules(text)

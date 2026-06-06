@@ -210,25 +210,47 @@ function buildStatusBar(workspaceName, item, archivedFlag) {
 
 function renderLinkedList(listHost, data) {
   listHost.innerHTML = '';
-  const group = (heading, items, srcText) => {
-    if (!items.length) return;
+  if (data.attachments.length) {
     const h = document.createElement('div');
     h.className = 'tc-linked-heading';
-    h.textContent = heading;
+    h.textContent = 'Attachments';
     listHost.appendChild(h);
-    for (const it of items) {
+    for (const it of data.attachments) {
+      const row = document.createElement('div');
+      row.className = 'tc-linked-row';
+      const titleBtn = document.createElement('button');
+      titleBtn.type = 'button';
+      titleBtn.className = 'tc-linked-goto';
+      titleBtn.textContent = it.title;
+      titleBtn.title = `Go to ${it.workspace} → ${it.title}`;
+      titleBtn.addEventListener('click', () => {
+        const ws = CWA_KIND_TO_WORKSPACE[it.kind];
+        if (ws) route(ws, it.id);
+      });
+      row.appendChild(titleBtn);
+      const src = document.createElement('span');
+      src.className = 'tc-linked-src';
+      src.textContent = it.workspace;
+      row.appendChild(src);
+      listHost.appendChild(row);
+    }
+  }
+  if (data.canonLinks.length) {
+    const h = document.createElement('div');
+    h.className = 'tc-linked-heading';
+    h.textContent = 'Canon links';
+    listHost.appendChild(h);
+    for (const it of data.canonLinks) {
       const row = document.createElement('div');
       row.className = 'tc-linked-row';
       row.appendChild(document.createTextNode(it.title));
       const src = document.createElement('span');
       src.className = 'tc-linked-src';
-      src.textContent = srcText(it);
+      src.textContent = `Canon Bible · ${it.entry_type}`;
       row.appendChild(src);
       listHost.appendChild(row);
     }
-  };
-  group('Attachments', data.attachments, (it) => it.workspace);
-  group('Canon links', data.canonLinks, (it) => `Canon Bible · ${it.entry_type}`);
+  }
 }
 
 // Passive count that expands to the linked list on click. Mounts immediately
@@ -265,6 +287,221 @@ function mountLinkedIndicator(host, entityKind, id) {
       summary.textContent = '🔗 Links unavailable';
       summary.classList.add('tc-linked-empty');
     });
+}
+
+// P36 — cross-workspace attachment section (interactive, Characters/Episodes only).
+const CWA_HOST_KINDS = new Set(['characters', 'episodes']);
+const CWA_SOURCE_KINDS = [
+  { kind: 'decisions',      label: 'Decisions' },
+  { kind: 'open_questions', label: 'Open Questions' },
+  { kind: 'conflicts',      label: 'Conflicts' },
+  { kind: 'brainstorm',     label: 'Brainstorm' },
+  { kind: 'research',       label: 'Research' },
+];
+const CWA_KIND_TO_WORKSPACE = {
+  characters:      'Characters',
+  episodes:        'Episodes',
+  decisions:       'Decisions',
+  open_questions:  'Open Questions',
+  conflicts:       'Conflicts',
+  brainstorm:      'Brainstorm',
+  research:        'Research',
+  source_material: 'Source Material',
+};
+
+function buildAttachmentPicker(hostKind, hostId, onAttached, onClose) {
+  const picker = document.createElement('div');
+  picker.className = 'cwa-picker';
+
+  const tabRow = document.createElement('div');
+  tabRow.className = 'cwa-picker-tabs';
+  picker.appendChild(tabRow);
+
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.className = 'cwa-picker-search';
+  searchInput.placeholder = 'Search…';
+  picker.appendChild(searchInput);
+
+  const itemList = document.createElement('div');
+  itemList.className = 'cwa-picker-list';
+  picker.appendChild(itemList);
+
+  const doneBtn = document.createElement('button');
+  doneBtn.type = 'button';
+  doneBtn.className = 'cwa-picker-done';
+  doneBtn.textContent = 'Done';
+  doneBtn.addEventListener('click', () => { picker.remove(); onClose(); });
+  picker.appendChild(doneBtn);
+
+  let currentKind = CWA_SOURCE_KINDS[0].kind;
+  let allCandidates = [];
+
+  for (const src of CWA_SOURCE_KINDS) {
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.className = 'cwa-picker-tab';
+    tab.textContent = src.label;
+    tab.dataset.kind = src.kind;
+    if (src.kind === currentKind) tab.classList.add('active');
+    tab.addEventListener('click', () => {
+      currentKind = src.kind;
+      tabRow.querySelectorAll('.cwa-picker-tab').forEach((t) =>
+        t.classList.toggle('active', t.dataset.kind === currentKind)
+      );
+      searchInput.value = '';
+      loadCandidates();
+    });
+    tabRow.appendChild(tab);
+  }
+
+  async function loadCandidates() {
+    itemList.innerHTML = '<div class="cwa-picker-msg">Loading…</div>';
+    try {
+      allCandidates = await window.revival.crossWorkspace.candidates(currentKind);
+      renderCandidates();
+    } catch {
+      itemList.innerHTML = '<div class="cwa-picker-msg">Failed to load.</div>';
+    }
+  }
+
+  function renderCandidates() {
+    const q = searchInput.value.trim().toLowerCase();
+    const filtered = q
+      ? allCandidates.filter((c) => c.title.toLowerCase().includes(q))
+      : allCandidates;
+    itemList.innerHTML = '';
+    if (!filtered.length) {
+      const msg = document.createElement('div');
+      msg.className = 'cwa-picker-msg';
+      msg.textContent = q ? 'No matches.' : 'No entries found.';
+      itemList.appendChild(msg);
+      return;
+    }
+    for (const c of filtered) {
+      const el = document.createElement('div');
+      el.className = 'cwa-picker-item';
+      el.textContent = c.title;
+      el.addEventListener('click', async () => {
+        if (el.classList.contains('attached') || el.classList.contains('attaching')) return;
+        el.classList.add('attaching');
+        try {
+          await window.revival.crossWorkspace.attach(hostKind, hostId, currentKind, c.id);
+          el.classList.remove('attaching');
+          el.classList.add('attached');
+          el.textContent = `${c.title} ✓`;
+          onAttached();
+        } catch {
+          el.classList.remove('attaching');
+        }
+      });
+      itemList.appendChild(el);
+    }
+  }
+
+  searchInput.addEventListener('input', renderCandidates);
+  loadCandidates();
+  return picker;
+}
+
+function mountAttachmentsSection(host, entityKind, id) {
+  if (!entityKind || !window.revival.links || !window.revival.crossWorkspace) return;
+
+  const section = document.createElement('div');
+  section.className = 'cwa-section';
+
+  const header = document.createElement('div');
+  header.className = 'cwa-header';
+  const heading = document.createElement('span');
+  heading.className = 'cwa-heading';
+  heading.textContent = 'Attached';
+  header.appendChild(heading);
+  section.appendChild(header);
+
+  const attachList = document.createElement('div');
+  attachList.className = 'cwa-list';
+  section.appendChild(attachList);
+
+  let pickerOpen = false;
+
+  const attachBtn = document.createElement('button');
+  attachBtn.type = 'button';
+  attachBtn.className = 'cwa-attach-btn';
+  attachBtn.textContent = '+ Attach';
+  header.appendChild(attachBtn);
+
+  attachBtn.addEventListener('click', () => {
+    if (pickerOpen) return;
+    pickerOpen = true;
+    attachBtn.disabled = true;
+    const picker = buildAttachmentPicker(entityKind, id, refresh, () => {
+      pickerOpen = false;
+      attachBtn.disabled = false;
+    });
+    section.appendChild(picker);
+  });
+
+  async function refresh() {
+    const data = await window.revival.links.for(entityKind, id);
+    renderAttachList(data.attachments);
+  }
+
+  function renderAttachList(attachments) {
+    attachList.innerHTML = '';
+    if (!attachments.length) {
+      const empty = document.createElement('div');
+      empty.className = 'cwa-empty';
+      empty.textContent = 'No attachments yet.';
+      attachList.appendChild(empty);
+      return;
+    }
+    for (const att of attachments) {
+      const row = document.createElement('div');
+      row.className = 'cwa-row';
+
+      const titleBtn = document.createElement('button');
+      titleBtn.type = 'button';
+      titleBtn.className = 'cwa-row-title';
+      titleBtn.textContent = att.title;
+      titleBtn.title = `Go to ${att.workspace}`;
+      titleBtn.addEventListener('click', () => {
+        const ws = CWA_KIND_TO_WORKSPACE[att.kind];
+        if (ws) route(ws, att.id);
+      });
+      row.appendChild(titleBtn);
+
+      const right = document.createElement('div');
+      right.className = 'cwa-row-right';
+
+      const src = document.createElement('span');
+      src.className = 'cwa-row-src';
+      src.textContent = att.workspace;
+      right.appendChild(src);
+
+      const unlinkBtn = document.createElement('button');
+      unlinkBtn.type = 'button';
+      unlinkBtn.className = 'cwa-unlink';
+      unlinkBtn.textContent = 'Unlink';
+      unlinkBtn.addEventListener('click', async () => {
+        unlinkBtn.disabled = true;
+        try {
+          await window.revival.crossWorkspace.detach(entityKind, id, att.kind, att.id);
+          await refresh();
+        } catch {
+          unlinkBtn.disabled = false;
+        }
+      });
+      right.appendChild(unlinkBtn);
+
+      row.appendChild(right);
+      attachList.appendChild(row);
+    }
+  }
+
+  host.appendChild(section);
+  refresh().catch(() => {
+    attachList.innerHTML = '<div class="cwa-empty">Links unavailable.</div>';
+  });
 }
 
 // --- Shared entry workspace (two-column: list left, detail right) ---
@@ -823,9 +1060,13 @@ function makeEntryWorkspace(config) {
       });
     }
 
-    // PPASSIVE — passive linked-entries indicator, then the persistent status
-    // bar pinned at the very bottom of the detail panel.
-    mountLinkedIndicator(rightCol, entityKind, item.id);
+    // P36 / PPASSIVE — Characters and Episodes get the interactive attachment
+    // section; all other workspaces get the passive linked-entries indicator.
+    if (CWA_HOST_KINDS.has(entityKind)) {
+      mountAttachmentsSection(rightCol, entityKind, item.id);
+    } else {
+      mountLinkedIndicator(rightCol, entityKind, item.id);
+    }
     rightCol.appendChild(buildStatusBar(workspaceName, item, archivedFlag));
   }
 

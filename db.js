@@ -3646,6 +3646,40 @@ const links = {
   },
 };
 
+// P36 — cross-workspace attachment writes. attach/detach create and remove
+// rows in cross_workspace_attachments; candidates lists active entries from a
+// source workspace so the picker can display them.
+const crossWorkspace = {
+  attach(hostKind, hostId, sourceKind, sourceId) {
+    const db = getDb();
+    db.prepare(
+      `INSERT OR IGNORE INTO cross_workspace_attachments
+         (host_kind, host_id, source_kind, source_id, created_at)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(hostKind, hostId, sourceKind, sourceId, new Date().toISOString());
+  },
+  detach(hostKind, hostId, sourceKind, sourceId) {
+    const db = getDb();
+    db.prepare(
+      `DELETE FROM cross_workspace_attachments
+        WHERE host_kind = ? AND host_id = ?
+          AND source_kind = ? AND source_id = ?`
+    ).run(hostKind, hostId, sourceKind, sourceId);
+  },
+  candidates(sourceKind) {
+    const db = getDb();
+    const table = CWA_TABLE_BY_KIND[sourceKind];
+    if (!table) return [];
+    return db
+      .prepare(
+        `SELECT id, title FROM ${table}
+          WHERE archived_at IS NULL
+          ORDER BY updated_at DESC, id DESC`
+      )
+      .all();
+  },
+};
+
 // PCONFLICT — deterministic conflict detection for the Canon Bible.
 //
 // Runs on demand, never automatically. Surfaces *pairs / groups* of active
@@ -4013,6 +4047,7 @@ module.exports = {
   tags,
   search,
   links,
+  crossWorkspace,
   getDbPath,
   DB_FILENAME,
   MIGRATIONS,

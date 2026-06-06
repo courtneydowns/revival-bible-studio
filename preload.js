@@ -217,6 +217,15 @@ contextBridge.exposeInMainWorld('revival', {
   links: {
     for: (kind, id) => ipcRenderer.invoke('links:for', kind, id),
   },
+  // P36 — cross-workspace attachment writes and picker data.
+  crossWorkspace: {
+    attach: (hostKind, hostId, sourceKind, sourceId) =>
+      ipcRenderer.invoke('crossWorkspace:attach', hostKind, hostId, sourceKind, sourceId),
+    detach: (hostKind, hostId, sourceKind, sourceId) =>
+      ipcRenderer.invoke('crossWorkspace:detach', hostKind, hostId, sourceKind, sourceId),
+    candidates: (sourceKind) =>
+      ipcRenderer.invoke('crossWorkspace:candidates', sourceKind),
+  },
   panic: {
     export: () => ipcRenderer.invoke('panic:export'),
   },
