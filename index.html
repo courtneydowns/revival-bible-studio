@@ -1499,6 +1499,89 @@
       .char-rel-form select:focus,
       .char-rel-form input:focus { outline: none; border-color: var(--accent); }
       .char-rel-form-actions { display: flex; align-items: center; gap: 8px; }
+      /* P38 — Propose Canon Change section in Characters/Episodes detail panel */
+      .canon-propose-section {
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border);
+      }
+      .canon-propose-heading {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        margin-bottom: 8px;
+      }
+      .canon-propose-btn { font-size: 12px; padding: 4px 10px; }
+      /* P38 — Propose Canon Change modal (cp = canon propose) */
+      .cp-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: 12vh;
+        background: rgba(0, 0, 0, 0.45);
+      }
+      .cp-overlay[hidden] { display: none; }
+      .cp-modal {
+        width: 520px;
+        max-width: 92vw;
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+        overflow: hidden;
+      }
+      .cp-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+      }
+      .cp-head-title { font-size: 13px; font-weight: 600; color: var(--text); }
+      .cp-close-btn {
+        background: none;
+        border: none;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1;
+        cursor: pointer;
+      }
+      .cp-close-btn:hover { color: var(--accent); }
+      .cp-form { display: flex; flex-direction: column; gap: 10px; padding: 14px; }
+      .cp-label { font-size: 11px; color: var(--muted); margin-bottom: 2px; display: block; }
+      .cp-input,
+      .cp-textarea {
+        font: inherit;
+        width: 100%;
+        box-sizing: border-box;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 10px;
+      }
+      .cp-textarea { resize: vertical; }
+      .cp-input:focus,
+      .cp-textarea:focus { outline: none; border-color: var(--accent); }
+      .cp-field { display: flex; flex-direction: column; }
+      .cp-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .cp-actions { display: flex; gap: 8px; }
+      .cp-error { font-size: 12px; color: #e06c6c; }
+      .cp-error[hidden] { display: none; }
+      .cp-success { font-size: 12px; color: #7ec89e; }
+      .cp-success[hidden] { display: none; }
+
       /* SVG graph — full-width because the left column is hidden in relational view */
       .char-graph-container {
         flex: 1;
@@ -2833,6 +2916,40 @@
         <button id="chat-send" type="submit" class="btn-primary">Send</button>
       </form>
     </aside>
+
+    <!-- P38 — Propose Canon Change modal. Opened from Character/Episode detail
+         panels via the "Propose Canon Change" button. Hidden until invoked. -->
+    <div id="cp-overlay" class="cp-overlay" hidden>
+      <div class="cp-modal" role="dialog" aria-modal="true" aria-labelledby="cp-head-title">
+        <header class="cp-head">
+          <span id="cp-head-title" class="cp-head-title">Propose Canon Change</span>
+          <button id="cp-close" class="cp-close-btn" type="button" aria-label="Close">✕</button>
+        </header>
+        <form id="cp-form" class="cp-form">
+          <div class="cp-field">
+            <label class="cp-label" for="cp-title">Title</label>
+            <input id="cp-title" class="cp-input" type="text" placeholder="Proposal title" aria-label="Title" />
+          </div>
+          <div class="cp-field">
+            <label class="cp-label" for="cp-body">Body</label>
+            <textarea id="cp-body" class="cp-textarea" rows="4" placeholder="What should be canonized? (optional)" aria-label="Body"></textarea>
+          </div>
+          <div class="cp-field">
+            <label class="cp-label" for="cp-note">Proposer note</label>
+            <input id="cp-note" class="cp-input" type="text" placeholder="Why this needs to be canon (optional)" aria-label="Proposer note" />
+          </div>
+          <div class="cp-error" id="cp-error" hidden></div>
+          <div class="cp-success" id="cp-success" hidden></div>
+          <div class="cp-foot">
+            <span></span>
+            <div class="cp-actions">
+              <button id="cp-cancel" type="button" class="btn-secondary">Cancel</button>
+              <button id="cp-submit" type="submit" class="btn-primary">Send to Canon Review</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
 
     <!-- PCAP global quick-capture: Cmd/Ctrl+Shift+N opens this from any
          workspace. Title + body, one click saves to Unsorted; Escape

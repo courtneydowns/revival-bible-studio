@@ -272,7 +272,7 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Visual showing how characters connect (relationships, factions, arcs, conflicts)
 - **Smoke:** Define a relationship between two characters, see it in relational view
 
-### P38 — Characters/Episodes → Canon Review
+### P38 — Characters/Episodes → Canon Review ✅
 - Propose a canon change from a Character or Episode entry
 - Lands in Canon Review queue
 - **Smoke:** Propose from a Character, see it in Canon Review, approve it, confirm in Canon Bible

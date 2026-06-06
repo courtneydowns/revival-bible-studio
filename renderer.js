@@ -5789,7 +5789,29 @@ async function mountCharRelationships(container, charId) {
   await loadData();
 }
 
-// --- End P37 helpers -------------------------------------------------------
+// P38 — Propose Canon Change section in Character/Episode detail panels.
+// Adds a "Canon" heading + button; clicking opens the cp-overlay modal with
+// the entry's title/body pre-filled and source attribution pre-wired.
+function mountProposeCanonSection(container, item, sourceKind) {
+  const section = document.createElement('div');
+  section.className = 'canon-propose-section';
+
+  const heading = document.createElement('div');
+  heading.className = 'canon-propose-heading';
+  heading.textContent = 'Canon';
+  section.appendChild(heading);
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn-secondary canon-propose-btn';
+  btn.textContent = 'Propose Canon Change';
+  btn.addEventListener('click', () => openProposalModal(item, sourceKind));
+  section.appendChild(btn);
+
+  container.appendChild(section);
+}
+
+// --- End P37+P38 helpers ---------------------------------------------------
 
 const CONTENT_RENDERERS = {
   'Home': renderHomePage,
@@ -5879,16 +5901,17 @@ const CONTENT_RENDERERS = {
     titlePlaceholder: 'Character name',
     bodyPlaceholder: 'Who they are — role, traits, arc, open threads (optional)',
     detailExtra(rightCol, item, archivedFlag) {
-      if (!archivedFlag) mountCharRelationships(rightCol, item.id);
+      if (!archivedFlag) {
+        mountCharRelationships(rightCol, item.id);
+        mountProposeCanonSection(rightCol, item, 'characters_workspace');
+      }
     },
     leftColExtra(leftCol, rightCol, ctx) {
       setupCharRelationalView(leftCol, rightCol, ctx);
     },
   }),
-  // Episodes (P27): basic create/edit/delete/archive/restore on episode entries
-  // (name + outline/scene list/beats/draft notes). Attachments and canon flow
-  // are later phases. Amber accent so the drafting surface reads distinctly from
-  // Characters and the queue workspaces.
+  // Episodes (P27+P38): basic create/edit/delete/archive/restore on episode entries
+  // (name + outline/scene list/beats/draft notes). P38 adds canon proposal button.
   'Episodes': makeEntryWorkspace({
     apiName: 'episodes',
     entityKind: 'episodes',
@@ -5897,6 +5920,9 @@ const CONTENT_RENDERERS = {
     sectionClass: 'ws-episodes',
     titlePlaceholder: 'Episode title',
     bodyPlaceholder: 'Outline, scene list, beats, draft notes (optional)',
+    detailExtra(rightCol, item, archivedFlag) {
+      if (!archivedFlag) mountProposeCanonSection(rightCol, item, 'episodes_workspace');
+    },
   }),
 };
 
@@ -6634,6 +6660,84 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !qcOverlay.hidden) {
     e.preventDefault();
     closeQuickCapture();
+  }
+});
+
+// --- P38 — Propose Canon Change modal (cp-overlay) -------------------------
+// Singleton modal opened from Character/Episode detail panels. Source kind
+// and entry id are stored in module-level vars on open.
+let _cpSourceKind = null;
+let _cpSourceEntryId = null;
+
+const cpOverlay = document.getElementById('cp-overlay');
+const cpForm = document.getElementById('cp-form');
+const cpTitleInput = document.getElementById('cp-title');
+const cpBodyInput = document.getElementById('cp-body');
+const cpNoteInput = document.getElementById('cp-note');
+const cpSubmitBtn = document.getElementById('cp-submit');
+const cpCancelBtn = document.getElementById('cp-cancel');
+const cpCloseBtn = document.getElementById('cp-close');
+const cpError = document.getElementById('cp-error');
+const cpSuccess = document.getElementById('cp-success');
+
+function openProposalModal(item, sourceKind) {
+  _cpSourceKind = sourceKind;
+  _cpSourceEntryId = item.id;
+  cpTitleInput.value = item.title || '';
+  cpBodyInput.value = item.body || '';
+  cpNoteInput.value = '';
+  setStatus(cpError, '');
+  setStatus(cpSuccess, '');
+  cpSubmitBtn.disabled = false;
+  cpOverlay.hidden = false;
+  cpTitleInput.focus();
+  cpTitleInput.select();
+}
+
+function closeProposalModal() {
+  cpOverlay.hidden = true;
+  _cpSourceKind = null;
+  _cpSourceEntryId = null;
+}
+
+cpCancelBtn.addEventListener('click', closeProposalModal);
+cpCloseBtn.addEventListener('click', closeProposalModal);
+
+cpOverlay.addEventListener('mousedown', (e) => {
+  if (e.target === cpOverlay) closeProposalModal();
+});
+
+cpForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const title = cpTitleInput.value.trim();
+  if (!title) {
+    setStatus(cpError, 'Title is required.');
+    cpTitleInput.focus();
+    return;
+  }
+  cpSubmitBtn.disabled = true;
+  setStatus(cpError, '');
+  try {
+    const note = cpNoteInput.value.trim();
+    await window.revival.canonProposals.createFromExtract({
+      title,
+      body: cpBodyInput.value.trim(),
+      source_kind: _cpSourceKind,
+      source_entry_id: _cpSourceEntryId,
+      proposer_note: note || null,
+    });
+    setStatus(cpSuccess, 'Sent to Canon Review.');
+    setTimeout(closeProposalModal, 1800);
+  } catch (err) {
+    setStatus(cpError, err.message || 'Could not send proposal.');
+    cpSubmitBtn.disabled = false;
+  }
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !cpOverlay.hidden) {
+    e.preventDefault();
+    closeProposalModal();
   }
 });
 

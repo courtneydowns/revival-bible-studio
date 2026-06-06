@@ -47,9 +47,9 @@
 | **PCONFLICT Conflict detection UI** | **CLI** ✅ | Cross-entry analysis + routing |
 | **PCONFLICT-2 Auto-route + re-check nudges** | **CLI** ✅ | New IPCs (scanAndRoute, openFlagEntryIds) + multi-file (Canon Bible + Conflicts) |
 | **PCONFLICT-3 Contradiction scan + conflict lifecycle** | **CLI** ✅ | Scan + lifecycle wiring across Canon Bible + Conflicts, reuses PCONFLICT-2 helpers |
-| **P36 Cross-workspace attachments** | **CLI** | Cross-module wiring, join tables |
-| **P37 Characters relational view** | **CLI** | New visual component |
-| **P38 Characters/Episodes → Canon Review** | **CLI** | Cross-module flow |
+| **P36 Cross-workspace attachments** | **CLI** ✅ | Cross-module wiring, join tables |
+| **P37 Characters relational view** | **CLI** ✅ | New visual component |
+| **P38 Characters/Episodes → Canon Review** | **CLI** ✅ | Cross-module flow |
 | **PWLAB Writing Lab → Canon Review** | **VS Code ext** | Action on existing Writing Lab page |
 | **PPOL1 UI Polish: pre-import** | **VS Code ext / CLI** | Per item in POLISH_NOTES_ONGOING.md |
 | **P20v2 Panic Export v2** | **VS Code ext** | Extend existing export module |
