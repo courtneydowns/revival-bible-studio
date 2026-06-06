@@ -941,19 +941,425 @@ function renderChatPage(section) {
   section.appendChild(btn);
 }
 
-// --- Canon Bible (P31) — read-only list view -------------------------------
+// --- Canon Bible (P31 read view + P32 create/edit/archive/delete) ---------
 // First UI surface on top of the canon schema. The page lists active canon
-// entries with provenance fields visible (origin_kind, origin_lock_code,
-// origin session, legacy IDs, lock/provisional/status/certainty/review
-// state). A collapsed "Retired" section sits below so the supersede chain
-// stays visible without dominating the page. Editing, lock toggles, and the
-// Canon Review queue arrive in P32–P35; nothing here mutates canon yet.
+// entries with provenance visible (origin_kind, origin_lock_code, origin
+// session, legacy IDs, lock/provisional/status/certainty/review state) and
+// a collapsed Retired section at the bottom that holds withdrawn entries.
 //
-// One dev affordance is included for the P31 smoke test only: a "Seed sample
-// entries (dev)" button that appears solely when the canon is empty. It calls
-// canon.devSeed (idempotent) so the smoke test has data to look at. Once any
-// entries exist the button vanishes — this is not a real-data entry path.
-function buildCanonCard(e, tagList, onTagChange) {
+// P32 adds the create/edit/archive/delete lifecycle directly on this page:
+//   - "+ Add canon entry" button at the top opens an inline create form.
+//     The form picks an entry_type first, then renders the type's detail
+//     fields (from canon.typeConfig) alongside title, body, status,
+//     certainty, review_state, and provisional. Drafts autosave to
+//     localStorage so quitting mid-edit preserves the work.
+//   - Each active card has an inline action row: Edit, Archive, Delete.
+//     Edit swaps the card content for the same form (now bound to that
+//     entry) without leaving the page. Archive flips retired=1 so the card
+//     drops into the Retired section. Delete prompts for confirmation then
+//     hard-deletes (ON DELETE CASCADE handles the detail row, legacy ids,
+//     and relationships; the renderer also unlinks tags before the row goes).
+//   - Each retired card has a Restore button (alongside Delete).
+//
+// CLAUDE.md says canon changes flow through Canon Review proposals. The
+// Canon Review UI doesn't exist until P35; until then this direct path is
+// the only way to bootstrap or correct canon. Lock/unlock (P33), supersede
+// (P34), and the Canon Review queue (P35) are all separate phases.
+//
+// The P31 dev-seed button still appears solely when the canon is empty so
+// the smoke test can prime data without typing.
+
+const CANON_STATUS_OPTIONS = [
+  'draft', 'speculative', 'implied', 'provisional', 'confirmed', 'retired', 'struck',
+];
+const CANON_CERTAINTY_OPTIONS = ['', 'low', 'medium', 'high'];
+const CANON_REVIEW_STATE_OPTIONS = [
+  '', 'placement_ready', 'needs_review', 'unresolved', 'deferred',
+  're_confirmation_flagged', 'open_for_revision',
+];
+
+const CanonDrafts = makeDrafts('canon');
+
+function formatCanonDetailValue(field, value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (field.kind === 'boolean') return value ? 'yes' : 'no';
+  return String(value);
+}
+
+// Build the read-only "Details" block beneath the body — the per-type
+// columns surfaced as label: value pairs. Skips null/empty fields so the
+// block stays compact on sparsely-populated entries.
+function buildCanonDetailsBlock(typeConfig, entryType, detail) {
+  const cfg = typeConfig && typeConfig[entryType];
+  if (!cfg) return null;
+  const rows = [];
+  if (cfg.table && detail) {
+    for (const f of cfg.fields) {
+      const v = formatCanonDetailValue(f, detail[f.col]);
+      if (v == null) continue;
+      rows.push({ label: f.label, value: v, kind: f.kind });
+    }
+  }
+  // cfg.note is form-time guidance only — suppressed in view mode so it
+  // doesn't repeat on every card.
+  if (rows.length === 0) return null;
+
+  const block = document.createElement('div');
+  block.className = 'canon-details';
+  const heading = document.createElement('div');
+  heading.className = 'canon-details-heading';
+  heading.textContent = `${cfg.label || entryType} details`;
+  block.appendChild(heading);
+  for (const row of rows) {
+    const r = document.createElement('div');
+    r.className = 'canon-details-row';
+    const k = document.createElement('span');
+    k.className = 'canon-details-key';
+    k.textContent = row.label;
+    const v = document.createElement('span');
+    v.className = 'canon-details-val';
+    if (row.kind === 'textarea') v.classList.add('multiline');
+    v.textContent = row.value;
+    r.append(k, v);
+    block.appendChild(r);
+  }
+  return block;
+}
+
+// One detail-field input. Returns { wrap, read } where read() pulls the
+// current value back as a JS primitive (string, number, or boolean) ready
+// to hand to canon.create/update.
+function buildCanonDetailField(field, initial) {
+  const wrap = document.createElement('div');
+  wrap.className = 'canon-field';
+  const label = document.createElement('label');
+  label.className = 'canon-field-label';
+  label.textContent = field.required ? `${field.label} *` : field.label;
+  wrap.appendChild(label);
+
+  let input;
+  if (field.kind === 'textarea') {
+    input = document.createElement('textarea');
+    input.rows = 3;
+    input.value = initial == null ? '' : String(initial);
+  } else if (field.kind === 'select') {
+    input = document.createElement('select');
+    for (const opt of field.options || []) {
+      const o = document.createElement('option');
+      o.value = opt;
+      o.textContent = opt === '' ? '(none)' : opt;
+      input.appendChild(o);
+    }
+    const initVal = initial != null ? String(initial) : (field.default != null ? String(field.default) : '');
+    input.value = initVal;
+  } else if (field.kind === 'boolean') {
+    input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = !!initial;
+  } else if (field.kind === 'number') {
+    input = document.createElement('input');
+    input.type = 'number';
+    input.value = initial == null ? '' : String(initial);
+  } else {
+    input = document.createElement('input');
+    input.type = 'text';
+    input.value = initial == null ? '' : String(initial);
+  }
+  input.className = 'canon-field-input';
+  label.appendChild(input);
+
+  if (field.hint) {
+    const h = document.createElement('div');
+    h.className = 'canon-field-hint';
+    h.textContent = field.hint;
+    wrap.appendChild(h);
+  }
+
+  function read() {
+    if (field.kind === 'boolean') return input.checked;
+    if (field.kind === 'number') {
+      const v = input.value.trim();
+      if (v === '') return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    }
+    if (field.kind === 'select') return input.value === '' ? null : input.value;
+    return input.value;
+  }
+
+  return { wrap, input, read };
+}
+
+// Shared form builder for both create and edit. `entry` is null for create
+// (just the picked type) or the existing entry for edit (type already
+// committed — picker is disabled). Calls onSubmit(payload) with the
+// payload shape canon.create/canon.update expects. Autosaves to a draft
+// slot ('new' or the entry id) on every input change.
+function buildCanonForm({
+  typeConfig,
+  entry,            // null = create
+  initialType,      // create only
+  draftSlot,        // 'new' or `edit:${id}`
+  onSubmit,
+  onCancel,
+}) {
+  const form = document.createElement('form');
+  form.className = 'canon-form';
+  const isEdit = !!entry;
+  let currentType = isEdit ? entry.entry_type : (initialType || null);
+  let detailFields = [];
+
+  const err = document.createElement('p');
+  err.className = 'form-error';
+
+  // Type picker (locked on edit).
+  const typeRow = document.createElement('div');
+  typeRow.className = 'canon-field';
+  const typeLabel = document.createElement('label');
+  typeLabel.className = 'canon-field-label';
+  typeLabel.textContent = 'Entry type *';
+  const typeSelect = document.createElement('select');
+  typeSelect.className = 'canon-field-input';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '— pick a type —';
+  typeSelect.appendChild(placeholder);
+  for (const key of Object.keys(typeConfig)) {
+    const o = document.createElement('option');
+    o.value = key;
+    o.textContent = `${typeConfig[key].label} (${key})`;
+    typeSelect.appendChild(o);
+  }
+  if (currentType) typeSelect.value = currentType;
+  if (isEdit) typeSelect.disabled = true;
+  typeLabel.appendChild(typeSelect);
+  typeRow.appendChild(typeLabel);
+  if (isEdit) {
+    const h = document.createElement('div');
+    h.className = 'canon-field-hint';
+    h.textContent = 'Type is fixed once an entry exists. Use supersede (P34) to change shape.';
+    typeRow.appendChild(h);
+  }
+  form.appendChild(typeRow);
+
+  // Common fields.
+  const titleInput = document.createElement('input');
+  titleInput.type = 'text';
+  titleInput.placeholder = 'Title';
+  titleInput.className = 'canon-field-input';
+  titleInput.maxLength = 200;
+  titleInput.value = entry ? entry.title : '';
+
+  const titleWrap = document.createElement('div');
+  titleWrap.className = 'canon-field';
+  const titleLabel = document.createElement('label');
+  titleLabel.className = 'canon-field-label';
+  titleLabel.textContent = 'Title *';
+  titleLabel.appendChild(titleInput);
+  titleWrap.appendChild(titleLabel);
+  form.appendChild(titleWrap);
+
+  const bodyInput = document.createElement('textarea');
+  bodyInput.rows = 4;
+  bodyInput.placeholder = 'Summary / body (optional)';
+  bodyInput.className = 'canon-field-input';
+  bodyInput.value = entry && entry.body ? entry.body : '';
+  const bodyWrap = document.createElement('div');
+  bodyWrap.className = 'canon-field';
+  const bodyLabel = document.createElement('label');
+  bodyLabel.className = 'canon-field-label';
+  bodyLabel.textContent = 'Body';
+  bodyLabel.appendChild(bodyInput);
+  bodyWrap.appendChild(bodyLabel);
+  form.appendChild(bodyWrap);
+
+  // Status / certainty / review_state / provisional row.
+  const statusRow = document.createElement('div');
+  statusRow.className = 'canon-form-statusrow';
+
+  function picker(label, options, current) {
+    const w = document.createElement('label');
+    w.className = 'canon-field canon-field-inline';
+    const lbl = document.createElement('span');
+    lbl.className = 'canon-field-label';
+    lbl.textContent = label;
+    const sel = document.createElement('select');
+    sel.className = 'canon-field-input';
+    for (const opt of options) {
+      const o = document.createElement('option');
+      o.value = opt;
+      o.textContent = opt === '' ? '(none)' : opt;
+      sel.appendChild(o);
+    }
+    sel.value = current == null ? '' : String(current);
+    w.append(lbl, sel);
+    return { wrap: w, input: sel };
+  }
+  const statusPicker = picker('Canon status', CANON_STATUS_OPTIONS, entry ? entry.canon_status : 'draft');
+  const certaintyPicker = picker('Certainty', CANON_CERTAINTY_OPTIONS, entry ? entry.certainty : '');
+  const reviewPicker = picker('Review state', CANON_REVIEW_STATE_OPTIONS, entry ? entry.review_state : '');
+
+  const provLabel = document.createElement('label');
+  provLabel.className = 'canon-field canon-field-inline';
+  const provSpan = document.createElement('span');
+  provSpan.className = 'canon-field-label';
+  provSpan.textContent = 'Provisional';
+  const provInput = document.createElement('input');
+  provInput.type = 'checkbox';
+  provInput.checked = !!(entry && entry.provisional);
+  provLabel.append(provSpan, provInput);
+
+  statusRow.append(statusPicker.wrap, certaintyPicker.wrap, reviewPicker.wrap, provLabel);
+  form.appendChild(statusRow);
+
+  // Detail-field host — re-rendered when type changes (create path only).
+  const detailHost = document.createElement('div');
+  detailHost.className = 'canon-detail-fields';
+  form.appendChild(detailHost);
+
+  function readPayload() {
+    const detail = {};
+    for (const f of detailFields) detail[f.field.col] = f.read();
+    return {
+      entry_type: currentType,
+      title: titleInput.value,
+      body: bodyInput.value,
+      canon_status: statusPicker.input.value || 'draft',
+      certainty: certaintyPicker.input.value || null,
+      review_state: reviewPicker.input.value || null,
+      provisional: provInput.checked,
+      detail,
+    };
+  }
+
+  function saveDraft() {
+    if (!draftSlot) return;
+    CanonDrafts.set(draftSlot, readPayload());
+    setStatus(formStatus, isEdit
+      ? 'Draft autosaved — click Save to finalize.'
+      : 'Draft saved — click Save canon entry to finalize.');
+  }
+
+  function renderDetailFields(savedDetailValues) {
+    detailHost.innerHTML = '';
+    detailFields = [];
+    if (!currentType) return;
+    const cfg = typeConfig[currentType];
+    if (!cfg) return;
+
+    if (cfg.note) {
+      const note = document.createElement('div');
+      note.className = 'canon-field-note';
+      note.textContent = cfg.note;
+      detailHost.appendChild(note);
+    }
+    if (!cfg.table || cfg.fields.length === 0) return;
+
+    const heading = document.createElement('div');
+    heading.className = 'canon-details-heading';
+    heading.textContent = `${cfg.label} fields`;
+    detailHost.appendChild(heading);
+
+    const seed = savedDetailValues || (entry && entry.detail) || {};
+    for (const field of cfg.fields) {
+      const initial = Object.prototype.hasOwnProperty.call(seed, field.col)
+        ? seed[field.col]
+        : undefined;
+      const b = buildCanonDetailField(field, initial);
+      detailHost.appendChild(b.wrap);
+      const wired = { field, read: b.read, input: b.input };
+      detailFields.push(wired);
+      const evt = field.kind === 'boolean' || field.kind === 'select'
+        ? 'change' : 'input';
+      b.input.addEventListener(evt, saveDraft);
+    }
+  }
+
+  // Restore draft if present. The draft seeds: type (create path),
+  // common fields, and detail-field initial values.
+  const draft = draftSlot ? CanonDrafts.get(draftSlot) : null;
+  if (draft) {
+    if (!isEdit && draft.entry_type) {
+      currentType = draft.entry_type;
+      typeSelect.value = draft.entry_type;
+    }
+    if (draft.title != null) titleInput.value = draft.title;
+    if (draft.body != null) bodyInput.value = draft.body;
+    if (draft.canon_status) statusPicker.input.value = draft.canon_status;
+    if (draft.certainty !== undefined) certaintyPicker.input.value = draft.certainty || '';
+    if (draft.review_state !== undefined) reviewPicker.input.value = draft.review_state || '';
+    if (draft.provisional !== undefined) provInput.checked = !!draft.provisional;
+  }
+  renderDetailFields(draft ? draft.detail : null);
+
+  typeSelect.addEventListener('change', () => {
+    currentType = typeSelect.value || null;
+    err.textContent = '';
+    renderDetailFields(null);
+    saveDraft();
+  });
+  for (const el of [titleInput, bodyInput]) {
+    el.addEventListener('input', saveDraft);
+  }
+  for (const sel of [statusPicker.input, certaintyPicker.input, reviewPicker.input]) {
+    sel.addEventListener('change', saveDraft);
+  }
+  provInput.addEventListener('change', saveDraft);
+
+  const actions = document.createElement('div');
+  actions.className = 'tc-detail-actions';
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'submit';
+  saveBtn.className = 'btn-primary';
+  saveBtn.textContent = isEdit ? 'Save' : 'Save canon entry';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'btn-secondary';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => {
+    if (draftSlot) CanonDrafts.clear(draftSlot);
+    if (typeof onCancel === 'function') onCancel();
+  });
+  actions.append(saveBtn, cancelBtn);
+
+  const formStatus = document.createElement('p');
+  formStatus.className = 'draft-status';
+  if (draft) {
+    setStatus(formStatus, isEdit
+      ? 'Unsaved draft restored — click Save to finalize.'
+      : 'Unfinalized draft restored — click Save canon entry to finalize.');
+  }
+
+  form.append(actions, formStatus, err);
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    err.textContent = '';
+    if (!currentType) {
+      err.textContent = 'Pick an entry type before saving.';
+      return;
+    }
+    if (titleInput.value.trim() === '') {
+      err.textContent = 'Title is required.';
+      return;
+    }
+    saveBtn.disabled = true;
+    try {
+      await onSubmit(readPayload());
+      if (draftSlot) CanonDrafts.clear(draftSlot);
+    } catch (e2) {
+      err.textContent = e2.message || 'Could not save canon entry.';
+      saveBtn.disabled = false;
+    }
+  });
+
+  return form;
+}
+
+// View-mode card render. The action row at the bottom is built by the
+// caller so it can wire the Edit button to flip the card into an in-place
+// edit form, etc.
+function buildCanonCard(e, typeConfig, onTagChange, actionsBuilder) {
   const card = document.createElement('div');
   card.className = 'entry-card canon-card';
   if (e.locked) card.classList.add('canon-locked');
@@ -978,6 +1384,10 @@ function buildCanonCard(e, tagList, onTagChange) {
     body.textContent = e.body;
     card.appendChild(body);
   }
+
+  // P32 — typed detail fields below body.
+  const details = buildCanonDetailsBlock(typeConfig, e.entry_type, e.detail);
+  if (details) card.appendChild(details);
 
   // Status chips — lock/provisional/status/certainty/review_state.
   const chips = document.createElement('div');
@@ -1047,9 +1457,14 @@ function buildCanonCard(e, tagList, onTagChange) {
   }
   card.appendChild(meta);
 
-  // PTAG — tag bar on canon cards. Canon content is read-only here, but tags
-  // are metadata (separate table) and the PTAG spec calls for "any entry
-  // across all workspaces and canon", so the picker is available on every card.
+  // P32 — Edit / Archive / Delete (or Restore / Delete for retired).
+  if (typeof actionsBuilder === 'function') {
+    const actions = actionsBuilder(e, card);
+    if (actions) card.appendChild(actions);
+  }
+
+  // PTAG — tag bar on canon cards. Available even on retired entries so the
+  // user can adjust metadata without restoring first.
   if (window.RevivalTags) {
     window.RevivalTags.mountTagBar(card, 'canon_entries', e.id, {
       onChange: typeof onTagChange === 'function' ? onTagChange : undefined,
@@ -1063,8 +1478,7 @@ function renderCanonBiblePage(section) {
   section.classList.add('ws-canon');
 
   // Five-UI-questions intro: where am I / what is this for / what next /
-  // where saved material goes / how to edit. All five answered up front so
-  // the read-only state isn't confusing.
+  // where saved material goes / how to edit.
   const intro = document.createElement('div');
   intro.className = 'canon-intro';
   const lede = document.createElement('p');
@@ -1074,27 +1488,44 @@ function renderCanonBiblePage(section) {
   const sub = document.createElement('p');
   sub.className = 'placeholder';
   sub.textContent =
-    'Read-only at this phase. New entries land here after approval in Canon ' +
-    'Review (P35); editing, lock/unlock, and supersede arrive in P32–P34. ' +
-    'Until then this view exists so you can see what canon already holds.';
+    'Add, edit, archive, or delete entries below. ' +
+    'Lock / unlock arrives in P33, supersede in P34, and the full Canon Review ' +
+    'queue in P35; until then this page is the direct editor.';
   intro.appendChild(sub);
   section.appendChild(intro);
 
-  // Dev seed bar — only renders when the canon is empty.
-  const seedBar = document.createElement('div');
+  // + Add row + dev seed bar (the seed button only renders when canon is
+  // empty so it doesn't clutter the page once real entries exist).
+  const topBar = document.createElement('div');
+  topBar.className = 'canon-topbar';
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'btn-primary canon-add-btn';
+  addBtn.textContent = '+ Add canon entry';
+  topBar.appendChild(addBtn);
+  const seedBar = document.createElement('span');
   seedBar.className = 'canon-seedbar';
-  section.appendChild(seedBar);
+  topBar.appendChild(seedBar);
+  section.appendChild(topBar);
 
   const status = document.createElement('div');
   status.className = 'canon-status placeholder';
   section.appendChild(status);
 
-  // PTAG filter bar above the canon list. AND semantics across both active
-  // and retired lists.
+  // Create-form host — fills with the inline form when addBtn is clicked,
+  // otherwise empty.
+  const createHost = document.createElement('div');
+  createHost.className = 'canon-create-host';
+  section.appendChild(createHost);
+
+  // PTAG filter bar.
   let tagFilter = new Set();
   let entriesCache = [];
   let retiredCache = [];
   let canonTagsById = {};
+  let typeConfig = {};
+  // Per-entry edit-mode state: id -> true means render edit form, not card.
+  const editing = new Set();
   if (window.RevivalTags) {
     const fc = window.RevivalTags.mountFilterBar(section, 'canon_entries', {
       onChange: (sel) => {
@@ -1132,8 +1563,161 @@ function renderCanonBiblePage(section) {
     return true;
   }
 
-  // Repaint both lists from cache. Called by both the filter bar's onChange
-  // and after a tag mutation refreshes canonTagsById.
+  // Build the inline action row for an active card.
+  function activeActions(e) {
+    const actions = document.createElement('div');
+    actions.className = 'tc-detail-actions';
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'btn-secondary';
+    editBtn.textContent = CanonDrafts.get(`edit:${e.id}`) ? 'Resume editing' : 'Edit';
+    editBtn.addEventListener('click', () => {
+      editing.add(e.id);
+      renderLists();
+    });
+    actions.appendChild(editBtn);
+
+    const archiveBtn = document.createElement('button');
+    archiveBtn.type = 'button';
+    archiveBtn.className = 'btn-secondary';
+    archiveBtn.textContent = 'Archive';
+    archiveBtn.addEventListener('click', async () => {
+      archiveBtn.disabled = true;
+      try {
+        await window.revival.canon.archive(e.id);
+        setStatus(status, `Archived “${e.title}”.`);
+        await refresh();
+      } catch (err) {
+        setStatus(status, `Archive failed: ${err.message || err}`);
+        archiveBtn.disabled = false;
+      }
+    });
+    actions.appendChild(archiveBtn);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn-danger';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', () => {
+      showCanonDeleteConfirm(actions, e);
+    });
+    actions.appendChild(deleteBtn);
+
+    return actions;
+  }
+
+  function retiredActions(e) {
+    const actions = document.createElement('div');
+    actions.className = 'tc-detail-actions';
+
+    const restoreBtn = document.createElement('button');
+    restoreBtn.type = 'button';
+    restoreBtn.className = 'btn-primary';
+    restoreBtn.textContent = 'Restore';
+    restoreBtn.addEventListener('click', async () => {
+      restoreBtn.disabled = true;
+      try {
+        await window.revival.canon.restore(e.id);
+        setStatus(status, `Restored “${e.title}”.`);
+        await refresh();
+      } catch (err) {
+        setStatus(status, `Restore failed: ${err.message || err}`);
+        restoreBtn.disabled = false;
+      }
+    });
+    actions.appendChild(restoreBtn);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn-danger';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', () => {
+      showCanonDeleteConfirm(actions, e);
+    });
+    actions.appendChild(deleteBtn);
+
+    return actions;
+  }
+
+  function showCanonDeleteConfirm(actionsRow, e) {
+    const confirmRow = document.createElement('div');
+    confirmRow.className = 'tc-detail-actions confirm-row';
+
+    const prompt = document.createElement('span');
+    prompt.className = 'confirm-text';
+    prompt.textContent = `Delete “${e.title}”? This is a hard delete — the canon entry and its detail row, legacy IDs, and relationships will be removed. This cannot be undone.`;
+
+    const yes = document.createElement('button');
+    yes.type = 'button';
+    yes.className = 'btn-danger';
+    yes.textContent = 'Delete';
+    yes.addEventListener('click', async () => {
+      yes.disabled = true;
+      try {
+        await window.revival.canon.delete(e.id);
+        CanonDrafts.clear(`edit:${e.id}`);
+        editing.delete(e.id);
+        setStatus(status, `Deleted “${e.title}”.`);
+        await refresh();
+      } catch (err) {
+        prompt.textContent = err.message || 'Could not delete entry.';
+        yes.disabled = false;
+      }
+    });
+
+    const no = document.createElement('button');
+    no.type = 'button';
+    no.className = 'btn-secondary';
+    no.textContent = 'Cancel';
+    no.addEventListener('click', () => confirmRow.replaceWith(actionsRow));
+
+    confirmRow.append(prompt, yes, no);
+    actionsRow.replaceWith(confirmRow);
+  }
+
+  function makeEditCard(e) {
+    const wrap = document.createElement('div');
+    wrap.className = 'entry-card canon-card canon-edit-card';
+    const heading = document.createElement('div');
+    heading.className = 'canon-card-header';
+    const badge = document.createElement('span');
+    badge.className = 'canon-type-badge';
+    badge.textContent = e.entry_type;
+    heading.appendChild(badge);
+    const title = document.createElement('span');
+    title.className = 'entry-title';
+    title.textContent = `Editing: ${e.title}`;
+    heading.appendChild(title);
+    wrap.appendChild(heading);
+
+    const form = buildCanonForm({
+      typeConfig,
+      entry: e,
+      draftSlot: `edit:${e.id}`,
+      onSubmit: async (payload) => {
+        await window.revival.canon.update(e.id, {
+          title: payload.title,
+          body: payload.body,
+          canon_status: payload.canon_status,
+          certainty: payload.certainty,
+          review_state: payload.review_state,
+          provisional: payload.provisional,
+          detail: payload.detail,
+        });
+        editing.delete(e.id);
+        setStatus(status, `Saved “${payload.title}”.`);
+        await refresh();
+      },
+      onCancel: () => {
+        editing.delete(e.id);
+        renderLists();
+      },
+    });
+    wrap.appendChild(form);
+    return wrap;
+  }
+
   function renderLists() {
     const filteredActive = entriesCache.filter(matchesFilter);
     const filteredRetired = retiredCache.filter(matchesFilter);
@@ -1143,7 +1727,7 @@ function renderCanonBiblePage(section) {
       const empty = document.createElement('div');
       empty.className = 'placeholder';
       empty.textContent =
-        'No canon entries yet. Approved entries will land here from Canon Review.';
+        'No canon entries yet. Click “+ Add canon entry” above to add one.';
       list.appendChild(empty);
     } else if (filteredActive.length === 0) {
       const empty = document.createElement('div');
@@ -1152,9 +1736,13 @@ function renderCanonBiblePage(section) {
       list.appendChild(empty);
     } else {
       for (const e of filteredActive) {
-        list.appendChild(
-          buildCanonCard(e, canonTagsById[e.id], onCanonTagChange)
-        );
+        if (editing.has(e.id)) {
+          list.appendChild(makeEditCard(e));
+        } else {
+          list.appendChild(
+            buildCanonCard(e, typeConfig, onCanonTagChange, activeActions)
+          );
+        }
       }
     }
 
@@ -1173,11 +1761,49 @@ function renderCanonBiblePage(section) {
     } else {
       for (const e of filteredRetired) {
         retiredList.appendChild(
-          buildCanonCard(e, canonTagsById[e.id], onCanonTagChange)
+          buildCanonCard(e, typeConfig, onCanonTagChange, retiredActions)
         );
       }
     }
   }
+
+  function openCreateForm() {
+    if (createHost.firstChild) return;
+    addBtn.disabled = true;
+    const form = buildCanonForm({
+      typeConfig,
+      entry: null,
+      initialType: null,
+      draftSlot: 'new',
+      onSubmit: async (payload) => {
+        await window.revival.canon.create(payload);
+        createHost.innerHTML = '';
+        addBtn.disabled = false;
+        setStatus(status, `Added “${payload.title}”.`);
+        await refresh();
+      },
+      onCancel: () => {
+        createHost.innerHTML = '';
+        addBtn.disabled = false;
+      },
+    });
+    const wrap = document.createElement('div');
+    wrap.className = 'entry-card canon-card canon-create-card';
+    const heading = document.createElement('div');
+    heading.className = 'canon-card-header';
+    const title = document.createElement('span');
+    title.className = 'entry-title';
+    title.textContent = 'New canon entry';
+    heading.appendChild(title);
+    wrap.appendChild(heading);
+    wrap.appendChild(form);
+    createHost.appendChild(wrap);
+  }
+
+  addBtn.addEventListener('click', openCreateForm);
+  // If a "new" draft was preserved from a prior session, surface the create
+  // form on mount so the user can resume.
+  if (CanonDrafts.get('new')) openCreateForm();
 
   async function reloadCanonTags() {
     if (!window.RevivalTags) return;
@@ -1197,19 +1823,20 @@ function renderCanonBiblePage(section) {
 
   async function onCanonTagChange() {
     await reloadCanonTags();
-    // No full re-render: the tag bar inside the card handles its own chip
-    // refresh. Re-render only if a filter is active so the affected card
-    // may slip in/out of view.
     if (tagFilter.size > 0) renderLists();
   }
 
   async function refresh() {
-    const [entries, retiredEntries] = await Promise.all([
+    const [entries, retiredEntries, cfg] = await Promise.all([
       window.revival.canon.list(),
       window.revival.canon.listRetired(),
+      typeConfig && Object.keys(typeConfig).length
+        ? Promise.resolve(typeConfig)
+        : window.revival.canon.typeConfig(),
     ]);
     entriesCache = entries;
     retiredCache = retiredEntries;
+    typeConfig = cfg;
     await reloadCanonTags();
 
     // Dev seed button: visible iff canon is completely empty.

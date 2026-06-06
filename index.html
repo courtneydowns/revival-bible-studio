@@ -662,6 +662,117 @@
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       }
 
+      /* P32 — typed detail fields rendered in view mode beneath the body.
+         Compact label: value rows; textarea-kind fields wrap multi-line. */
+      .canon-details {
+        margin-top: 10px;
+        padding: 8px 10px;
+        border: 1px dashed var(--border);
+        border-radius: 6px;
+        background: rgba(176, 140, 74, 0.04);
+      }
+      .canon-details-heading {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      .canon-details-row {
+        display: flex;
+        gap: 8px;
+        font-size: 13px;
+        margin: 2px 0;
+      }
+      .canon-details-key {
+        flex: 0 0 auto;
+        min-width: 140px;
+        color: var(--muted);
+      }
+      .canon-details-val { color: var(--text); }
+      .canon-details-val.multiline { white-space: pre-wrap; }
+      .canon-details-note {
+        margin-top: 6px;
+        font-size: 12px;
+        color: var(--muted);
+        font-style: italic;
+      }
+
+      /* P32 — top bar holds the + Add button and the dev-seed slot. */
+      .canon-topbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+      }
+      .canon-add-btn { white-space: nowrap; }
+      .canon-create-host { margin-bottom: 14px; }
+      .canon-create-card { border-left-color: #d6a14f; }
+      .canon-edit-card { border-left-color: #d6a14f; }
+
+      /* P32 — canon form fields. Each field has a label above its input;
+         the status-row keeps status/certainty/review/provisional inline. */
+      .canon-form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 8px;
+      }
+      .canon-field { display: flex; flex-direction: column; gap: 4px; }
+      .canon-field-label {
+        font-size: 12px;
+        color: var(--muted);
+        letter-spacing: 0.02em;
+      }
+      .canon-field-input {
+        font: inherit;
+        width: 100%;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 10px;
+        margin: 0;
+      }
+      textarea.canon-field-input { resize: vertical; min-height: 60px; }
+      .canon-field-hint {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 2px;
+        font-style: italic;
+      }
+      .canon-field-note {
+        font-size: 12px;
+        color: var(--muted);
+        font-style: italic;
+        padding: 6px 8px;
+        border: 1px dashed var(--border);
+        border-radius: 6px;
+        background: rgba(214, 161, 79, 0.06);
+      }
+      .canon-form-statusrow {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .canon-field-inline {
+        flex: 1 1 160px;
+        flex-direction: column;
+      }
+      .canon-field-inline input[type="checkbox"] {
+        width: auto;
+        margin-top: 6px;
+      }
+      .canon-detail-fields {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        border-top: 1px dashed var(--border);
+        padding-top: 10px;
+        margin-top: 4px;
+      }
+
       .entry-card input,
       .entry-card textarea {
         font: inherit;

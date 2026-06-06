@@ -2028,7 +2028,292 @@ const canonProposals = {
       .get().n,
 };
 
+// P32 — typed config for every entry_type. One source of truth for the
+// renderer's create/edit forms, the view-mode field list, and the DB-side
+// detail-row insert/update. `table` is the 1:1 detail table; entry types
+// without a 1:1 child (knowledge_state, rewatch_beat, relationship — their
+// structured rows live in their own non-1:1 tables) set table=null and only
+// carry the canon_entries common columns. `fields` lists detail-table columns
+// in display order with input kind, options, default, and required flag.
+const CANON_TYPE_CONFIG = {
+  character: {
+    label: 'Character',
+    table: 'canon_characters',
+    fields: [
+      { col: 'full_name',           label: 'Full name',           kind: 'text',     required: true },
+      { col: 'display_name',        label: 'Display name',        kind: 'text',     required: true },
+      { col: 'role',                label: 'Role',                kind: 'text' },
+      { col: 'dossier_tier',        label: 'Dossier tier',        kind: 'select',
+        options: ['full', 'holding', 'locked_unnamed'], default: 'holding', required: true },
+      { col: 'age_at_series_start', label: 'Age at series start', kind: 'number' },
+      { col: 'demographics',        label: 'Demographics',        kind: 'text' },
+      { col: 'sobriety_at_open',    label: 'Sobriety at open',    kind: 'text' },
+      { col: 'absolute_exclusions', label: 'Absolute exclusions', kind: 'textarea' },
+      { col: 'biography',           label: 'Biography',           kind: 'textarea' },
+      { col: 'arc_resolution',      label: 'Arc resolution',      kind: 'textarea' },
+    ],
+  },
+  season: {
+    label: 'Season',
+    table: 'canon_seasons',
+    fields: [
+      { col: 'season_number', label: 'Season number', kind: 'number', required: true },
+      { col: 'summary',       label: 'Summary',       kind: 'textarea' },
+    ],
+  },
+  episode: {
+    label: 'Episode',
+    table: 'canon_episodes',
+    fields: [
+      { col: 'season_entry_id',  label: 'Season entry ID',  kind: 'number',
+        hint: 'canon_entries.id of the season this episode belongs to (optional).' },
+      { col: 'episode_number',   label: 'Episode number',   kind: 'number' },
+      { col: 'episode_code',     label: 'Episode code',     kind: 'text', hint: 'e.g. S1E1' },
+      { col: 'working_title',    label: 'Working title',    kind: 'text' },
+      { col: 'summary',          label: 'Summary',          kind: 'textarea' },
+      { col: 'opening_register', label: 'Opening register', kind: 'textarea' },
+      { col: 'closing_image',    label: 'Closing image',    kind: 'textarea' },
+    ],
+  },
+  locked_scene: {
+    label: 'Locked scene',
+    table: 'canon_locked_scenes',
+    fields: [
+      { col: 'episode_entry_id',  label: 'Episode entry ID', kind: 'number',
+        hint: 'canon_entries.id of the episode this scene belongs to (optional).' },
+      { col: 'code',              label: 'Scene code',       kind: 'text' },
+      { col: 'scene_description', label: 'Scene description', kind: 'textarea', required: true },
+      { col: 'locked_label',      label: 'Locked label',     kind: 'text' },
+    ],
+  },
+  locked_line: {
+    label: 'Locked line',
+    table: 'canon_locked_lines',
+    fields: [
+      { col: 'episode_entry_id',   label: 'Episode entry ID',   kind: 'number' },
+      { col: 'character_entry_id', label: 'Character entry ID', kind: 'number' },
+      { col: 'code',               label: 'Line code',          kind: 'text' },
+      { col: 'line_state',         label: 'Line state',         kind: 'select',
+        options: ['locked', 'texture_locked_words_open', 'architecture_locked', 'open'],
+        default: 'locked', required: true },
+      { col: 'line_text',          label: 'Line text',          kind: 'textarea' },
+      { col: 'description',        label: 'Description',        kind: 'textarea' },
+    ],
+  },
+  locked_decision: {
+    label: 'Locked decision',
+    table: 'canon_locked_decisions',
+    fields: [
+      { col: 'code',                label: 'Decision code',  kind: 'text',     required: true,
+        hint: 'Unique across decisions (e.g. A-04, T-001, CF-12).' },
+      { col: 'scheme',              label: 'Scheme',         kind: 'select',
+        options: ['T', 'A', 'CF'], default: 'A', required: true },
+      { col: 'parent_code',         label: 'Parent code',    kind: 'text' },
+      { col: 'session_id',          label: 'Session ID',     kind: 'number' },
+      { col: 'session_date',        label: 'Session date',   kind: 'text',
+        hint: 'YYYY-MM-DD.' },
+      { col: 'body',                label: 'Decision body',  kind: 'textarea', required: true },
+      { col: 'supersedes_text',     label: 'Supersedes',     kind: 'textarea' },
+      { col: 'confirms_text',       label: 'Confirms',       kind: 'textarea' },
+      { col: 'duplicates_closed',   label: 'Duplicates closed', kind: 'textarea' },
+      { col: 'categorical_section', label: 'Categorical section', kind: 'number' },
+    ],
+  },
+  knowledge_state: {
+    label: 'Knowledge state',
+    table: null,
+    fields: [],
+    note:
+      'Structured per-character/per-season-point rows live in canon_knowledge_states ' +
+      '(not yet editable here — title/body summary only for now).',
+  },
+  timeline_event: {
+    label: 'Timeline event',
+    table: 'canon_timeline_events',
+    fields: [
+      { col: 'season_point', label: 'Season point', kind: 'text',
+        hint: 'e.g. S1E1, S2E2_S2E6, PRE_SERIES.' },
+      { col: 'sort_order',   label: 'Sort order',   kind: 'number' },
+      { col: 'description',  label: 'Description',  kind: 'textarea' },
+    ],
+  },
+  viral_phase: {
+    label: 'Viral phase',
+    table: 'canon_viral_phases',
+    fields: [
+      { col: 'phase_number', label: 'Phase number (1–5)', kind: 'number', required: true },
+      { col: 'phase_label',  label: 'Phase label',        kind: 'text' },
+      { col: 'description',  label: 'Description',        kind: 'textarea' },
+      { col: 'time_window',  label: 'Time window',        kind: 'text' },
+    ],
+  },
+  virus_rule: {
+    label: 'Virus rule',
+    table: 'canon_virus_rules',
+    fields: [
+      { col: 'rule_text',        label: 'Rule text',        kind: 'textarea', required: true },
+      { col: 'applies_to_phase', label: 'Applies to phase', kind: 'number' },
+    ],
+  },
+  institution: {
+    label: 'Institution',
+    table: 'canon_institutions',
+    fields: [
+      { col: 'name',        label: 'Name',        kind: 'text',     required: true },
+      { col: 'description', label: 'Description', kind: 'textarea' },
+    ],
+  },
+  location: {
+    label: 'Location',
+    table: 'canon_locations',
+    fields: [
+      { col: 'name',          label: 'Name',          kind: 'text', required: true },
+      { col: 'location_type', label: 'Location type', kind: 'text' },
+      { col: 'description',   label: 'Description',   kind: 'textarea' },
+    ],
+  },
+  motif: {
+    label: 'Motif',
+    table: 'canon_motifs',
+    fields: [
+      { col: 'motif_name',  label: 'Motif name',  kind: 'text', required: true },
+      { col: 'description', label: 'Description', kind: 'textarea' },
+      { col: 'recurrence',  label: 'Recurrence',  kind: 'text' },
+    ],
+  },
+  theme: {
+    label: 'Theme',
+    table: 'canon_themes',
+    fields: [
+      { col: 'theme_kind',     label: 'Theme kind', kind: 'select',
+        options: ['theme', 'buried_truth', 'spine', 'core_question', 'argument'],
+        default: 'theme', required: true },
+      { col: 'register',       label: 'Register',   kind: 'select',
+        options: ['', 'system', 'self', 'both'], default: '' },
+      { col: 'statement',      label: 'Statement',  kind: 'textarea' },
+      { col: 'spoken_in_show', label: 'Spoken in show?', kind: 'boolean', default: 0 },
+    ],
+  },
+  production_rule: {
+    label: 'Production rule',
+    table: 'canon_production_rules',
+    fields: [
+      { col: 'rule_text', label: 'Rule text', kind: 'textarea', required: true },
+      { col: 'scope',     label: 'Scope',     kind: 'text' },
+    ],
+  },
+  principle: {
+    label: 'Principle',
+    table: 'canon_principles',
+    fields: [
+      { col: 'principle_text', label: 'Principle text', kind: 'textarea', required: true },
+      { col: 'attribution',    label: 'Attribution',    kind: 'text' },
+    ],
+  },
+  rewatch_beat: {
+    label: 'Rewatch beat',
+    table: null,
+    fields: [],
+    note:
+      'Structured rows live in canon_rewatch_beats (not yet editable here — ' +
+      'title/body summary only for now).',
+  },
+  relationship: {
+    label: 'Relationship',
+    table: null,
+    fields: [],
+    note:
+      'Edges live in canon_entry_relationships (not yet editable here — ' +
+      'title/body summary only for now).',
+  },
+};
+
+const CANON_STATUS_VALUES = [
+  'draft', 'speculative', 'implied', 'provisional', 'confirmed', 'retired', 'struck',
+];
+const CANON_CERTAINTY_VALUES = ['low', 'medium', 'high'];
+const CANON_REVIEW_STATE_VALUES = [
+  'placement_ready', 'needs_review', 'unresolved', 'deferred',
+  're_confirmation_flagged', 'open_for_revision',
+];
+
+// Coerce a form value to the SQL value its column expects. Empty strings on
+// non-text columns become NULL; booleans collapse to 0/1; numbers parse.
+function coerceCanonField(field, value) {
+  if (value === undefined) return undefined;
+  if (field.kind === 'boolean') return value ? 1 : 0;
+  if (value === null || value === '') {
+    return field.kind === 'text' || field.kind === 'textarea' ? null : null;
+  }
+  if (field.kind === 'number') {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (field.kind === 'select' && Array.isArray(field.options)) {
+    const allowed = field.options;
+    if (!allowed.includes(String(value))) return null;
+  }
+  return value;
+}
+
+function pickDetailColumns(entryType, raw) {
+  const cfg = CANON_TYPE_CONFIG[entryType];
+  if (!cfg || !cfg.table) return null;
+  const out = {};
+  for (const f of cfg.fields) {
+    const v = coerceCanonField(f, raw ? raw[f.col] : undefined);
+    if (v === undefined) {
+      if (f.default !== undefined) out[f.col] = f.kind === 'boolean' ? (f.default ? 1 : 0) : f.default;
+      else out[f.col] = null;
+    } else {
+      out[f.col] = v;
+    }
+  }
+  return out;
+}
+
+function ensureRequiredFields(entryType, columns) {
+  const cfg = CANON_TYPE_CONFIG[entryType];
+  if (!cfg || !cfg.table) return;
+  for (const f of cfg.fields) {
+    if (!f.required) continue;
+    const v = columns[f.col];
+    const missing =
+      v === null || v === undefined ||
+      (typeof v === 'string' && v.trim() === '');
+    if (missing) throw new Error(`${f.label} is required.`);
+  }
+}
+
+// Bulk-load 1:1 detail rows for a set of entries and graft them on. Groups by
+// entry_type so each detail table is queried at most once per list call.
+function attachDetails(entries) {
+  if (entries.length === 0) return entries;
+  const byType = new Map();
+  for (const e of entries) {
+    if (!byType.has(e.entry_type)) byType.set(e.entry_type, []);
+    byType.get(e.entry_type).push(e.id);
+  }
+  const detailById = new Map();
+  for (const [type, ids] of byType.entries()) {
+    const cfg = CANON_TYPE_CONFIG[type];
+    if (!cfg || !cfg.table || cfg.fields.length === 0) continue;
+    const cols = ['canon_entry_id', ...cfg.fields.map((f) => f.col)].join(', ');
+    const placeholders = ids.map(() => '?').join(',');
+    const rows = getDb()
+      .prepare(`SELECT ${cols} FROM ${cfg.table} WHERE canon_entry_id IN (${placeholders})`)
+      .all(...ids);
+    for (const r of rows) {
+      const { canon_entry_id, ...detail } = r;
+      detailById.set(canon_entry_id, detail);
+    }
+  }
+  return entries.map((e) => ({ ...e, detail: detailById.get(e.id) || null }));
+}
+
 const canon = {
+  typeConfig: () => CANON_TYPE_CONFIG,
+
   // Active = not retired. Newest first so just-added entries are visible.
   list: () => {
     const entries = getDb()
@@ -2040,7 +2325,7 @@ const canon = {
           ORDER BY ce.created_at DESC, ce.id DESC`
       )
       .all();
-    return attachLegacyIds(entries);
+    return attachDetails(attachLegacyIds(entries));
   },
   // Retired = superseded/withdrawn. Lives in the collapsed section of the
   // page so the supersede chain stays visible without dominating the view.
@@ -2054,7 +2339,7 @@ const canon = {
           ORDER BY ce.retired_at DESC, ce.id DESC`
       )
       .all();
-    return attachLegacyIds(entries);
+    return attachDetails(attachLegacyIds(entries));
   },
   count: () =>
     getDb().prepare('SELECT COUNT(*) AS n FROM canon_entries').get().n,
@@ -2191,6 +2476,241 @@ const canon = {
     })();
 
     return { inserted, alreadySeeded: false };
+  },
+
+  // P32 — full single-entry fetch including 1:1 detail row. Used by the
+  // edit form so it can populate every detail-table column without having to
+  // re-derive them from list().
+  getDetail: (id) => {
+    const eid = Number(id);
+    if (!Number.isFinite(eid)) throw new Error('canon id is required');
+    const row = getDb()
+      .prepare(
+        `SELECT ${CANON_LIST_COLUMNS}
+           FROM canon_entries ce
+           LEFT JOIN sessions s ON s.id = ce.origin_session_id
+          WHERE ce.id = ?`
+      )
+      .get(eid);
+    if (!row) return null;
+    const [withLegacy] = attachLegacyIds([row]);
+    const [withDetail] = attachDetails([withLegacy]);
+    return withDetail;
+  },
+
+  // P32 — create a new canon entry. The renderer always provides entry_type,
+  // title, and a detail object keyed to the type's detail-table column names.
+  // canon_status/certainty/review_state/provisional are common columns and
+  // default to a sane draft state if not supplied. origin_kind defaults to
+  // 'manual' since this path is direct-editor-driven (Canon Review flow is
+  // separate, see P35).
+  create: (payload = {}) => {
+    const entryType = String(payload.entry_type || '').trim();
+    if (!CANON_TYPE_CONFIG[entryType]) {
+      throw new Error(`Unknown canon entry_type: ${entryType || '(empty)'}.`);
+    }
+    const title = String(payload.title || '').trim();
+    if (!title) throw new Error('Title is required.');
+    const body = payload.body == null ? null : String(payload.body);
+
+    const canonStatus = CANON_STATUS_VALUES.includes(payload.canon_status)
+      ? payload.canon_status
+      : 'draft';
+    const certainty = CANON_CERTAINTY_VALUES.includes(payload.certainty)
+      ? payload.certainty
+      : null;
+    const reviewState = CANON_REVIEW_STATE_VALUES.includes(payload.review_state)
+      ? payload.review_state
+      : null;
+    const provisional = payload.provisional ? 1 : 0;
+
+    const detailColumns = pickDetailColumns(entryType, payload.detail);
+    if (detailColumns) ensureRequiredFields(entryType, detailColumns);
+
+    const now = new Date().toISOString();
+    const db = getDb();
+    const insertEntry = db.prepare(
+      `INSERT INTO canon_entries
+         (created_at, updated_at, entry_type, title, body,
+          locked, locked_at, locked_label,
+          retired, retired_at,
+          provisional, canon_status, certainty, review_state,
+          origin_kind, origin_entry_id, origin_session_id, origin_lock_code)
+       VALUES
+         (?, ?, ?, ?, ?,
+          0, NULL, NULL,
+          0, NULL,
+          ?, ?, ?, ?,
+          'manual', NULL, NULL, NULL)`
+    );
+
+    let newId;
+    db.transaction(() => {
+      const info = insertEntry.run(
+        now, now, entryType, title, body,
+        provisional, canonStatus, certainty, reviewState
+      );
+      newId = info.lastInsertRowid;
+      if (detailColumns) {
+        const cfg = CANON_TYPE_CONFIG[entryType];
+        const cols = ['canon_entry_id', ...Object.keys(detailColumns)];
+        const placeholders = cols.map(() => '?').join(', ');
+        const vals = [newId, ...Object.values(detailColumns)];
+        db.prepare(
+          `INSERT INTO ${cfg.table} (${cols.join(', ')}) VALUES (${placeholders})`
+        ).run(...vals);
+      }
+    })();
+
+    return canon.getDetail(newId);
+  },
+
+  // P32 — partial update. Only the supplied keys are touched. entry_type is
+  // intentionally NOT mutable here (changing it would invalidate the 1:1
+  // detail row); supersede/replace is the right path for "this is now a
+  // different kind of entry", and that's P34.
+  update: (id, payload = {}) => {
+    const eid = Number(id);
+    if (!Number.isFinite(eid)) throw new Error('canon id is required');
+    const existing = getDb()
+      .prepare('SELECT id, entry_type FROM canon_entries WHERE id = ?')
+      .get(eid);
+    if (!existing) throw new Error('Canon entry not found.');
+
+    const sets = [];
+    const params = [];
+
+    if (payload.title !== undefined) {
+      const t = String(payload.title || '').trim();
+      if (!t) throw new Error('Title is required.');
+      sets.push('title = ?');
+      params.push(t);
+    }
+    if (payload.body !== undefined) {
+      sets.push('body = ?');
+      params.push(payload.body == null ? null : String(payload.body));
+    }
+    if (payload.canon_status !== undefined) {
+      if (!CANON_STATUS_VALUES.includes(payload.canon_status)) {
+        throw new Error(`Invalid canon_status: ${payload.canon_status}.`);
+      }
+      sets.push('canon_status = ?');
+      params.push(payload.canon_status);
+    }
+    if (payload.certainty !== undefined) {
+      const v = payload.certainty || null;
+      if (v !== null && !CANON_CERTAINTY_VALUES.includes(v)) {
+        throw new Error(`Invalid certainty: ${v}.`);
+      }
+      sets.push('certainty = ?');
+      params.push(v);
+    }
+    if (payload.review_state !== undefined) {
+      const v = payload.review_state || null;
+      if (v !== null && !CANON_REVIEW_STATE_VALUES.includes(v)) {
+        throw new Error(`Invalid review_state: ${v}.`);
+      }
+      sets.push('review_state = ?');
+      params.push(v);
+    }
+    if (payload.provisional !== undefined) {
+      sets.push('provisional = ?');
+      params.push(payload.provisional ? 1 : 0);
+    }
+
+    const now = new Date().toISOString();
+    const db = getDb();
+    db.transaction(() => {
+      if (sets.length > 0) {
+        sets.push('updated_at = ?');
+        params.push(now, eid);
+        db.prepare(
+          `UPDATE canon_entries SET ${sets.join(', ')} WHERE id = ?`
+        ).run(...params);
+      } else {
+        // Touch updated_at so the timestamp tracks detail-only edits too.
+        db.prepare('UPDATE canon_entries SET updated_at = ? WHERE id = ?').run(now, eid);
+      }
+
+      if (payload.detail !== undefined) {
+        const cfg = CANON_TYPE_CONFIG[existing.entry_type];
+        if (cfg && cfg.table) {
+          const detailColumns = pickDetailColumns(existing.entry_type, payload.detail);
+          ensureRequiredFields(existing.entry_type, detailColumns);
+          const existingDetail = db
+            .prepare(`SELECT canon_entry_id FROM ${cfg.table} WHERE canon_entry_id = ?`)
+            .get(eid);
+          if (existingDetail) {
+            const sets2 = Object.keys(detailColumns).map((c) => `${c} = ?`);
+            const vals = [...Object.values(detailColumns), eid];
+            db.prepare(
+              `UPDATE ${cfg.table} SET ${sets2.join(', ')} WHERE canon_entry_id = ?`
+            ).run(...vals);
+          } else {
+            const cols = ['canon_entry_id', ...Object.keys(detailColumns)];
+            const placeholders = cols.map(() => '?').join(', ');
+            const vals = [eid, ...Object.values(detailColumns)];
+            db.prepare(
+              `INSERT INTO ${cfg.table} (${cols.join(', ')}) VALUES (${placeholders})`
+            ).run(...vals);
+          }
+        }
+      }
+    })();
+
+    return canon.getDetail(eid);
+  },
+
+  // P32 — hard delete. ON DELETE CASCADE on every detail table, legacy_ids,
+  // relationships, knowledge_states, rewatch_beats, downstream_corrections,
+  // and taggable_tags handles the children. canon_proposals.target_entry_id
+  // uses ON DELETE SET NULL so any open proposal pointing at this row is
+  // detached rather than dropped.
+  delete: (id) => {
+    const eid = Number(id);
+    if (!Number.isFinite(eid)) throw new Error('canon id is required');
+    // Tags are polymorphic (entity_kind = 'canon_entries', no FK), so unlink
+    // them explicitly — the migration's cascade only covers FK-linked rows.
+    const db = getDb();
+    db.transaction(() => {
+      db.prepare(
+        `DELETE FROM taggable_tags
+          WHERE entity_kind = 'canon_entries' AND entity_id = ?`
+      ).run(eid);
+      db.prepare('DELETE FROM canon_entries WHERE id = ?').run(eid);
+    })();
+    return { deleted: true };
+  },
+
+  // P32 — archive == retire flag. We reuse the existing retired/retired_at
+  // columns rather than inventing a parallel archived state, because the read
+  // view already collapses retired entries to the bottom of the page (and
+  // P34 supersede will write the same flag). Restore clears it.
+  archive: (id) => {
+    const eid = Number(id);
+    if (!Number.isFinite(eid)) throw new Error('canon id is required');
+    const now = new Date().toISOString();
+    getDb()
+      .prepare(
+        `UPDATE canon_entries
+            SET retired = 1, retired_at = ?, updated_at = ?
+          WHERE id = ?`
+      )
+      .run(now, now, eid);
+    return canon.getDetail(eid);
+  },
+  restore: (id) => {
+    const eid = Number(id);
+    if (!Number.isFinite(eid)) throw new Error('canon id is required');
+    const now = new Date().toISOString();
+    getDb()
+      .prepare(
+        `UPDATE canon_entries
+            SET retired = 0, retired_at = NULL, updated_at = ?
+          WHERE id = ?`
+      )
+      .run(now, eid);
+    return canon.getDetail(eid);
   },
 };
 

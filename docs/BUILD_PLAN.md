@@ -207,13 +207,13 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Canon Bible UI
 
-### P32 — Canon entries: create + edit + archive + delete
+### P32 — Canon entries: create + edit + archive + delete ✅
 - Entry-type picker (all 18 types from schema)
 - Detail table fields rendered per entry type
 - View mode default; Edit button to enter edit state; autosave preserves draft; deliberate Save to confirm
 - Delete: confirmation required; hard delete
 - Archive: collapsed retired section at bottom of Canon Bible page; restore available
-- **Smoke**: Create one entry of three different types, edit each, changes persist; delete one, confirm gone; archive one, confirm it appears in collapsed section and is restorable
+- **Smoke passed.**
 
 ### P33 — Canon lock / unlock
 - Lock = currently accepted, edits still allowed but warn user

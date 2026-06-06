@@ -190,6 +190,21 @@ function registerIpc() {
   ipcMain.handle('canon:count', () => db.canon.count());
   ipcMain.handle('canon:devSeed', () => db.canon.devSeed());
 
+  // P32 — direct canon CRUD. Until the Canon Review queue lands (P35) this is
+  // the only write path into canon_entries; CLAUDE.md's "all changes flow
+  // through Canon Review" rule is bootstrapped here. typeConfig hands the
+  // renderer the field schema for all 18 entry types so its create/edit forms
+  // stay in lockstep with the DB-side detail tables.
+  ipcMain.handle('canon:typeConfig', () => db.canon.typeConfig());
+  ipcMain.handle('canon:getDetail', (_event, id) => db.canon.getDetail(id));
+  ipcMain.handle('canon:create', (_event, payload) => db.canon.create(payload));
+  ipcMain.handle('canon:update', (_event, id, payload) =>
+    db.canon.update(id, payload)
+  );
+  ipcMain.handle('canon:delete', (_event, id) => db.canon.delete(id));
+  ipcMain.handle('canon:archive', (_event, id) => db.canon.archive(id));
+  ipcMain.handle('canon:restore', (_event, id) => db.canon.restore(id));
+
   // PUI3: Canon Review's only write path for now — accept an extracted
   // snippet and stage it as a pending proposal. The full review UI lands in
   // P35; this just records the proposal so the snippet isn't lost between

@@ -126,6 +126,16 @@ contextBridge.exposeInMainWorld('revival', {
     listRetired: () => ipcRenderer.invoke('canon:listRetired'),
     count: () => ipcRenderer.invoke('canon:count'),
     devSeed: () => ipcRenderer.invoke('canon:devSeed'),
+    // P32 — direct create/edit/archive/delete on canon entries. typeConfig
+    // returns the field schema for all 18 entry types so the renderer builds
+    // forms without duplicating column lists.
+    typeConfig: () => ipcRenderer.invoke('canon:typeConfig'),
+    getDetail: (id) => ipcRenderer.invoke('canon:getDetail', id),
+    create: (payload) => ipcRenderer.invoke('canon:create', payload),
+    update: (id, payload) => ipcRenderer.invoke('canon:update', id, payload),
+    delete: (id) => ipcRenderer.invoke('canon:delete', id),
+    archive: (id) => ipcRenderer.invoke('canon:archive', id),
+    restore: (id) => ipcRenderer.invoke('canon:restore', id),
   },
   // PUI3: extract-and-route lands new Canon Review proposals here. Full
   // review queue UI comes in P35; this is the staging write only.
