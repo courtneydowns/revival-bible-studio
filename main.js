@@ -204,6 +204,12 @@ function registerIpc() {
   ipcMain.handle('canon:delete', (_event, id) => db.canon.delete(id));
   ipcMain.handle('canon:archive', (_event, id) => db.canon.archive(id));
   ipcMain.handle('canon:restore', (_event, id) => db.canon.restore(id));
+  // P33 — lock/unlock toggle. Lock is "currently accepted, edits still
+  // allowed but warned"; the renderer enforces the warning, this just flips
+  // the flag and stamps the locked_at/locked_label provenance.
+  ipcMain.handle('canon:setLocked', (_event, id, payload) =>
+    db.canon.setLocked(id, payload)
+  );
 
   // PUI3: Canon Review's only write path for now — accept an extracted
   // snippet and stage it as a pending proposal. The full review UI lands in

@@ -2682,6 +2682,43 @@ const canon = {
     return { deleted: true };
   },
 
+  // P33 — toggle the locked flag. Lock = currently accepted, edits still
+  // allowed but the UI warns before opening the editor. Unlock clears the
+  // companion locked_at + locked_label fields so the next lock starts clean.
+  // locked_label is optional shorthand (e.g. an "A-04" code) shown next to
+  // the lock chip; empty strings are stored as NULL so the chip stays terse.
+  setLocked: (id, payload = {}) => {
+    const eid = Number(id);
+    if (!Number.isFinite(eid)) throw new Error('canon id is required');
+    const existing = getDb()
+      .prepare('SELECT id FROM canon_entries WHERE id = ?')
+      .get(eid);
+    if (!existing) throw new Error('Canon entry not found.');
+    const lock = payload.locked ? 1 : 0;
+    const now = new Date().toISOString();
+    if (lock) {
+      const rawLabel = payload.locked_label;
+      const label =
+        rawLabel == null ? null : String(rawLabel).trim() || null;
+      getDb()
+        .prepare(
+          `UPDATE canon_entries
+              SET locked = 1, locked_at = ?, locked_label = ?, updated_at = ?
+            WHERE id = ?`
+        )
+        .run(now, label, now, eid);
+    } else {
+      getDb()
+        .prepare(
+          `UPDATE canon_entries
+              SET locked = 0, locked_at = NULL, locked_label = NULL, updated_at = ?
+            WHERE id = ?`
+        )
+        .run(now, eid);
+    }
+    return canon.getDetail(eid);
+  },
+
   // P32 — archive == retire flag. We reuse the existing retired/retired_at
   // columns rather than inventing a parallel archived state, because the read
   // view already collapses retired entries to the bottom of the page (and

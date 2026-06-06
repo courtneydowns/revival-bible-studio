@@ -1488,9 +1488,10 @@ function renderCanonBiblePage(section) {
   const sub = document.createElement('p');
   sub.className = 'placeholder';
   sub.textContent =
-    'Add, edit, archive, or delete entries below. ' +
-    'Lock / unlock arrives in P33, supersede in P34, and the full Canon Review ' +
-    'queue in P35; until then this page is the direct editor.';
+    'Add, edit, archive, or delete entries below. Lock an entry to mark it as ' +
+    'currently accepted Revival canon — edits to a locked entry are still ' +
+    'allowed but prompt for confirmation first. Supersede arrives in P34, and ' +
+    'the full Canon Review queue in P35.';
   intro.appendChild(sub);
   section.appendChild(intro);
 
@@ -1573,10 +1574,41 @@ function renderCanonBiblePage(section) {
     editBtn.className = 'btn-secondary';
     editBtn.textContent = CanonDrafts.get(`edit:${e.id}`) ? 'Resume editing' : 'Edit';
     editBtn.addEventListener('click', () => {
+      // P33 — locked entries require a deliberate confirm before opening the
+      // edit form. Resumed drafts skip the warning so reopening a draft
+      // doesn't surprise the user.
+      if (e.locked && !CanonDrafts.get(`edit:${e.id}`)) {
+        showCanonLockedEditWarning(actions, e);
+        return;
+      }
       editing.add(e.id);
       renderLists();
     });
     actions.appendChild(editBtn);
+
+    // P33 — Lock / Unlock toggle. Locking opens a small inline label form so
+    // the user can attach an optional shorthand (e.g. "A-04"); unlocking is a
+    // single click since it just clears the flag.
+    const lockBtn = document.createElement('button');
+    lockBtn.type = 'button';
+    lockBtn.className = 'btn-secondary';
+    lockBtn.textContent = e.locked ? 'Unlock' : 'Lock';
+    lockBtn.addEventListener('click', async () => {
+      if (e.locked) {
+        lockBtn.disabled = true;
+        try {
+          await window.revival.canon.setLocked(e.id, { locked: false });
+          setStatus(status, `Unlocked “${e.title}”.`);
+          await refresh();
+        } catch (err) {
+          setStatus(status, `Unlock failed: ${err.message || err}`);
+          lockBtn.disabled = false;
+        }
+      } else {
+        showCanonLockForm(actions, e);
+      }
+    });
+    actions.appendChild(lockBtn);
 
     const archiveBtn = document.createElement('button');
     archiveBtn.type = 'button';
@@ -1638,6 +1670,85 @@ function renderCanonBiblePage(section) {
     actions.appendChild(deleteBtn);
 
     return actions;
+  }
+
+  // P33 — locked entries are editable but require a deliberate confirm before
+  // the form opens, so accidental clicks on a locked entry don't slip into
+  // edit mode. Resumed drafts skip this gate (handled in activeActions).
+  function showCanonLockedEditWarning(actionsRow, e) {
+    const warnRow = document.createElement('div');
+    warnRow.className = 'tc-detail-actions confirm-row';
+
+    const prompt = document.createElement('span');
+    prompt.className = 'confirm-text';
+    prompt.textContent =
+      `🔒 “${e.title}” is locked — currently accepted Revival canon. ` +
+      'Editing will update the locked record. Continue?';
+
+    const yes = document.createElement('button');
+    yes.type = 'button';
+    yes.className = 'btn-primary';
+    yes.textContent = 'Continue editing';
+    yes.addEventListener('click', () => {
+      editing.add(e.id);
+      renderLists();
+    });
+
+    const no = document.createElement('button');
+    no.type = 'button';
+    no.className = 'btn-secondary';
+    no.textContent = 'Cancel';
+    no.addEventListener('click', () => warnRow.replaceWith(actionsRow));
+
+    warnRow.append(prompt, yes, no);
+    actionsRow.replaceWith(warnRow);
+  }
+
+  // P33 — Lock form. The label field is optional shorthand stored on
+  // canon_entries.locked_label (e.g. "A-04", "S1 standing lock") and shown
+  // next to the 🔒 chip on the card. Empty input = no label.
+  function showCanonLockForm(actionsRow, e) {
+    const row = document.createElement('div');
+    row.className = 'tc-detail-actions confirm-row';
+
+    const prompt = document.createElement('span');
+    prompt.className = 'confirm-text';
+    prompt.textContent = `Lock “${e.title}” as currently accepted canon.`;
+
+    const labelInput = document.createElement('input');
+    labelInput.type = 'text';
+    labelInput.className = 'canon-field-input';
+    labelInput.placeholder = 'Optional label (e.g. A-04)';
+    labelInput.maxLength = 120;
+
+    const yes = document.createElement('button');
+    yes.type = 'button';
+    yes.className = 'btn-primary';
+    yes.textContent = 'Lock';
+    yes.addEventListener('click', async () => {
+      yes.disabled = true;
+      try {
+        await window.revival.canon.setLocked(e.id, {
+          locked: true,
+          locked_label: labelInput.value,
+        });
+        setStatus(status, `Locked “${e.title}”.`);
+        await refresh();
+      } catch (err) {
+        prompt.textContent = err.message || 'Could not lock entry.';
+        yes.disabled = false;
+      }
+    });
+
+    const no = document.createElement('button');
+    no.type = 'button';
+    no.className = 'btn-secondary';
+    no.textContent = 'Cancel';
+    no.addEventListener('click', () => row.replaceWith(actionsRow));
+
+    row.append(prompt, labelInput, yes, no);
+    actionsRow.replaceWith(row);
+    labelInput.focus();
   }
 
   function showCanonDeleteConfirm(actionsRow, e) {

@@ -215,10 +215,10 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Archive: collapsed retired section at bottom of Canon Bible page; restore available
 - **Smoke passed.**
 
-### P33 — Canon lock / unlock
+### P33 — Canon lock / unlock ✅
 - Lock = currently accepted, edits still allowed but warn user
 - Deliberate mode switch required to edit locked entries
-- **Smoke:** Lock an entry, attempt edit, warning appears, proceed, change saved; unlock and edit without warning
+- **Smoke passed.**
 
 ### P34 — Canon supersede + retired section
 - Superseding creates new entry, marks prior retired, sets chain pointers

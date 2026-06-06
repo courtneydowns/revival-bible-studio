@@ -136,6 +136,9 @@ contextBridge.exposeInMainWorld('revival', {
     delete: (id) => ipcRenderer.invoke('canon:delete', id),
     archive: (id) => ipcRenderer.invoke('canon:archive', id),
     restore: (id) => ipcRenderer.invoke('canon:restore', id),
+    // P33 — lock/unlock toggle. payload = { locked: bool, locked_label?: string }.
+    setLocked: (id, payload) =>
+      ipcRenderer.invoke('canon:setLocked', id, payload),
   },
   // PUI3: extract-and-route lands new Canon Review proposals here. Full
   // review queue UI comes in P35; this is the staging write only.
