@@ -15,6 +15,12 @@
 // without a manual reload, and a sibling popout watching the same workspace
 // stays current too.
 
+// P35 — Canon Review proposals don't fit the generic entry workspace shape
+// (no archive flag, no api.list/listArchived split, JSON proposed fields,
+// verb actions Approve/SendBack/Defer/Reject/Delete instead of Edit/Archive).
+// They get their own popout render path below; everything else falls through
+// to the shared entry-workspace popout.
+
 const WORKSPACE_CONFIGS = {
   'Unsorted': {
     apiName: 'unsorted',
@@ -105,7 +111,8 @@ applyTheme();
 const params = new URLSearchParams(location.search);
 const workspaceName = params.get('workspace');
 const entryId = Number(params.get('id'));
-const config = WORKSPACE_CONFIGS[workspaceName];
+const isCanonReview = workspaceName === 'Canon Review';
+const config = isCanonReview ? null : WORKSPACE_CONFIGS[workspaceName];
 const api = config ? window.revival[config.apiName] : null;
 
 const root = document.getElementById('popout-root');
@@ -505,12 +512,348 @@ async function refresh() {
 }
 
 window.revival.popout.onChanged((ws) => {
+  // Canon Review's own onChanged is wired by mountCanonReviewPopout below —
+  // returning early here keeps the generic refresh() from running with a
+  // null api.
+  if (isCanonReview) return;
   if (ws === workspaceName && !isEditing) refresh();
 });
 
-if (!config || !api || !Number.isFinite(entryId)) {
+// P35 — Canon Review proposals get their own bootstrap below; the generic
+// entry-workspace branch only runs for the original popout workspaces.
+if (isCanonReview) {
+  if (!Number.isFinite(entryId)) {
+    shell = mountShell();
+    renderMissing(shell.card, shell.mode);
+  } else {
+    mountCanonReviewPopout();
+  }
+} else if (!config || !api || !Number.isFinite(entryId)) {
   shell = mountShell();
   renderMissing(shell.card, shell.mode);
 } else {
   refresh();
+}
+
+// --- Canon Review popout (P35) ---------------------------------------------
+// Loads a single proposal by id and renders the editable proposed content +
+// queue verbs. Approve in the popout intentionally hands off to the main
+// window — the entry-type + per-type detail form lives there in renderer.js
+// and the popout doesn't load it. SendBack / Defer / Reject / Delete all
+// commit from here.
+
+const CR_STATUS_LABELS = {
+  pending: 'Pending',
+  sent_back: 'Sent back',
+  deferred: 'Deferred',
+};
+
+function mountCanonReviewPopout() {
+  if (!shell) shell = mountShell();
+  // Override the workspace + type labels on the frame bar so it reads as a
+  // Canon Review surface rather than the default placeholder text.
+  const bar = root.querySelector('.po-frame-bar');
+  if (bar) {
+    bar.innerHTML = '';
+    const wsLabel = document.createElement('span');
+    wsLabel.textContent = 'Canon Review';
+    const dot = document.createElement('span');
+    dot.className = 'po-frame-dot';
+    dot.textContent = '•';
+    const typeLabel = document.createElement('span');
+    typeLabel.textContent = 'Proposal';
+    const mode = document.createElement('span');
+    mode.className = 'po-frame-mode';
+    bar.append(wsLabel, dot, typeLabel, mode);
+    shell.mode = mode;
+  }
+  refreshCanonReview();
+  // Sibling-window edits broadcast 'Canon Review'; refresh in place.
+  window.revival.popout.onChanged((ws) => {
+    if (ws === 'Canon Review' && !isEditing) refreshCanonReview();
+  });
+}
+
+async function refreshCanonReview() {
+  let proposal;
+  try {
+    proposal = await window.revival.canonProposals.getById(entryId);
+  } catch (e) {
+    shell.card.innerHTML = '';
+    const p = document.createElement('p');
+    p.className = 'form-error';
+    p.textContent = `Could not load proposal: ${e.message || e}`;
+    shell.card.appendChild(p);
+    return;
+  }
+  if (!proposal) {
+    renderMissing(shell.card, shell.mode);
+    return;
+  }
+  renderCanonReviewView(shell.card, shell.mode, proposal);
+}
+
+function renderCanonReviewView(card, mode, p) {
+  card.innerHTML = '';
+  isEditing = false;
+  setStatus(
+    mode,
+    p.status === 'pending' ? 'Pending review' : CR_STATUS_LABELS[p.status] || p.status
+  );
+  document.title = `${(p.proposed_fields && p.proposed_fields.title) || 'Proposal'} — Canon Review`;
+
+  const header = document.createElement('h2');
+  header.className = 'tc-detail-header';
+  header.textContent =
+    (p.proposed_fields && p.proposed_fields.title) || '(untitled proposal)';
+  card.appendChild(header);
+
+  const meta = document.createElement('div');
+  meta.className = 'tc-detail-meta';
+  const chunks = [
+    `Status: ${CR_STATUS_LABELS[p.status] || p.status}`,
+    `Intent: ${p.proposal_intent}`,
+    `Staged ${new Date(p.created_at).toLocaleString()}`,
+  ];
+  if (p.updated_at && p.updated_at !== p.created_at) {
+    chunks.push(`edited ${new Date(p.updated_at).toLocaleString()}`);
+  }
+  if (p.source_kind) {
+    chunks.push(
+      `from ${p.source_kind}${p.source_entry_id ? ` #${p.source_entry_id}` : ''}`
+    );
+  }
+  meta.textContent = chunks.join(' · ');
+  card.appendChild(meta);
+
+  if (p.review_note) {
+    const reviewNote = document.createElement('div');
+    reviewNote.className = 'cr-review-note';
+    reviewNote.textContent = `Latest review note: ${p.review_note}`;
+    card.appendChild(reviewNote);
+  }
+
+  // Editable fields — identical shape to the main-window queue form so the
+  // popout reads as the same surface in another window.
+  const form = document.createElement('div');
+  form.className = 'cr-edit-form';
+
+  function fieldRow(label, build) {
+    const wrap = document.createElement('div');
+    wrap.className = 'canon-field';
+    const lbl = document.createElement('label');
+    lbl.className = 'canon-field-label';
+    lbl.textContent = label;
+    const input = build();
+    input.className = 'canon-field-input';
+    lbl.appendChild(input);
+    wrap.appendChild(lbl);
+    return { wrap, input };
+  }
+
+  const titleField = fieldRow('Proposed title *', () => {
+    const i = document.createElement('input');
+    i.type = 'text';
+    i.maxLength = 200;
+    i.value = (p.proposed_fields && p.proposed_fields.title) || '';
+    return i;
+  });
+  const bodyField = fieldRow('Proposed body', () => {
+    const t = document.createElement('textarea');
+    t.rows = 8;
+    t.value = (p.proposed_fields && p.proposed_fields.body) || '';
+    return t;
+  });
+  const noteField = fieldRow('Proposer note', () => {
+    const i = document.createElement('input');
+    i.type = 'text';
+    i.maxLength = 500;
+    i.value = p.proposer_note || '';
+    return i;
+  });
+  form.append(titleField.wrap, bodyField.wrap, noteField.wrap);
+
+  const formStatus = document.createElement('p');
+  formStatus.className = 'draft-status';
+  form.appendChild(formStatus);
+  card.appendChild(form);
+
+  // Save-edits row.
+  const editActions = document.createElement('div');
+  editActions.className = 'tc-detail-actions cr-edit-actions';
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.className = 'btn-secondary';
+  saveBtn.textContent = 'Save edits';
+  saveBtn.addEventListener('click', async () => {
+    if (titleField.input.value.trim() === '') {
+      setStatus(formStatus, 'Title is required.');
+      return;
+    }
+    saveBtn.disabled = true;
+    isEditing = true;
+    try {
+      await window.revival.canonProposals.updateFields(p.id, {
+        proposed_fields: {
+          title: titleField.input.value,
+          body: bodyField.input.value,
+        },
+        proposer_note: noteField.input.value,
+      });
+      window.revival.popout.notifyChanged('Canon Review');
+      setStatus(formStatus, 'Edits saved.');
+    } catch (err) {
+      setStatus(formStatus, err.message || 'Could not save edits.');
+    } finally {
+      isEditing = false;
+      saveBtn.disabled = false;
+      refreshCanonReview();
+    }
+  });
+  editActions.appendChild(saveBtn);
+  card.appendChild(editActions);
+
+  // Verb actions.
+  const actions = document.createElement('div');
+  actions.className = 'tc-detail-actions cr-verb-actions';
+
+  // Approve in the popout: tell the main window to open Canon Review and
+  // surface this proposal. The user finishes the approve there because the
+  // entry-type + detail form lives in renderer.js. notifyChanged broadcasts
+  // 'Canon Review' — the main window's setActiveWorkspaceRefresh registration
+  // refreshes its list; the user clicks Approve in that window.
+  const approveBtn = document.createElement('button');
+  approveBtn.type = 'button';
+  approveBtn.className = 'btn-primary';
+  approveBtn.textContent = 'Approve → main window';
+  approveBtn.title =
+    'Approve picks an entry type and writes to Canon Bible — that form lives in the main window. Click to open it there.';
+  approveBtn.addEventListener('click', () => {
+    window.revival.popout.notifyChanged('Canon Review');
+    // Surface a hint in the formStatus that the user should switch.
+    setStatus(formStatus, 'Switch to the main window to finish approving.');
+  });
+  actions.appendChild(approveBtn);
+
+  function verbWithNote(label, danger, prompt, run) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = danger ? 'btn-secondary' : 'btn-secondary';
+    btn.textContent = label;
+    btn.addEventListener('click', () =>
+      showVerbConfirm(card, actions, { verb: label, danger, prompt, run })
+    );
+    return btn;
+  }
+
+  if (p.status !== 'sent_back') {
+    actions.appendChild(
+      verbWithNote(
+        'Send back',
+        false,
+        'Send this proposal back for revision. It stays in the queue.',
+        async (note) => {
+          await window.revival.canonProposals.sendBack(p.id, { review_note: note });
+          window.revival.popout.notifyChanged('Canon Review');
+          refreshCanonReview();
+        }
+      )
+    );
+  }
+  if (p.status !== 'deferred') {
+    actions.appendChild(
+      verbWithNote(
+        'Defer',
+        false,
+        'Move this proposal to the collapsed Deferred section.',
+        async (note) => {
+          await window.revival.canonProposals.defer(p.id, { review_note: note });
+          window.revival.popout.notifyChanged('Canon Review');
+          refreshCanonReview();
+        }
+      )
+    );
+  }
+  const rejectBtn = verbWithNote(
+    'Reject',
+    true,
+    'Reject this proposal. It leaves the queue but the row stays for audit.',
+    async (note) => {
+      await window.revival.canonProposals.reject(p.id, { review_note: note });
+      window.revival.popout.notifyChanged('Canon Review');
+      renderMissing(card, mode);
+    }
+  );
+  actions.appendChild(rejectBtn);
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.className = 'btn-danger';
+  deleteBtn.textContent = 'Delete';
+  deleteBtn.addEventListener('click', () => {
+    const confirmRow = document.createElement('div');
+    confirmRow.className = 'tc-detail-actions confirm-row';
+    const promptEl = document.createElement('span');
+    promptEl.className = 'confirm-text';
+    promptEl.textContent =
+      'Delete this proposal? This is a hard delete — use Reject to keep an audit row.';
+    const yes = document.createElement('button');
+    yes.type = 'button';
+    yes.className = 'btn-danger';
+    yes.textContent = 'Delete';
+    yes.addEventListener('click', async () => {
+      yes.disabled = true;
+      try {
+        await window.revival.canonProposals.delete(p.id);
+        window.revival.popout.notifyChanged('Canon Review');
+        renderMissing(card, mode);
+      } catch (err) {
+        promptEl.textContent = err.message || 'Could not delete proposal.';
+        yes.disabled = false;
+      }
+    });
+    const no = document.createElement('button');
+    no.type = 'button';
+    no.className = 'btn-secondary';
+    no.textContent = 'Cancel';
+    no.addEventListener('click', () => confirmRow.replaceWith(actions));
+    confirmRow.append(promptEl, yes, no);
+    actions.replaceWith(confirmRow);
+  });
+  actions.appendChild(deleteBtn);
+  card.appendChild(actions);
+}
+
+function showVerbConfirm(card, actions, { verb, danger, prompt, run }) {
+  const row = document.createElement('div');
+  row.className = 'tc-detail-actions confirm-row cr-note-row';
+  const promptEl = document.createElement('div');
+  promptEl.className = 'confirm-text';
+  promptEl.textContent = prompt;
+  const noteInput = document.createElement('input');
+  noteInput.type = 'text';
+  noteInput.className = 'canon-field-input';
+  noteInput.maxLength = 500;
+  noteInput.placeholder = 'Optional note for the audit trail';
+  const yes = document.createElement('button');
+  yes.type = 'button';
+  yes.className = danger ? 'btn-danger' : 'btn-primary';
+  yes.textContent = verb;
+  yes.addEventListener('click', async () => {
+    yes.disabled = true;
+    try {
+      await run(noteInput.value);
+    } catch (err) {
+      promptEl.textContent = err.message || `Could not ${verb.toLowerCase()}.`;
+      yes.disabled = false;
+    }
+  });
+  const no = document.createElement('button');
+  no.type = 'button';
+  no.className = 'btn-secondary';
+  no.textContent = 'Cancel';
+  no.addEventListener('click', () => row.replaceWith(actions));
+  row.append(promptEl, noteInput, yes, no);
+  actions.replaceWith(row);
+  noteInput.focus();
 }

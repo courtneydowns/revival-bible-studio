@@ -145,11 +145,26 @@ contextBridge.exposeInMainWorld('revival', {
     supersede: (id, payload) =>
       ipcRenderer.invoke('canon:supersede', id, payload),
   },
-  // PUI3: extract-and-route lands new Canon Review proposals here. Full
-  // review queue UI comes in P35; this is the staging write only.
+  // PUI3 + P35: extract-and-route stages snippets; the queue surface reads/
+  // edits the JSON payload and resolves each proposal via approve/sendBack/
+  // defer/reject/delete. list returns pending+sent_back+deferred (the
+  // actionable queue); approved/rejected are out of scope for the UI.
   canonProposals: {
     createFromExtract: (payload) =>
       ipcRenderer.invoke('canonProposals:createFromExtract', payload),
+    list: () => ipcRenderer.invoke('canonProposals:list'),
+    getById: (id) => ipcRenderer.invoke('canonProposals:getById', id),
+    updateFields: (id, payload) =>
+      ipcRenderer.invoke('canonProposals:updateFields', id, payload),
+    approve: (id, payload) =>
+      ipcRenderer.invoke('canonProposals:approve', id, payload),
+    sendBack: (id, payload) =>
+      ipcRenderer.invoke('canonProposals:sendBack', id, payload),
+    defer: (id, payload) =>
+      ipcRenderer.invoke('canonProposals:defer', id, payload),
+    reject: (id, payload) =>
+      ipcRenderer.invoke('canonProposals:reject', id, payload),
+    delete: (id) => ipcRenderer.invoke('canonProposals:delete', id),
   },
   // PTAG — tag library + per-entity attach/detach. entity_kind = the DB
   // table name (e.g. 'unsorted', 'canon_entries').

@@ -1091,6 +1091,84 @@
         color: #d6a14f;
       }
 
+      /* --- Canon Review (P35) ------------------------------------------- */
+      .ws-canon-review .canon-intro { max-width: 720px; margin-bottom: 16px; }
+      .ws-canon-review .canon-intro p { margin: 0 0 8px 0; }
+      .ws-canon-review .tc-list-item { border-left: 3px solid #6fb88c; }
+
+      .cr-filter {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
+        font-size: 13px;
+      }
+      .cr-filter-label {
+        font-size: 12px;
+        color: var(--muted);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .cr-filter-select {
+        font: inherit;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 5px 8px;
+      }
+
+      /* Status badges on list items + the detail meta line. */
+      .cr-badge {
+        display: inline-block;
+        font-size: 10.5px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 1px 6px;
+        border-radius: 4px;
+        border: 1px solid currentColor;
+        margin-right: 6px;
+        vertical-align: middle;
+      }
+      .cr-badge-pending    { color: #6fb88c; }
+      .cr-badge-sent_back  { color: #d6a14f; }
+      .cr-badge-deferred   { color: #888;    }
+
+      .cr-list-source {
+        color: var(--muted);
+        font-style: italic;
+      }
+
+      .cr-review-note {
+        margin: 6px 0 12px;
+        padding: 8px 10px;
+        border-left: 3px solid #d6a14f;
+        background: rgba(214, 161, 79, 0.06);
+        font-size: 13px;
+        color: var(--text);
+        border-radius: 4px;
+      }
+
+      .cr-edit-form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 10px;
+      }
+      .cr-edit-actions { margin-top: 4px; }
+      .cr-verb-actions { margin-top: 14px; }
+      .cr-note-row .canon-field-input { flex: 1 1 240px; }
+      .cr-approve-host { margin-top: 8px; }
+      .cr-approve-banner {
+        margin: 0 0 12px;
+        padding: 8px 12px;
+        border-radius: 6px;
+        background: rgba(111, 184, 140, 0.16);
+        color: var(--text);
+        border: 1px solid #6fb88c;
+        font-size: 13px;
+      }
+
       /* --- Writing Lab (P28) ------------------------------------------- */
       .wl-intro { margin-bottom: 18px; }
       .wl-toolbar { margin-bottom: 4px; }

@@ -24,3 +24,5 @@ Running log of UI/UX observations from smoke tests. Addressed in PPOL1 (pre-impo
 
 On the workspace pages, the title overflows on the previews of the cards
 
+- [ ] [P35] Extract-and-route menu only fires on detail panels and popouts. Extend to Canon Bible cards (and any other in-list card with a visible body), so highlighting doesn't require popping out first.
+

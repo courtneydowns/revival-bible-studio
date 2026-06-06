@@ -225,6 +225,33 @@ function registerIpc() {
     db.canonProposals.createFromExtract(payload)
   );
 
+  // P35 — Canon Review queue. list returns pending/sent_back/deferred (the
+  // queue surface). updateFields edits proposed JSON in place; approve
+  // applies the proposal to canon_entries and stamps target_entry_id;
+  // sendBack/defer/reject set status flags; delete is hard-delete.
+  ipcMain.handle('canonProposals:list', () => db.canonProposals.list());
+  ipcMain.handle('canonProposals:getById', (_event, id) =>
+    db.canonProposals.getById(id)
+  );
+  ipcMain.handle('canonProposals:updateFields', (_event, id, payload) =>
+    db.canonProposals.updateFields(id, payload)
+  );
+  ipcMain.handle('canonProposals:approve', (_event, id, payload) =>
+    db.canonProposals.approve(id, payload)
+  );
+  ipcMain.handle('canonProposals:sendBack', (_event, id, payload) =>
+    db.canonProposals.sendBack(id, payload)
+  );
+  ipcMain.handle('canonProposals:defer', (_event, id, payload) =>
+    db.canonProposals.defer(id, payload)
+  );
+  ipcMain.handle('canonProposals:reject', (_event, id, payload) =>
+    db.canonProposals.reject(id, payload)
+  );
+  ipcMain.handle('canonProposals:delete', (_event, id) =>
+    db.canonProposals.delete(id)
+  );
+
   // PTAG — tag library + per-entity tag attach/detach. entity_kind is the
   // workspace's DB table name; the renderer passes a constant per workspace.
   ipcMain.handle('tags:listAll', () => db.tags.listAll());

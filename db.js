@@ -1219,6 +1219,55 @@ const MIGRATIONS = [
       `);
     },
   },
+
+  {
+    name: '034_canon_proposals_add_deferred_status',
+    up(db) {
+      // P35 — Canon Review queue surfaces 'deferred' as a first-class status
+      // (collapsed bottom section, like Retired in Canon Bible). The 023
+      // migration's CHECK only allowed pending/approved/rejected/sent_back, so
+      // we recreate the table with the wider CHECK. Nothing references
+      // canon_proposals from outside, so the standard "create new → copy →
+      // drop → rename → reindex" dance is safe even with foreign_keys=ON.
+      db.exec(`
+        CREATE TABLE canon_proposals_new (
+          id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+          created_at           TEXT NOT NULL,
+          updated_at           TEXT NOT NULL,
+
+          target_entry_id      INTEGER REFERENCES canon_entries(id) ON DELETE SET NULL,
+          proposal_intent      TEXT NOT NULL CHECK(proposal_intent IN
+                                ('new_entry','update_entry','supersede_entry',
+                                 'retire_entry','add_legacy_id','attach_relationship')),
+          proposed_fields_json TEXT NOT NULL DEFAULT '{}',
+
+          source_kind          TEXT,
+          source_entry_id      INTEGER,
+          proposer_note        TEXT,
+
+          status               TEXT NOT NULL DEFAULT 'pending'
+                                CHECK(status IN ('pending','approved','rejected','sent_back','deferred')),
+          reviewed_at          TEXT,
+          review_note          TEXT
+        );
+
+        INSERT INTO canon_proposals_new
+          (id, created_at, updated_at, target_entry_id, proposal_intent,
+           proposed_fields_json, source_kind, source_entry_id, proposer_note,
+           status, reviewed_at, review_note)
+        SELECT id, created_at, updated_at, target_entry_id, proposal_intent,
+               proposed_fields_json, source_kind, source_entry_id, proposer_note,
+               status, reviewed_at, review_note
+          FROM canon_proposals;
+
+        DROP TABLE canon_proposals;
+        ALTER TABLE canon_proposals_new RENAME TO canon_proposals;
+
+        CREATE INDEX canon_proposals_status_idx ON canon_proposals(status);
+        CREATE INDEX canon_proposals_target_idx ON canon_proposals(target_entry_id);
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -1988,7 +2037,36 @@ const tags = {
   },
 };
 
+// P35 — Canon Review queue. The renderer reads proposals (pending /
+// sent_back / deferred) through `list`, edits the JSON fields in place with
+// `updateFields`, and ends each proposal with one of approve/sendBack/defer/
+// reject/delete. Approve is the only path that mutates canon_entries; the
+// other terminal verbs only stamp the proposal row. createFromExtract stays
+// as the PUI3 staging write — nothing else writes to canon_proposals.
+//
+// Why JSON for proposed fields: SQ-10 of the approved schema keeps proposals
+// schemaless on purpose so we don't have to migrate the proposal table every
+// time a canon detail table grows a column. The renderer parses the JSON,
+// the approve path forwards it straight to canon.create().
+
+// `pending` and `sent_back` are the actionable queue; `deferred` is the
+// collapsed bottom section. approved/rejected are terminal and not surfaced
+// in the queue list (they live in the DB for audit only).
+const CANON_PROPOSAL_QUEUE_STATUSES = ['pending', 'sent_back', 'deferred'];
+
+function parseProposalRow(row) {
+  if (!row) return null;
+  let proposed = {};
+  try {
+    proposed = JSON.parse(row.proposed_fields_json || '{}') || {};
+  } catch {
+    proposed = {};
+  }
+  return { ...row, proposed_fields: proposed };
+}
+
 const canonProposals = {
+  // Used by extract.js (PUI3) to stage a snippet as a pending proposal.
   createFromExtract: ({
     title,
     body,
@@ -2018,15 +2096,206 @@ const canonProposals = {
         source_entry_id == null ? null : Number(source_entry_id),
         (proposer_note || '').trim() || null
       );
-    return getDb()
-      .prepare('SELECT * FROM canon_proposals WHERE id = ?')
-      .get(info.lastInsertRowid);
+    return parseProposalRow(
+      getDb()
+        .prepare('SELECT * FROM canon_proposals WHERE id = ?')
+        .get(info.lastInsertRowid)
+    );
   },
+
   pendingCount: () =>
     getDb()
       .prepare(`SELECT COUNT(*) AS n FROM canon_proposals WHERE status = 'pending'`)
       .get().n,
+
+  // P35 — queue read. Returns proposals grouped by status as a flat array,
+  // ordered status-first (pending → sent_back → deferred) then newest-first
+  // within each status. Approved / rejected proposals are out of scope for
+  // the queue UI and excluded here.
+  list: () => {
+    const rows = getDb()
+      .prepare(
+        `SELECT * FROM canon_proposals
+          WHERE status IN ('pending','sent_back','deferred')
+          ORDER BY
+            CASE status
+              WHEN 'pending'   THEN 0
+              WHEN 'sent_back' THEN 1
+              WHEN 'deferred'  THEN 2
+              ELSE 3
+            END,
+            updated_at DESC, id DESC`
+      )
+      .all();
+    return rows.map(parseProposalRow);
+  },
+
+  getById: (id) => {
+    const pid = Number(id);
+    if (!Number.isFinite(pid)) throw new Error('Proposal id is required.');
+    return parseProposalRow(
+      getDb()
+        .prepare('SELECT * FROM canon_proposals WHERE id = ?')
+        .get(pid)
+    );
+  },
+
+  // P35 — edit the proposed content while the proposal is still in the
+  // queue. Only the JSON payload and the proposer's note are user-mutable;
+  // status / reviewed_at / target_entry_id are owned by the terminal verbs.
+  // SQ-10: sent-back edits overwrite in place — no revision history child.
+  updateFields: (id, payload = {}) => {
+    const pid = Number(id);
+    if (!Number.isFinite(pid)) throw new Error('Proposal id is required.');
+    const existing = getDb()
+      .prepare('SELECT * FROM canon_proposals WHERE id = ?')
+      .get(pid);
+    if (!existing) throw new Error('Proposal not found.');
+    if (!CANON_PROPOSAL_QUEUE_STATUSES.includes(existing.status)) {
+      throw new Error(
+        `Cannot edit a ${existing.status} proposal — it has already been resolved.`
+      );
+    }
+
+    let proposed = {};
+    try {
+      proposed = JSON.parse(existing.proposed_fields_json || '{}') || {};
+    } catch {
+      proposed = {};
+    }
+    if (payload.proposed_fields && typeof payload.proposed_fields === 'object') {
+      proposed = { ...proposed, ...payload.proposed_fields };
+    }
+
+    const now = new Date().toISOString();
+    const note =
+      payload.proposer_note === undefined
+        ? existing.proposer_note
+        : payload.proposer_note == null
+        ? null
+        : String(payload.proposer_note).trim() || null;
+
+    getDb()
+      .prepare(
+        `UPDATE canon_proposals
+            SET proposed_fields_json = ?, proposer_note = ?, updated_at = ?
+          WHERE id = ?`
+      )
+      .run(JSON.stringify(proposed), note, now, pid);
+
+    return canonProposals.getById(pid);
+  },
+
+  // P35 — Approve = create a canon_entries row from the proposal, then mark
+  // the proposal approved with target_entry_id pointing at the new row. The
+  // queue UI gathers the entry_type + per-type detail fields before calling
+  // here (createFromExtract only stages a title + body snippet, so a fresh
+  // approval almost always supplies a wider payload). For now only the
+  // 'new_entry' intent is wired — supersede / retire / etc. land in later
+  // phases when the queue grows those affordances.
+  approve: (id, payload = {}) => {
+    const pid = Number(id);
+    if (!Number.isFinite(pid)) throw new Error('Proposal id is required.');
+    const existing = getDb()
+      .prepare('SELECT * FROM canon_proposals WHERE id = ?')
+      .get(pid);
+    if (!existing) throw new Error('Proposal not found.');
+    if (!CANON_PROPOSAL_QUEUE_STATUSES.includes(existing.status)) {
+      throw new Error(
+        `Cannot approve a ${existing.status} proposal — it has already been resolved.`
+      );
+    }
+    if (existing.proposal_intent !== 'new_entry') {
+      throw new Error(
+        `Approving ${existing.proposal_intent} proposals isn't wired yet — ` +
+          'only new_entry proposals can be approved in P35.'
+      );
+    }
+
+    const reviewNote =
+      payload.review_note == null
+        ? null
+        : String(payload.review_note).trim() || null;
+
+    const db = getDb();
+    let newEntry;
+    db.transaction(() => {
+      // canon.create runs its own validation (entry_type, title, required
+      // detail fields). Any error bubbles and aborts the transaction so the
+      // proposal stays pending — no half-finished approvals.
+      newEntry = canon.create({
+        entry_type: payload.entry_type,
+        title: payload.title,
+        body: payload.body,
+        canon_status: payload.canon_status,
+        certainty: payload.certainty,
+        review_state: payload.review_state,
+        provisional: payload.provisional,
+        detail: payload.detail,
+      });
+      const now = new Date().toISOString();
+      db.prepare(
+        `UPDATE canon_proposals
+            SET status = 'approved', reviewed_at = ?, review_note = ?,
+                target_entry_id = ?, updated_at = ?
+          WHERE id = ?`
+      ).run(now, reviewNote, newEntry.id, now, pid);
+    })();
+
+    return { proposal: canonProposals.getById(pid), entry: newEntry };
+  },
+
+  // P35 — non-terminal review actions. Each one stamps reviewed_at +
+  // review_note and updates the status flag; the proposal stays editable in
+  // the queue (sent_back and deferred are both queue states).
+  sendBack: (id, payload = {}) =>
+    setProposalStatus(id, 'sent_back', payload.review_note),
+  defer: (id, payload = {}) =>
+    setProposalStatus(id, 'deferred', payload.review_note),
+  // Reject is terminal — the proposal exits the queue. We do not hard-delete
+  // it so the audit trail (source_kind / source_entry_id / proposer_note) is
+  // preserved.
+  reject: (id, payload = {}) =>
+    setProposalStatus(id, 'rejected', payload.review_note),
+
+  // P35 — hard delete. Used when a proposal was created in error and should
+  // leave no audit trace (the user explicitly chose this over Reject).
+  delete: (id) => {
+    const pid = Number(id);
+    if (!Number.isFinite(pid)) throw new Error('Proposal id is required.');
+    const info = getDb()
+      .prepare('DELETE FROM canon_proposals WHERE id = ?')
+      .run(pid);
+    return { deleted: info.changes > 0 };
+  },
 };
+
+function setProposalStatus(id, status, rawNote) {
+  const pid = Number(id);
+  if (!Number.isFinite(pid)) throw new Error('Proposal id is required.');
+  const existing = getDb()
+    .prepare('SELECT id, status FROM canon_proposals WHERE id = ?')
+    .get(pid);
+  if (!existing) throw new Error('Proposal not found.');
+  // Allowed transitions: only from a queue status. sendBack/defer/reject
+  // from approved would invalidate the canon entry already created — reject
+  // that explicitly so the renderer can't silently re-resolve a proposal.
+  if (!CANON_PROPOSAL_QUEUE_STATUSES.includes(existing.status)) {
+    throw new Error(
+      `Cannot ${status} a ${existing.status} proposal — it has already been resolved.`
+    );
+  }
+  const note = rawNote == null ? null : String(rawNote).trim() || null;
+  const now = new Date().toISOString();
+  getDb()
+    .prepare(
+      `UPDATE canon_proposals
+          SET status = ?, reviewed_at = ?, review_note = ?, updated_at = ?
+        WHERE id = ?`
+    )
+    .run(status, now, note, now, pid);
+  return canonProposals.getById(pid);
+}
 
 // P32 — typed config for every entry_type. One source of truth for the
 // renderer's create/edit forms, the view-mode field list, and the DB-side

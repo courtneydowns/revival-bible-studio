@@ -1098,8 +1098,12 @@ function buildCanonDetailField(field, initial) {
 function buildCanonForm({
   typeConfig,
   entry,            // null = create
-  initialType,      // create only
-  draftSlot,        // 'new' or `edit:${id}`
+  initialType,      // create only — preselects the type picker
+  initialValues,    // P35 approve path — seeds title/body (and optional
+                    //   status/certainty/review_state/provisional) in create
+                    //   mode without locking the type picker. Ignored when
+                    //   `entry` is passed.
+  draftSlot,        // 'new' or `edit:${id}`, or null to disable autosave
   onSubmit,
   onCancel,
 }) {
@@ -1108,6 +1112,8 @@ function buildCanonForm({
   const isEdit = !!entry;
   let currentType = isEdit ? entry.entry_type : (initialType || null);
   let detailFields = [];
+  // initialValues only applies on the create path (no committed entry yet).
+  const seed = !isEdit && initialValues ? initialValues : null;
 
   const err = document.createElement('p');
   err.className = 'form-error';
@@ -1148,7 +1154,7 @@ function buildCanonForm({
   titleInput.placeholder = 'Title';
   titleInput.className = 'canon-field-input';
   titleInput.maxLength = 200;
-  titleInput.value = entry ? entry.title : '';
+  titleInput.value = entry ? entry.title : (seed && seed.title != null ? seed.title : '');
 
   const titleWrap = document.createElement('div');
   titleWrap.className = 'canon-field';
@@ -1163,7 +1169,7 @@ function buildCanonForm({
   bodyInput.rows = 4;
   bodyInput.placeholder = 'Summary / body (optional)';
   bodyInput.className = 'canon-field-input';
-  bodyInput.value = entry && entry.body ? entry.body : '';
+  bodyInput.value = entry && entry.body ? entry.body : (seed && seed.body != null ? seed.body : '');
   const bodyWrap = document.createElement('div');
   bodyWrap.className = 'canon-field';
   const bodyLabel = document.createElement('label');
@@ -1195,9 +1201,21 @@ function buildCanonForm({
     w.append(lbl, sel);
     return { wrap: w, input: sel };
   }
-  const statusPicker = picker('Canon status', CANON_STATUS_OPTIONS, entry ? entry.canon_status : 'draft');
-  const certaintyPicker = picker('Certainty', CANON_CERTAINTY_OPTIONS, entry ? entry.certainty : '');
-  const reviewPicker = picker('Review state', CANON_REVIEW_STATE_OPTIONS, entry ? entry.review_state : '');
+  const statusPicker = picker(
+    'Canon status',
+    CANON_STATUS_OPTIONS,
+    entry ? entry.canon_status : (seed && seed.canon_status) || 'draft'
+  );
+  const certaintyPicker = picker(
+    'Certainty',
+    CANON_CERTAINTY_OPTIONS,
+    entry ? entry.certainty : (seed && seed.certainty) || ''
+  );
+  const reviewPicker = picker(
+    'Review state',
+    CANON_REVIEW_STATE_OPTIONS,
+    entry ? entry.review_state : (seed && seed.review_state) || ''
+  );
 
   const provLabel = document.createElement('label');
   provLabel.className = 'canon-field canon-field-inline';
@@ -1206,7 +1224,7 @@ function buildCanonForm({
   provSpan.textContent = 'Provisional';
   const provInput = document.createElement('input');
   provInput.type = 'checkbox';
-  provInput.checked = !!(entry && entry.provisional);
+  provInput.checked = entry ? !!entry.provisional : !!(seed && seed.provisional);
   provLabel.append(provSpan, provInput);
 
   statusRow.append(statusPicker.wrap, certaintyPicker.wrap, reviewPicker.wrap, provLabel);
@@ -2168,6 +2186,708 @@ function renderCanonBiblePage(section) {
   }
 
   refresh();
+}
+
+// --- Canon Review (P35) -----------------------------------------------------
+// The review queue. Two-column layout: left = proposal list with status
+// badges and a status filter; right = the proposed content (editable in
+// place) plus the verb buttons (Approve / Send Back / Defer / Reject /
+// Delete / Pop out). Deferred proposals live in a collapsed section at the
+// bottom of the left column, matching Canon Bible's Retired pattern.
+//
+// CLAUDE.md routing: all canon writes flow through this queue. Approve is
+// the only verb that touches canon_entries (via canonProposals.approve →
+// canon.create); the others only stamp the proposal row.
+
+const CR_STATUS_LABELS = {
+  pending: 'Pending',
+  sent_back: 'Sent back',
+  deferred: 'Deferred',
+};
+// Filter chip set + the order they render in. "active" surfaces pending +
+// sent_back together (the actionable queue); deferred is its own bucket
+// because it collapses to the bottom section by default.
+const CR_FILTERS = [
+  { key: 'active',    label: 'Active (pending + sent back)' },
+  { key: 'pending',   label: 'Pending only' },
+  { key: 'sent_back', label: 'Sent back only' },
+  { key: 'deferred',  label: 'Deferred only' },
+];
+
+// Reused by the popout. Mounted onto a host element, builds the queue
+// surface against a Drafts namespace so edit/approve drafts survive restart.
+const CanonReviewDrafts = makeDrafts('canon_review');
+
+function shortenForList(text, limit = 80) {
+  if (text == null) return '';
+  const oneLine = String(text).replace(/\s+/g, ' ').trim();
+  return oneLine.length > limit ? `${oneLine.slice(0, limit)}…` : oneLine;
+}
+
+function renderCanonReviewPage(section, workspaceName) {
+  section.classList.add('ws-canon-review');
+
+  // Where am I / what / what next / where saved / how to edit.
+  const intro = document.createElement('div');
+  intro.className = 'canon-intro';
+  const lede = document.createElement('p');
+  lede.innerHTML =
+    '<strong>The approval queue for every proposed change to Canon Bible.</strong>';
+  intro.appendChild(lede);
+  const sub = document.createElement('p');
+  sub.className = 'placeholder';
+  sub.textContent =
+    'Edit a proposal in place, then Approve it (writes to Canon Bible), ' +
+    'Send it back for revision, Defer it to the collapsed bottom section, ' +
+    'Reject it (keeps an audit trail), or Delete it. Proposals arrive here ' +
+    'from the highlight + extract route in any workspace.';
+  intro.appendChild(sub);
+  section.appendChild(intro);
+
+  // Two-column shell — same primitives as the entry workspaces.
+  const layout = document.createElement('div');
+  layout.className = 'tc-layout';
+  const leftCol = document.createElement('div');
+  leftCol.className = 'tc-left';
+  const rightCol = document.createElement('div');
+  rightCol.className = 'tc-right';
+  layout.append(leftCol, rightCol);
+  section.appendChild(layout);
+
+  // Status filter — single-select. Defaults to "active" so the queue opens
+  // on the actionable items; deferred appears in its own collapsed section.
+  const filterBar = document.createElement('div');
+  filterBar.className = 'cr-filter';
+  const filterLabel = document.createElement('span');
+  filterLabel.className = 'cr-filter-label';
+  filterLabel.textContent = 'Status:';
+  const filterSelect = document.createElement('select');
+  filterSelect.className = 'cr-filter-select';
+  for (const f of CR_FILTERS) {
+    const opt = document.createElement('option');
+    opt.value = f.key;
+    opt.textContent = f.label;
+    filterSelect.appendChild(opt);
+  }
+  let filter = 'active';
+  filterSelect.value = filter;
+  filterSelect.addEventListener('change', () => {
+    filter = filterSelect.value;
+    renderList();
+  });
+  filterBar.append(filterLabel, filterSelect);
+  leftCol.appendChild(filterBar);
+
+  const list = document.createElement('div');
+  list.className = 'tc-list';
+  leftCol.appendChild(list);
+
+  // Deferred bottom section — only mounted when filter==='active', so a
+  // direct "Deferred only" filter doesn't double-render deferred items.
+  const deferred = document.createElement('details');
+  deferred.className = 'tc-archived-section';
+  const deferredSummary = document.createElement('summary');
+  deferred.appendChild(deferredSummary);
+  const deferredList = document.createElement('div');
+  deferredList.className = 'tc-list';
+  deferred.appendChild(deferredList);
+  leftCol.appendChild(deferred);
+
+  // selectedId: null = empty state; <id> = view/edit/approve.
+  let selectedId = null;
+  let proposals = [];
+
+  function findProposal(id) {
+    return proposals.find((p) => p.id === id) || null;
+  }
+
+  function statusBadge(status) {
+    const b = document.createElement('span');
+    b.className = `cr-badge cr-badge-${status}`;
+    b.textContent = CR_STATUS_LABELS[status] || status;
+    return b;
+  }
+
+  function buildListItem(p) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'tc-list-item';
+    if (selectedId === p.id) btn.classList.add('active');
+
+    const titleRow = document.createElement('div');
+    titleRow.className = 'tc-list-title';
+    titleRow.appendChild(statusBadge(p.status));
+    if (CanonReviewDrafts.get(`edit:${p.id}`) || CanonReviewDrafts.get(`approve:${p.id}`)) {
+      const draftBadge = document.createElement('span');
+      draftBadge.className = 'tc-list-badge';
+      draftBadge.textContent = 'Draft';
+      titleRow.appendChild(draftBadge);
+    }
+    const proposedTitle =
+      (p.proposed_fields && p.proposed_fields.title) || '(untitled proposal)';
+    titleRow.appendChild(document.createTextNode(proposedTitle));
+    btn.appendChild(titleRow);
+
+    const pv = shortenForList(p.proposed_fields && p.proposed_fields.body);
+    if (pv) {
+      const preview = document.createElement('div');
+      preview.className = 'tc-list-preview';
+      preview.textContent = pv;
+      btn.appendChild(preview);
+    }
+    if (p.source_kind) {
+      const src = document.createElement('div');
+      src.className = 'tc-list-preview cr-list-source';
+      src.textContent = `from ${p.source_kind}`;
+      btn.appendChild(src);
+    }
+
+    btn.addEventListener('click', () => {
+      selectedId = p.id;
+      renderList();
+      renderDetail();
+    });
+    return btn;
+  }
+
+  function renderList() {
+    list.innerHTML = '';
+    deferredList.innerHTML = '';
+
+    const showDeferredInMain = filter === 'deferred';
+    const showDeferredSection = filter === 'active';
+    const main = proposals.filter((p) => {
+      if (filter === 'active')    return p.status === 'pending' || p.status === 'sent_back';
+      if (filter === 'pending')   return p.status === 'pending';
+      if (filter === 'sent_back') return p.status === 'sent_back';
+      if (filter === 'deferred')  return p.status === 'deferred';
+      return true;
+    });
+    const deferredItems = showDeferredSection
+      ? proposals.filter((p) => p.status === 'deferred')
+      : [];
+
+    if (main.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'tc-list-empty';
+      if (proposals.length === 0) {
+        empty.textContent =
+          'No proposals in the queue yet. Highlight text anywhere and route ' +
+          'it to Canon Review to stage one.';
+      } else {
+        empty.textContent = 'No proposals match this filter.';
+      }
+      list.appendChild(empty);
+    } else {
+      for (const p of main) list.appendChild(buildListItem(p));
+    }
+
+    deferred.style.display = showDeferredSection ? '' : 'none';
+    deferredSummary.textContent = `Deferred (${deferredItems.length})`;
+    if (showDeferredSection) {
+      if (deferredItems.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'tc-list-empty';
+        empty.textContent = 'No deferred proposals.';
+        deferredList.appendChild(empty);
+      } else {
+        for (const p of deferredItems) deferredList.appendChild(buildListItem(p));
+      }
+    }
+  }
+
+  // --- Right panel renderers -------------------------------------------------
+
+  function showEmpty() {
+    rightCol.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'tc-empty';
+    const t = document.createElement('div');
+    t.className = 'tc-empty-title';
+    t.textContent = 'Nothing selected';
+    const h = document.createElement('div');
+    h.className = 'tc-empty-hint';
+    h.textContent =
+      proposals.length === 0
+        ? 'Highlight text in any workspace and choose Canon Review to stage a proposal.'
+        : 'Pick a proposal on the left to review it.';
+    wrap.append(t, h);
+    rightCol.appendChild(wrap);
+  }
+
+  // Inline confirm with an optional note input. Used for Send Back / Defer /
+  // Reject — each shares the same shape (reason field + commit/cancel), only
+  // the verb and the storage call differ.
+  function showNoteConfirm(actions, { verb, danger, prompt, placeholder, run }) {
+    const row = document.createElement('div');
+    row.className = 'tc-detail-actions confirm-row cr-note-row';
+    const promptEl = document.createElement('div');
+    promptEl.className = 'confirm-text';
+    promptEl.textContent = prompt;
+    const noteInput = document.createElement('input');
+    noteInput.type = 'text';
+    noteInput.className = 'canon-field-input';
+    noteInput.maxLength = 500;
+    noteInput.placeholder = placeholder || 'Optional note for the audit trail';
+    const yes = document.createElement('button');
+    yes.type = 'button';
+    yes.className = danger ? 'btn-danger' : 'btn-primary';
+    yes.textContent = verb;
+    yes.addEventListener('click', async () => {
+      yes.disabled = true;
+      try {
+        await run(noteInput.value);
+      } catch (err) {
+        promptEl.textContent = err.message || `Could not ${verb.toLowerCase()}.`;
+        yes.disabled = false;
+      }
+    });
+    const no = document.createElement('button');
+    no.type = 'button';
+    no.className = 'btn-secondary';
+    no.textContent = 'Cancel';
+    no.addEventListener('click', () => row.replaceWith(actions));
+    row.append(promptEl, noteInput, yes, no);
+    actions.replaceWith(row);
+    noteInput.focus();
+  }
+
+  function showDeleteConfirm(actions, p) {
+    const row = document.createElement('div');
+    row.className = 'tc-detail-actions confirm-row';
+    const promptEl = document.createElement('span');
+    promptEl.className = 'confirm-text';
+    promptEl.textContent =
+      'Delete this proposal? This is a hard delete — the audit trail goes ' +
+      'too. Use Reject instead if you want to keep a record.';
+    const yes = document.createElement('button');
+    yes.type = 'button';
+    yes.className = 'btn-danger';
+    yes.textContent = 'Delete';
+    yes.addEventListener('click', async () => {
+      yes.disabled = true;
+      try {
+        await window.revival.canonProposals.delete(p.id);
+        CanonReviewDrafts.clear(`edit:${p.id}`);
+        CanonReviewDrafts.clear(`approve:${p.id}`);
+        selectedId = null;
+        await loadList();
+      } catch (err) {
+        promptEl.textContent = err.message || 'Could not delete proposal.';
+        yes.disabled = false;
+      }
+    });
+    const no = document.createElement('button');
+    no.type = 'button';
+    no.className = 'btn-secondary';
+    no.textContent = 'Cancel';
+    no.addEventListener('click', () => row.replaceWith(actions));
+    row.append(promptEl, yes, no);
+    actions.replaceWith(row);
+  }
+
+  // The default right-panel state: editable title + body + proposer note,
+  // plus the verb buttons. Saving the edits writes through updateFields and
+  // refreshes the list. Approve flips the right column to the type/detail
+  // form (see showApprove).
+  function showReview(p) {
+    rightCol.innerHTML = '';
+
+    // Approve drafts are kept separate from edit drafts so a half-filled
+    // approve form doesn't trample the simpler title/body edit draft.
+    const editDraft = CanonReviewDrafts.get(`edit:${p.id}`);
+    const initialTitle =
+      editDraft && editDraft.title != null
+        ? editDraft.title
+        : (p.proposed_fields.title || '');
+    const initialBody =
+      editDraft && editDraft.body != null
+        ? editDraft.body
+        : (p.proposed_fields.body || '');
+    const initialNote =
+      editDraft && editDraft.proposer_note != null
+        ? editDraft.proposer_note
+        : (p.proposer_note || '');
+
+    const header = document.createElement('h2');
+    header.className = 'tc-detail-header';
+    header.textContent = initialTitle || '(untitled proposal)';
+    rightCol.appendChild(header);
+
+    const meta = document.createElement('div');
+    meta.className = 'tc-detail-meta';
+    const chunks = [
+      `Status: ${CR_STATUS_LABELS[p.status] || p.status}`,
+      `Intent: ${p.proposal_intent}`,
+      `Staged ${new Date(p.created_at).toLocaleString()}`,
+    ];
+    if (p.updated_at && p.updated_at !== p.created_at) {
+      chunks.push(`edited ${new Date(p.updated_at).toLocaleString()}`);
+    }
+    if (p.source_kind) {
+      chunks.push(`from ${p.source_kind}${p.source_entry_id ? ` #${p.source_entry_id}` : ''}`);
+    }
+    if (p.reviewed_at && (p.status === 'sent_back' || p.status === 'deferred')) {
+      chunks.push(`${p.status === 'sent_back' ? 'Sent back' : 'Deferred'} ${new Date(p.reviewed_at).toLocaleString()}`);
+    }
+    meta.textContent = chunks.join(' · ');
+    rightCol.appendChild(meta);
+
+    if (p.review_note) {
+      const reviewNote = document.createElement('div');
+      reviewNote.className = 'cr-review-note';
+      reviewNote.textContent = `Latest review note: ${p.review_note}`;
+      rightCol.appendChild(reviewNote);
+    }
+
+    // Editable fields. Autosave to the edit draft on every keystroke so
+    // restart preserves the work without committing through updateFields.
+    const form = document.createElement('div');
+    form.className = 'cr-edit-form';
+
+    const titleWrap = document.createElement('div');
+    titleWrap.className = 'canon-field';
+    const titleLabel = document.createElement('label');
+    titleLabel.className = 'canon-field-label';
+    titleLabel.textContent = 'Proposed title *';
+    const titleInput = document.createElement('input');
+    titleInput.type = 'text';
+    titleInput.className = 'canon-field-input';
+    titleInput.maxLength = 200;
+    titleInput.value = initialTitle;
+    titleLabel.appendChild(titleInput);
+    titleWrap.appendChild(titleLabel);
+    form.appendChild(titleWrap);
+
+    const bodyWrap = document.createElement('div');
+    bodyWrap.className = 'canon-field';
+    const bodyLabel = document.createElement('label');
+    bodyLabel.className = 'canon-field-label';
+    bodyLabel.textContent = 'Proposed body';
+    const bodyInput = document.createElement('textarea');
+    bodyInput.className = 'canon-field-input';
+    bodyInput.rows = 8;
+    bodyInput.value = initialBody;
+    bodyLabel.appendChild(bodyInput);
+    bodyWrap.appendChild(bodyLabel);
+    form.appendChild(bodyWrap);
+
+    const noteWrap = document.createElement('div');
+    noteWrap.className = 'canon-field';
+    const noteLabel = document.createElement('label');
+    noteLabel.className = 'canon-field-label';
+    noteLabel.textContent = 'Proposer note';
+    const noteInput = document.createElement('input');
+    noteInput.type = 'text';
+    noteInput.className = 'canon-field-input';
+    noteInput.maxLength = 500;
+    noteInput.value = initialNote;
+    noteLabel.appendChild(noteInput);
+    noteWrap.appendChild(noteLabel);
+    form.appendChild(noteWrap);
+
+    const formStatus = document.createElement('p');
+    formStatus.className = 'draft-status';
+    setStatus(formStatus, editDraft ? 'Draft restored — click Save edits to commit.' : '');
+    form.appendChild(formStatus);
+
+    function saveEditDraft() {
+      CanonReviewDrafts.set(`edit:${p.id}`, {
+        title: titleInput.value,
+        body: bodyInput.value,
+        proposer_note: noteInput.value,
+      });
+      setStatus(formStatus, 'Draft autosaved — click Save edits to commit.');
+    }
+    titleInput.addEventListener('input', saveEditDraft);
+    bodyInput.addEventListener('input', saveEditDraft);
+    noteInput.addEventListener('input', saveEditDraft);
+
+    rightCol.appendChild(form);
+
+    // Save edits row — commits updateFields to the proposal row. Approve
+    // and other verbs read from the live row, so always commit edits first.
+    const editActions = document.createElement('div');
+    editActions.className = 'tc-detail-actions cr-edit-actions';
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'btn-secondary';
+    saveBtn.textContent = 'Save edits';
+    saveBtn.addEventListener('click', async () => {
+      if (titleInput.value.trim() === '') {
+        setStatus(formStatus, 'Title is required.');
+        return;
+      }
+      saveBtn.disabled = true;
+      try {
+        await window.revival.canonProposals.updateFields(p.id, {
+          proposed_fields: {
+            title: titleInput.value,
+            body: bodyInput.value,
+          },
+          proposer_note: noteInput.value,
+        });
+        CanonReviewDrafts.clear(`edit:${p.id}`);
+        setStatus(formStatus, 'Edits saved.');
+        await loadList();
+      } catch (err) {
+        setStatus(formStatus, err.message || 'Could not save edits.');
+        saveBtn.disabled = false;
+      }
+    });
+    editActions.appendChild(saveBtn);
+    rightCol.appendChild(editActions);
+
+    // --- Verb action row ----------------------------------------------------
+    const actions = document.createElement('div');
+    actions.className = 'tc-detail-actions cr-verb-actions';
+
+    const approveBtn = document.createElement('button');
+    approveBtn.type = 'button';
+    approveBtn.className = 'btn-primary';
+    approveBtn.textContent = 'Approve →';
+    approveBtn.title = 'Pick an entry type, fill required fields, and write to Canon Bible.';
+    approveBtn.addEventListener('click', () => {
+      // Persist the edit draft so the approve form starts from latest text.
+      saveEditDraft();
+      showApprove(p, {
+        title: titleInput.value,
+        body: bodyInput.value,
+      });
+    });
+    actions.appendChild(approveBtn);
+
+    if (p.status !== 'sent_back') {
+      const sendBackBtn = document.createElement('button');
+      sendBackBtn.type = 'button';
+      sendBackBtn.className = 'btn-secondary';
+      sendBackBtn.textContent = 'Send back';
+      sendBackBtn.addEventListener('click', () => {
+        showNoteConfirm(actions, {
+          verb: 'Send back',
+          danger: false,
+          prompt: 'Send this proposal back for revision. It stays in the queue.',
+          placeholder: 'Why is it being sent back? (optional)',
+          run: async (note) => {
+            await window.revival.canonProposals.sendBack(p.id, { review_note: note });
+            await loadList();
+          },
+        });
+      });
+      actions.appendChild(sendBackBtn);
+    }
+
+    if (p.status !== 'deferred') {
+      const deferBtn = document.createElement('button');
+      deferBtn.type = 'button';
+      deferBtn.className = 'btn-secondary';
+      deferBtn.textContent = 'Defer';
+      deferBtn.addEventListener('click', () => {
+        showNoteConfirm(actions, {
+          verb: 'Defer',
+          danger: false,
+          prompt: 'Move this proposal to the collapsed Deferred section.',
+          placeholder: 'Why defer? (optional)',
+          run: async (note) => {
+            await window.revival.canonProposals.defer(p.id, { review_note: note });
+            await loadList();
+          },
+        });
+      });
+      actions.appendChild(deferBtn);
+    }
+
+    const rejectBtn = document.createElement('button');
+    rejectBtn.type = 'button';
+    rejectBtn.className = 'btn-secondary';
+    rejectBtn.textContent = 'Reject';
+    rejectBtn.title = 'Mark rejected (keeps an audit row). Use Delete to remove entirely.';
+    rejectBtn.addEventListener('click', () => {
+      showNoteConfirm(actions, {
+        verb: 'Reject',
+        danger: true,
+        prompt:
+          'Reject this proposal. It leaves the queue but the row stays for ' +
+          'audit. Use Delete instead to remove it entirely.',
+        placeholder: 'Reason for rejection (optional)',
+        run: async (note) => {
+          await window.revival.canonProposals.reject(p.id, { review_note: note });
+          CanonReviewDrafts.clear(`edit:${p.id}`);
+          CanonReviewDrafts.clear(`approve:${p.id}`);
+          selectedId = null;
+          await loadList();
+        },
+      });
+    });
+    actions.appendChild(rejectBtn);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn-danger';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', () => showDeleteConfirm(actions, p));
+    actions.appendChild(deleteBtn);
+
+    if (workspaceName) {
+      const popoutBtn = document.createElement('button');
+      popoutBtn.type = 'button';
+      popoutBtn.className = 'btn-secondary';
+      popoutBtn.textContent = 'Pop out ↗';
+      popoutBtn.title = 'Open this proposal in its own window';
+      popoutBtn.addEventListener('click', () => {
+        window.revival.popout.open(workspaceName, p.id);
+      });
+      actions.appendChild(popoutBtn);
+    }
+
+    rightCol.appendChild(actions);
+  }
+
+  // Approve form: pick entry type, fill required detail fields, click
+  // Approve. Drives canonProposals.approve which writes to canon_entries
+  // and stamps the proposal as approved (target_entry_id = new entry).
+  let cachedTypeConfig = null;
+  async function showApprove(p, latestEdits) {
+    rightCol.innerHTML = '';
+    const heading = document.createElement('h2');
+    heading.className = 'tc-detail-header';
+    heading.textContent = `Approve: ${latestEdits.title || '(untitled proposal)'}`;
+    rightCol.appendChild(heading);
+
+    const hint = document.createElement('p');
+    hint.className = 'placeholder';
+    hint.textContent =
+      'Pick an entry type and fill required fields. Approving writes a ' +
+      'new entry to Canon Bible and marks this proposal approved.';
+    rightCol.appendChild(hint);
+
+    const formHost = document.createElement('div');
+    formHost.className = 'cr-approve-host';
+    rightCol.appendChild(formHost);
+
+    const loadingNote = document.createElement('p');
+    loadingNote.className = 'placeholder';
+    loadingNote.textContent = 'Loading entry-type schema…';
+    formHost.appendChild(loadingNote);
+
+    try {
+      if (!cachedTypeConfig) {
+        cachedTypeConfig = await window.revival.canon.typeConfig();
+      }
+    } catch (err) {
+      loadingNote.textContent = `Could not load entry-type schema: ${err.message || err}`;
+      return;
+    }
+    loadingNote.remove();
+
+    const approveDraftKey = `approve:${p.id}`;
+    // Resume from a prior approve draft if one exists; otherwise seed with
+    // the latest edits so the proposal's title/body carry over.
+    const approveDraft = CanonReviewDrafts.get(approveDraftKey) || {};
+    const seedValues = {
+      title: approveDraft.title != null ? approveDraft.title : latestEdits.title,
+      body: approveDraft.body != null ? approveDraft.body : latestEdits.body,
+      canon_status: approveDraft.canon_status || 'draft',
+      certainty: approveDraft.certainty || null,
+      review_state: approveDraft.review_state || null,
+      provisional: !!approveDraft.provisional,
+    };
+
+    // buildCanonForm's draft slot is shared with Canon Bible. Suppress it
+    // here by passing `null` so an approve-in-progress doesn't reappear as
+    // a Canon Bible new-entry draft. We persist our own draft to
+    // CanonReviewDrafts via the input/change listeners below.
+    const form = buildCanonForm({
+      typeConfig: cachedTypeConfig,
+      entry: null,
+      initialType: approveDraft.entry_type || null,
+      initialValues: seedValues,
+      draftSlot: null,
+      onSubmit: async (payload) => {
+        const result = await window.revival.canonProposals.approve(p.id, {
+          entry_type: payload.entry_type,
+          title: payload.title,
+          body: payload.body,
+          canon_status: payload.canon_status,
+          certainty: payload.certainty,
+          review_state: payload.review_state,
+          provisional: payload.provisional,
+          detail: payload.detail,
+        });
+        CanonReviewDrafts.clear(`edit:${p.id}`);
+        CanonReviewDrafts.clear(approveDraftKey);
+        selectedId = null;
+        await loadList();
+        // Toast-style confirmation via the page intro's status hint isn't
+        // worth wiring; the list refresh + selection clear already tells
+        // the story. Mention the new Canon Bible entry id for debugging.
+        const banner = document.createElement('div');
+        banner.className = 'cr-approve-banner';
+        banner.textContent = `Approved → Canon Bible entry #${result.entry.id}.`;
+        rightCol.prepend(banner);
+        setTimeout(() => banner.remove(), 6000);
+      },
+      onCancel: () => {
+        const fresh = findProposal(p.id);
+        if (fresh) showReview(fresh);
+        else { selectedId = null; renderDetail(); }
+      },
+    });
+    formHost.appendChild(form);
+
+    // Mirror form mutations into CanonReviewDrafts. buildCanonForm doesn't
+    // expose a change hook, so we watch the form for input/change events at
+    // the host element — close enough since the form lives in here only.
+    function persistApproveDraft() {
+      // Read the form's inputs by their visible labels' inputs — the
+      // simplest path is to defer to buildCanonForm's own state by walking
+      // the DOM. We just snapshot the raw values to a draft.
+      const titleEl = form.querySelector('.canon-field input[type="text"]');
+      const bodyEl = form.querySelector('.canon-field textarea');
+      const typeEl = form.querySelector('.canon-field select');
+      if (!titleEl) return;
+      CanonReviewDrafts.set(approveDraftKey, {
+        title: titleEl.value,
+        body: bodyEl ? bodyEl.value : '',
+        entry_type: typeEl ? typeEl.value || null : null,
+      });
+    }
+    form.addEventListener('input', persistApproveDraft);
+    form.addEventListener('change', persistApproveDraft);
+  }
+
+  function renderDetail() {
+    if (selectedId == null) return showEmpty();
+    const p = findProposal(selectedId);
+    if (!p) {
+      selectedId = null;
+      return showEmpty();
+    }
+    return showReview(p);
+  }
+
+  async function loadList() {
+    try {
+      proposals = await window.revival.canonProposals.list();
+    } catch (err) {
+      proposals = [];
+      list.innerHTML = '';
+      const e = document.createElement('div');
+      e.className = 'tc-list-empty';
+      e.textContent = `Could not load proposals: ${err.message || err}`;
+      list.appendChild(e);
+      return;
+    }
+    if (selectedId !== null && !findProposal(selectedId)) selectedId = null;
+    renderList();
+    renderDetail();
+    refreshNavBadges();
+  }
+
+  // PUI2 cross-window refresh: another window approving / editing a
+  // proposal fans 'Canon Review' to us, and we reload.
+  setActiveWorkspaceRefresh(workspaceName, loadList);
+  loadList();
 }
 
 // --- Home dashboard (P27) ---------------------------------------------------
@@ -3518,6 +4238,7 @@ const CONTENT_RENDERERS = {
   'Chat': renderChatPage,
   'Settings': renderSettingsPage,
   'Canon Bible': renderCanonBiblePage,
+  'Canon Review': renderCanonReviewPage,
   'Unsorted': makeEntryWorkspace({
     apiName: 'unsorted',
     entityKind: 'unsorted',
