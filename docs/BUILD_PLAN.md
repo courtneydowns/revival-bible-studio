@@ -201,12 +201,13 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Thin persistent status bar at bottom of every detail panel: workspace, entry type, created date, last edited, lock status
 - Linked entries indicator on every detail panel: passive count ("3 attachments / 2 canon links"), expandable on click
 - **Smoke:** Open entries with and without links, confirm counts are correct and expandable
+- **Smoke passed.**
 
 ---
 
 ## Canon Bible UI
 
-### P32 — Canon entries: create + edit
+### P32 — Canon entries: create + edit + archive + delete
 - Entry-type picker (all 18 types from schema)
 - Detail table fields rendered per entry type
 - **Smoke:** Create one entry of three different types, edit each, changes persist

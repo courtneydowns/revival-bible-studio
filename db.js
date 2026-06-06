@@ -2424,6 +2424,126 @@ const search = {
     })),
 };
 
+// --- PPASSIVE: linked-entries indicator ------------------------------------
+// Read-only count + list of everything that references a given workspace
+// entry. Two relationship kinds, both already in the schema:
+//   • attachments — rows in cross_workspace_attachments where this entry is
+//     either the host OR an attached source (link table, P31 schema).
+//   • canon links — canon_entries whose origin_kind/origin_entry_id point back
+//     at this entry (forward provenance on canon_entries).
+// No writes; purely passive. The picker that creates attachments lands in P36.
+
+// cross_workspace_attachments host/source kinds are the logical names — map
+// each to the actual table so we can resolve a title for the expandable list.
+const CWA_TABLE_BY_KIND = {
+  characters: 'characters_workspace',
+  episodes: 'episodes_workspace',
+  decisions: 'decisions',
+  open_questions: 'open_questions',
+  conflicts: 'conflicts',
+  brainstorm: 'brainstorm_items',
+  research: 'research_items',
+  source_material: 'source_material',
+};
+
+// Renderer entityKind (logical name) → canon_entries.origin_kind enum value.
+const CANON_ORIGIN_BY_KIND = {
+  unsorted: 'unsorted_items',
+  source_material: 'source_material',
+  documents: 'documents',
+  open_questions: 'open_questions',
+  conflicts: 'conflicts',
+  decisions: 'decisions',
+  brainstorm: 'brainstorm_items',
+  research: 'research_items',
+  characters: 'characters_workspace',
+  episodes: 'episodes_workspace',
+  writing_lab: 'writing_lab_drafts',
+};
+
+const WORKSPACE_LABEL_BY_KIND = {
+  characters: 'Characters',
+  episodes: 'Episodes',
+  decisions: 'Decisions',
+  open_questions: 'Open Questions',
+  conflicts: 'Conflicts',
+  brainstorm: 'Brainstorm',
+  research: 'Research',
+  source_material: 'Source Material',
+};
+
+const links = {
+  // kind = renderer entityKind (e.g. 'characters', 'decisions'); id = row id.
+  for(kind, id) {
+    const db = getDb();
+    const attachments = [];
+
+    // Only the eight cross-workspace kinds can be a host or a source; the
+    // others (unsorted, documents, writing_lab) never appear in the link
+    // table, so skip the query entirely for them.
+    if (CWA_TABLE_BY_KIND[kind]) {
+      const rows = [
+        // This entry as host → the sources it has attached.
+        ...db
+          .prepare(
+            `SELECT source_kind AS kind, source_id AS id
+               FROM cross_workspace_attachments
+              WHERE host_kind = ? AND host_id = ?`
+          )
+          .all(kind, id),
+        // This entry as source → the hosts that attached it.
+        ...db
+          .prepare(
+            `SELECT host_kind AS kind, host_id AS id
+               FROM cross_workspace_attachments
+              WHERE source_kind = ? AND source_id = ?`
+          )
+          .all(kind, id),
+      ];
+      for (const row of rows) {
+        const table = CWA_TABLE_BY_KIND[row.kind];
+        const item = table
+          ? db.prepare(`SELECT title FROM ${table} WHERE id = ?`).get(row.id)
+          : null;
+        attachments.push({
+          kind: row.kind,
+          id: row.id,
+          title: (item && item.title) || '(untitled)',
+          workspace: WORKSPACE_LABEL_BY_KIND[row.kind] || row.kind,
+        });
+      }
+    }
+
+    const canonLinks = [];
+    const originKind = CANON_ORIGIN_BY_KIND[kind];
+    if (originKind) {
+      const rows = db
+        .prepare(
+          `SELECT id, title, entry_type FROM canon_entries
+            WHERE origin_kind = ? AND origin_entry_id = ?
+            ORDER BY created_at DESC, id DESC`
+        )
+        .all(originKind, id);
+      for (const r of rows) {
+        canonLinks.push({
+          id: r.id,
+          title: r.title || '(untitled)',
+          entry_type: r.entry_type,
+        });
+      }
+    }
+
+    return {
+      attachments,
+      canonLinks,
+      counts: {
+        attachments: attachments.length,
+        canonLinks: canonLinks.length,
+      },
+    };
+  },
+};
+
 module.exports = {
   initDatabase,
   getDb,
@@ -2434,6 +2554,7 @@ module.exports = {
   canonProposals,
   tags,
   search,
+  links,
   getDbPath,
   DB_FILENAME,
   MIGRATIONS,

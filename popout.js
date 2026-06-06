@@ -119,6 +119,94 @@ function isArchived(item) {
   return !!(item && item.archived_at);
 }
 
+// PPASSIVE — same passive status bar + linked-entries indicator as the main
+// window detail panel. Both read-only.
+function buildStatusBar(item, archivedFlag) {
+  const bar = document.createElement('div');
+  bar.className = 'tc-statusbar';
+  const seg = (label, value) => {
+    const s = document.createElement('span');
+    s.className = 'tc-statusbar-seg';
+    const k = document.createElement('span');
+    k.className = 'tc-statusbar-key';
+    k.textContent = label;
+    s.append(k, document.createTextNode(value));
+    return s;
+  };
+  const created = item.created_at
+    ? new Date(item.created_at).toLocaleDateString()
+    : '—';
+  const edited =
+    item.updated_at && item.updated_at !== item.created_at
+      ? new Date(item.updated_at).toLocaleDateString()
+      : '—';
+  bar.append(
+    seg('Workspace', workspaceName || '—'),
+    seg('Type', (config && config.typeLabel) || 'Entry'),
+    seg('Created', created),
+    seg('Edited', edited),
+    seg('Status', archivedFlag ? 'Archived' : 'Unlocked')
+  );
+  return bar;
+}
+
+function renderLinkedList(listHost, data) {
+  listHost.innerHTML = '';
+  const group = (heading, items, srcText) => {
+    if (!items.length) return;
+    const h = document.createElement('div');
+    h.className = 'tc-linked-heading';
+    h.textContent = heading;
+    listHost.appendChild(h);
+    for (const it of items) {
+      const row = document.createElement('div');
+      row.className = 'tc-linked-row';
+      row.appendChild(document.createTextNode(it.title));
+      const src = document.createElement('span');
+      src.className = 'tc-linked-src';
+      src.textContent = srcText(it);
+      row.appendChild(src);
+      listHost.appendChild(row);
+    }
+  };
+  group('Attachments', data.attachments, (it) => it.workspace);
+  group('Canon links', data.canonLinks, (it) => `Canon Bible · ${it.entry_type}`);
+}
+
+function mountLinkedIndicator(host, entityKind, id) {
+  if (!entityKind || !window.revival.links) return;
+  const wrap = document.createElement('details');
+  wrap.className = 'tc-linked';
+  const summary = document.createElement('summary');
+  summary.className = 'tc-linked-summary';
+  summary.textContent = '🔗 Linked entries…';
+  wrap.appendChild(summary);
+  const listHost = document.createElement('div');
+  listHost.className = 'tc-linked-body';
+  wrap.appendChild(listHost);
+  host.appendChild(wrap);
+
+  window.revival.links
+    .for(entityKind, id)
+    .then((data) => {
+      const a = data.counts.attachments;
+      const c = data.counts.canonLinks;
+      if (a === 0 && c === 0) {
+        summary.textContent = '🔗 No linked entries';
+        summary.classList.add('tc-linked-empty');
+        return;
+      }
+      summary.textContent =
+        `🔗 ${a} attachment${a === 1 ? '' : 's'} / ` +
+        `${c} canon link${c === 1 ? '' : 's'}`;
+      renderLinkedList(listHost, data);
+    })
+    .catch(() => {
+      summary.textContent = '🔗 Links unavailable';
+      summary.classList.add('tc-linked-empty');
+    });
+}
+
 async function fetchEntry() {
   const [items, archs] = await Promise.all([api.list(), api.listArchived()]);
   return (
@@ -273,6 +361,10 @@ function renderView(card, mode, item) {
   if (config && config.entityKind && window.RevivalTags) {
     window.RevivalTags.mountTagBar(card, config.entityKind, item.id);
   }
+
+  // PPASSIVE — linked-entries indicator + persistent status bar at the bottom.
+  mountLinkedIndicator(card, config && config.entityKind, item.id);
+  card.appendChild(buildStatusBar(item, archivedFlag));
 }
 
 function showDeleteConfirm(card, mode, actions, item) {

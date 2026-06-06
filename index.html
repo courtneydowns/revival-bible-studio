@@ -864,6 +864,58 @@
         padding: 6px 14px;
         cursor: pointer;
       }
+      /* PPASSIVE — linked-entries indicator (passive count, expands on click). */
+      .tc-linked { margin-top: 16px; }
+      .tc-linked > summary {
+        cursor: pointer;
+        font-size: 12px;
+        color: var(--text);
+        list-style: none;
+        user-select: none;
+        padding: 4px 0;
+        display: inline-block;
+      }
+      .tc-linked > summary::-webkit-details-marker { display: none; }
+      .tc-linked > summary:hover { color: var(--accent); }
+      .tc-linked-summary.tc-linked-empty {
+        color: var(--muted);
+        cursor: default;
+        pointer-events: none;
+      }
+      .tc-linked-body { padding: 4px 0 0 2px; }
+      .tc-linked-heading {
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 8px 0 3px;
+      }
+      .tc-linked-row {
+        font-size: 13px;
+        padding: 3px 0;
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      .tc-linked-src { color: var(--muted); font-size: 11px; white-space: nowrap; }
+      /* PPASSIVE — thin persistent status bar pinned at the bottom. */
+      .tc-statusbar {
+        margin-top: 18px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .tc-statusbar-key {
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-right: 5px;
+        opacity: 0.7;
+      }
       /* Conflicts accent in the list — borrow the existing red accent so the
          two-column list still reads as distinctly conflict-y. */
       .ws-conflicts .tc-list-item { border-left: 3px solid #e06c6c; }

@@ -159,6 +159,11 @@ contextBridge.exposeInMainWorld('revival', {
   search: {
     run: (params) => ipcRenderer.invoke('search:run', params),
   },
+  // PPASSIVE — read-only linked-entries indicator. kind = entityKind (DB
+  // logical name), id = row id. Returns { attachments, canonLinks, counts }.
+  links: {
+    for: (kind, id) => ipcRenderer.invoke('links:for', kind, id),
+  },
   panic: {
     export: () => ipcRenderer.invoke('panic:export'),
   },

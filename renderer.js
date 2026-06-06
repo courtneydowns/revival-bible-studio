@@ -128,6 +128,118 @@ function setStatus(el, text) {
   el.style.display = text ? '' : 'none';
 }
 
+// --- PPASSIVE: passive status bar + linked-entries indicator ---------------
+// Shared by every two-column detail panel (and mirrored in popout.js). Both
+// surfaces are read-only — they summarise state and relationships, they never
+// mutate anything.
+
+// Per-workspace entry-type label for the status bar (mirrors popout configs).
+const ENTRY_TYPE_LABELS = {
+  'Unsorted': 'Entry',
+  'Source Material': 'Source',
+  'Documents': 'Document',
+  'Open Questions': 'Open question',
+  'Conflicts': 'Conflict',
+  'Decisions': 'Decision',
+  'Brainstorm': 'Idea',
+  'Research': 'Research',
+  'Characters': 'Character',
+  'Episodes': 'Episode',
+  'Writing Lab': 'Draft',
+};
+
+// Thin persistent bar: workspace · type · created · last edited · state.
+// Generic workspace entries are never locked, so the state slot reads
+// "Archived" when archived and "Unlocked" otherwise (the lock concept is
+// canon-only; this keeps the slot honest without inventing a lock).
+function buildStatusBar(workspaceName, item, archivedFlag) {
+  const bar = document.createElement('div');
+  bar.className = 'tc-statusbar';
+  const seg = (label, value) => {
+    const s = document.createElement('span');
+    s.className = 'tc-statusbar-seg';
+    const k = document.createElement('span');
+    k.className = 'tc-statusbar-key';
+    k.textContent = label;
+    s.append(k, document.createTextNode(value));
+    return s;
+  };
+  const created = item.created_at
+    ? new Date(item.created_at).toLocaleDateString()
+    : '—';
+  const edited =
+    item.updated_at && item.updated_at !== item.created_at
+      ? new Date(item.updated_at).toLocaleDateString()
+      : '—';
+  bar.append(
+    seg('Workspace', workspaceName || '—'),
+    seg('Type', ENTRY_TYPE_LABELS[workspaceName] || 'Entry'),
+    seg('Created', created),
+    seg('Edited', edited),
+    seg('Status', archivedFlag ? 'Archived' : 'Unlocked')
+  );
+  return bar;
+}
+
+function renderLinkedList(listHost, data) {
+  listHost.innerHTML = '';
+  const group = (heading, items, srcText) => {
+    if (!items.length) return;
+    const h = document.createElement('div');
+    h.className = 'tc-linked-heading';
+    h.textContent = heading;
+    listHost.appendChild(h);
+    for (const it of items) {
+      const row = document.createElement('div');
+      row.className = 'tc-linked-row';
+      row.appendChild(document.createTextNode(it.title));
+      const src = document.createElement('span');
+      src.className = 'tc-linked-src';
+      src.textContent = srcText(it);
+      row.appendChild(src);
+      listHost.appendChild(row);
+    }
+  };
+  group('Attachments', data.attachments, (it) => it.workspace);
+  group('Canon links', data.canonLinks, (it) => `Canon Bible · ${it.entry_type}`);
+}
+
+// Passive count that expands to the linked list on click. Mounts immediately
+// with a loading label; fills in once links.for() resolves.
+function mountLinkedIndicator(host, entityKind, id) {
+  if (!entityKind || !window.revival.links) return;
+  const wrap = document.createElement('details');
+  wrap.className = 'tc-linked';
+  const summary = document.createElement('summary');
+  summary.className = 'tc-linked-summary';
+  summary.textContent = '🔗 Linked entries…';
+  wrap.appendChild(summary);
+  const listHost = document.createElement('div');
+  listHost.className = 'tc-linked-body';
+  wrap.appendChild(listHost);
+  host.appendChild(wrap);
+
+  window.revival.links
+    .for(entityKind, id)
+    .then((data) => {
+      const a = data.counts.attachments;
+      const c = data.counts.canonLinks;
+      if (a === 0 && c === 0) {
+        summary.textContent = '🔗 No linked entries';
+        summary.classList.add('tc-linked-empty');
+        return;
+      }
+      summary.textContent =
+        `🔗 ${a} attachment${a === 1 ? '' : 's'} / ` +
+        `${c} canon link${c === 1 ? '' : 's'}`;
+      renderLinkedList(listHost, data);
+    })
+    .catch(() => {
+      summary.textContent = '🔗 Links unavailable';
+      summary.classList.add('tc-linked-empty');
+    });
+}
+
 // --- Shared entry workspace (two-column: list left, detail right) ---
 // PUI1: every entry workspace renders this layout — left list of titles with a
 // "+ Add" button and a collapsed Archived section at the bottom; right panel
@@ -616,6 +728,11 @@ function makeEntryWorkspace(config) {
         onChange: () => refreshTagBadges(),
       });
     }
+
+    // PPASSIVE — passive linked-entries indicator, then the persistent status
+    // bar pinned at the very bottom of the detail panel.
+    mountLinkedIndicator(rightCol, entityKind, item.id);
+    rightCol.appendChild(buildStatusBar(workspaceName, item, archivedFlag));
   }
 
   async function refreshTagBadges() {

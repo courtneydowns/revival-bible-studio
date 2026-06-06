@@ -226,6 +226,10 @@ function registerIpc() {
   // filters in a single call.
   ipcMain.handle('search:run', (_event, params) => db.search.run(params));
 
+  // PPASSIVE — linked-entries indicator. Read-only: counts + lists the
+  // attachments and canon entries that reference a given workspace entry.
+  ipcMain.handle('links:for', (_event, kind, id) => db.links.for(kind, id));
+
   ipcMain.handle('settings:getProjectRules', () => db.settings.getProjectRules());
   ipcMain.handle('settings:setProjectRules', (_event, text) =>
     db.settings.setProjectRules(text)
