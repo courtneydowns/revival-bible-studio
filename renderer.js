@@ -1377,7 +1377,9 @@ function buildCanonForm({
 // View-mode card render. The action row at the bottom is built by the
 // caller so it can wire the Edit button to flip the card into an in-place
 // edit form, etc.
-function buildCanonCard(e, typeConfig, onTagChange, actionsBuilder, chainHelper) {
+function buildCanonCard(
+  e, typeConfig, onTagChange, actionsBuilder, chainHelper, tagReadOnly
+) {
   const card = document.createElement('div');
   card.className = 'entry-card canon-card';
   card.dataset.canonId = String(e.id);
@@ -1529,10 +1531,12 @@ function buildCanonCard(e, typeConfig, onTagChange, actionsBuilder, chainHelper)
   }
 
   // PTAG — tag bar on canon cards. Available even on retired entries so the
-  // user can adjust metadata without restoring first.
+  // user can adjust metadata without restoring first. PCBREF — in Reference
+  // Mode the bar renders read-only (chips only, no add/remove affordances).
   if (window.RevivalTags) {
     window.RevivalTags.mountTagBar(card, 'canon_entries', e.id, {
       onChange: typeof onTagChange === 'function' ? onTagChange : undefined,
+      readOnly: !!tagReadOnly,
     });
   }
 
@@ -1553,11 +1557,12 @@ function renderCanonBiblePage(section) {
   const sub = document.createElement('p');
   sub.className = 'placeholder';
   sub.textContent =
-    'Add, edit, supersede, archive, or delete entries below. Lock an entry to ' +
-    'mark it as currently accepted Revival canon — edits to a locked entry ' +
-    'are still allowed but prompt for confirmation first. Superseded entries ' +
-    'move to the Retired section with a chain link to the new version. The ' +
-    'full Canon Review queue arrives in P35.';
+    'This page opens in read-only Reference Mode. Switch to Edit Mode ' +
+    '(top right) to add, edit, supersede, lock, archive, or delete entries. ' +
+    'Lock an entry to mark it as currently accepted Revival canon — edits to ' +
+    'a locked entry are still allowed but prompt for confirmation first. ' +
+    'Superseded entries move to the Retired section with a chain link to the ' +
+    'new version.';
   intro.appendChild(sub);
   section.appendChild(intro);
 
@@ -1573,6 +1578,18 @@ function renderCanonBiblePage(section) {
   const seedBar = document.createElement('span');
   seedBar.className = 'canon-seedbar';
   topBar.appendChild(seedBar);
+
+  // PCBREF — Reference Mode / Edit Mode toggle, pinned top-right. The page
+  // defaults to Reference Mode (read-only, no edit affordances, clean layout);
+  // Edit Mode is a deliberate switch that reveals Add / Edit / Lock /
+  // Supersede / Archive / Delete and editable tag bars. Mode is in-memory
+  // per-render state, so a second window (or popout) tracks its own mode
+  // independently — switching one never flips the other.
+  let editMode = false;
+  const modeToggle = document.createElement('button');
+  modeToggle.type = 'button';
+  modeToggle.className = 'btn-secondary canon-mode-toggle';
+  topBar.appendChild(modeToggle);
   section.appendChild(topBar);
 
   const status = document.createElement('div');
@@ -1598,6 +1615,30 @@ function renderCanonBiblePage(section) {
   // old auto-retires). Kept separate so a user can have one Edit and one
   // Supersede open without state collisions.
   const superseding = new Set();
+
+  // PCBREF — apply the current Reference/Edit mode to the page. Reference Mode
+  // hides every edit affordance (Add button, dev seed, any open create form)
+  // and renders cards read-only; Edit Mode reveals them. Leaving Edit Mode
+  // closes any in-progress create/edit/supersede forms so the read-only view
+  // is clean — preserved drafts stay in localStorage and resurface via the
+  // Resume buttons when Edit Mode is re-entered.
+  function applyMode() {
+    section.classList.toggle('canon-edit-mode', editMode);
+    section.classList.toggle('canon-reference-mode', !editMode);
+    modeToggle.textContent = editMode ? '✓ Done — Reference Mode' : '✎ Edit Mode';
+    modeToggle.title = editMode
+      ? 'Return to read-only Reference Mode'
+      : 'Switch to Edit Mode to add, edit, lock, supersede, archive or delete entries';
+    modeToggle.setAttribute('aria-pressed', editMode ? 'true' : 'false');
+    addBtn.style.display = editMode ? '' : 'none';
+    seedBar.style.display = editMode ? '' : 'none';
+    if (!editMode) {
+      editing.clear();
+      superseding.clear();
+      createHost.innerHTML = '';
+      addBtn.disabled = false;
+    }
+  }
 
   // P35b — additional filter dimensions combinable with the tag filter via
   // AND. State lives here; the bar UI is (re)built by renderFilterBar().
@@ -2263,8 +2304,9 @@ function renderCanonBiblePage(section) {
     if (entriesCache.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'placeholder';
-      empty.textContent =
-        'No canon entries yet. Click “+ Add canon entry” above to add one.';
+      empty.textContent = editMode
+        ? 'No canon entries yet. Click “+ Add canon entry” above to add one.'
+        : 'No canon entries yet. Switch to Edit Mode (top right) to add one.';
       list.appendChild(empty);
     } else if (filteredActive.length === 0) {
       const empty = document.createElement('div');
@@ -2273,14 +2315,20 @@ function renderCanonBiblePage(section) {
       list.appendChild(empty);
     } else {
       for (const e of filteredActive) {
-        if (superseding.has(e.id)) {
+        if (editMode && superseding.has(e.id)) {
           list.appendChild(makeSupersedeCard(e));
-        } else if (editing.has(e.id)) {
+        } else if (editMode && editing.has(e.id)) {
           list.appendChild(makeEditCard(e));
         } else {
+          // PCBREF — Reference Mode: no action row, read-only tag bar.
           list.appendChild(
             buildCanonCard(
-              e, typeConfig, onCanonTagChange, activeActions, chainHelper
+              e,
+              typeConfig,
+              editMode ? onCanonTagChange : undefined,
+              editMode ? activeActions : null,
+              chainHelper,
+              !editMode
             )
           );
         }
@@ -2303,7 +2351,12 @@ function renderCanonBiblePage(section) {
       for (const e of filteredRetired) {
         retiredList.appendChild(
           buildCanonCard(
-            e, typeConfig, onCanonTagChange, retiredActions, chainHelper
+            e,
+            typeConfig,
+            editMode ? onCanonTagChange : undefined,
+            editMode ? retiredActions : null,
+            chainHelper,
+            !editMode
           )
         );
       }
@@ -2344,9 +2397,21 @@ function renderCanonBiblePage(section) {
   }
 
   addBtn.addEventListener('click', openCreateForm);
+
+  // PCBREF — toggle Reference ⇄ Edit Mode. renderLists() reads editMode to
+  // decide whether cards get action rows + editable tag bars.
+  modeToggle.addEventListener('click', () => {
+    editMode = !editMode;
+    applyMode();
+    if (editMode && CanonDrafts.get('new')) openCreateForm();
+    renderLists();
+  });
+  applyMode();
+
   // If a "new" draft was preserved from a prior session, surface the create
-  // form on mount so the user can resume.
-  if (CanonDrafts.get('new')) openCreateForm();
+  // form on mount so the user can resume — but only once the user opts into
+  // Edit Mode (handled in the toggle handler above), since the page opens
+  // read-only.
 
   async function reloadCanonTags() {
     if (!window.RevivalTags) return;

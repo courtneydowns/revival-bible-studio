@@ -65,6 +65,11 @@
       renderChips();
     }
 
+    // PCBREF — read-only tag bars (e.g. Canon Bible Reference Mode) show the
+    // chips for reference but suppress every mutate affordance: the per-chip
+    // remove ×, the + Tag picker, and Clear all.
+    const readOnly = !!opts.readOnly;
+
     function renderChips() {
       wrap.innerHTML = '';
 
@@ -82,6 +87,11 @@
         label.className = 'tag-chip-name';
         label.textContent = t.name;
         chip.appendChild(label);
+
+        if (readOnly) {
+          chipRow.appendChild(chip);
+          continue;
+        }
 
         const remove = document.createElement('button');
         remove.type = 'button';
@@ -101,6 +111,15 @@
         });
         chip.appendChild(remove);
         chipRow.appendChild(chip);
+      }
+
+      // PCBREF — read-only bar stops here: chips only, no picker/clear. When
+      // there are no tags at all, hide the bar entirely so read-only cards
+      // don't carry an empty tag row.
+      if (readOnly) {
+        wrap.style.display = currentTags.length ? '' : 'none';
+        wrap.appendChild(chipRow);
+        return;
       }
 
       const addBtn = document.createElement('button');

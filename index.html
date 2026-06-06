@@ -774,6 +774,14 @@
         flex-wrap: wrap;
       }
       .canon-add-btn { white-space: nowrap; }
+      /* PCBREF — Reference/Edit mode toggle, pinned to the right of the top
+         bar. Gets an accent treatment while Edit Mode is active so the page's
+         editable state is unmistakable. */
+      .canon-mode-toggle { margin-left: auto; white-space: nowrap; }
+      .ws-canon.canon-edit-mode .canon-mode-toggle {
+        border-color: #d6a14f;
+        color: #d6a14f;
+      }
       .canon-create-host { margin-bottom: 14px; }
       .canon-create-card { border-left-color: #d6a14f; }
       .canon-edit-card { border-left-color: #d6a14f; }
