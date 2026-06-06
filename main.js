@@ -222,6 +222,28 @@ function registerIpc() {
     db.canon.versionChain(id)
   );
 
+  // PCONFLICT — deterministic conflict scan over canon_entries. Read-only;
+  // routeToConflicts is the only write path and it writes ONE row to the
+  // `conflicts` table summarizing the flagged pair/group. Nothing in canon
+  // mutates here.
+  ipcMain.handle('canonConflicts:scan', () => db.canonConflicts.scan());
+  ipcMain.handle('canonConflicts:routeToConflicts', (_event, payload) =>
+    db.canonConflicts.routeToConflicts(payload)
+  );
+  // PCONFLICT-2 (auto-route) — scan + auto-route in one shot, deduping by
+  // signature so the same collision never gets two Conflicts rows. The UI
+  // calls this from both Canon Bible (scan) and the Conflicts page (rescan).
+  ipcMain.handle('canonConflicts:scanAndRoute', () =>
+    db.canonConflicts.scanAndRoute()
+  );
+  // PCONFLICT-2 — load-bearing canon entry ids across all open flags. Canon
+  // Bible uses this set to nudge the user with a toast when they edit /
+  // archive / supersede / delete an entry that's currently surfaced in an
+  // open Conflicts row.
+  ipcMain.handle('canonConflicts:openFlagEntryIds', () =>
+    db.canonConflicts.openFlagEntryIds()
+  );
+
   // PUI3: Canon Review's only write path for now — accept an extracted
   // snippet and stage it as a pending proposal. The full review UI lands in
   // P35; this just records the proposal so the snippet isn't lost between

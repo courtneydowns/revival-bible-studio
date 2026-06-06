@@ -783,6 +783,102 @@
         color: #d6a14f;
       }
       .canon-create-host { margin-bottom: 14px; }
+      /* PCONFLICT — results panel shown when "Run conflict detection" is
+         clicked. Edit-Mode-only; cleared on Reference Mode return. */
+      .canon-conflicts-host { margin-bottom: 14px; }
+      .canon-conflicts-panel {
+        border: 1px solid var(--border);
+        border-left: 3px solid #d6a14f;
+        border-radius: 6px;
+        padding: 12px 14px;
+        background: rgba(176, 140, 74, 0.05);
+      }
+      .canon-conflicts-header {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      .canon-conflicts-heading {
+        font-weight: 600;
+        flex: 1;
+      }
+      .canon-conflicts-close {
+        background: none;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 18px;
+        line-height: 1;
+        padding: 0 4px;
+      }
+      .canon-conflicts-close:hover { color: inherit; }
+      .canon-conflicts-intro,
+      .canon-conflicts-empty {
+        margin: 0 0 10px;
+        font-size: 12px;
+      }
+      .canon-conflicts-autoarchived {
+        flex-basis: 100%;
+        margin-top: 6px;
+        padding: 6px 8px;
+        border-radius: 4px;
+        background: rgba(110, 180, 130, 0.10);
+        color: #6eb482;
+        font-size: 12px;
+      }
+      .canon-conflict-card {
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 10px 12px;
+        margin-top: 8px;
+        background: var(--card);
+      }
+      .canon-conflict-card-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .canon-conflict-kind {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 2px 6px;
+        border-radius: 3px;
+        background: rgba(176, 140, 74, 0.18);
+        color: #b08c4a;
+      }
+      .canon-conflict-label { font-weight: 600; }
+      .canon-conflict-detail {
+        margin-top: 4px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .canon-conflict-entries {
+        margin: 8px 0 4px;
+        padding-left: 20px;
+        font-size: 13px;
+      }
+      .canon-conflict-entries li { margin: 2px 0; }
+      .canon-conflict-entry-id {
+        font-family: var(--mono, monospace);
+        color: var(--muted);
+      }
+      .canon-conflict-entry-meta {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .canon-conflict-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 8px;
+      }
+      .canon-conflict-routed {
+        font-size: 12px;
+        color: var(--muted);
+      }
       .canon-create-card { border-left-color: #d6a14f; }
       .canon-edit-card { border-left-color: #d6a14f; }
       /* P34 — supersede form card. Use a distinct accent so a card mid-
@@ -1946,6 +2042,62 @@
       }
       .extract-toast[hidden] { display: none; }
       .extract-toast.extract-toast-visible { opacity: 1; }
+
+      /* PCONFLICT-2 — center-of-screen toast Canon Bible fires when the
+         user edits/archives/supersedes/deletes an entry that's currently
+         part of an open Conflicts row. Positioned dead-center so it can't
+         be missed; sized larger than the bottom-anchored extract toast for
+         the same reason. Sits above the chat drawer and corner cluster. */
+      .rb-toast {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 110;
+        max-width: 520px;
+        min-width: 320px;
+        font-size: 15px;
+        line-height: 1.45;
+        text-align: center;
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-left: 4px solid #d6a14f;
+        border-radius: 12px;
+        padding: 18px 26px;
+        box-shadow: 0 14px 44px rgba(0, 0, 0, 0.45);
+        opacity: 0;
+        transition: opacity 0.18s ease;
+      }
+      .rb-toast[hidden] { display: none; }
+      .rb-toast.rb-toast-visible { opacity: 1; }
+
+      /* PCONFLICT-2 — inline hint + scan button on the Conflicts workspace.
+         Sits in the left column directly under the + Add button so the
+         affordance is visible without scrolling and never competes with the
+         entry list for primary focus. */
+      .conflict-rescan-bar {
+        margin: 8px 0 12px;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-left: 3px solid #e06c6c;
+        border-radius: 6px;
+        background: rgba(224, 108, 108, 0.05);
+      }
+      .conflict-rescan-hint {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 8px;
+      }
+      .conflict-rescan-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .conflict-rescan-status {
+        font-size: 12px;
+      }
 
       /* --- PCAP global quick-capture --------------------------------------
          Cmd/Ctrl+Shift+N opens this modal from any workspace. Title + body,

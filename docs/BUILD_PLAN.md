@@ -256,6 +256,25 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Runs on demand, not automatically
 - **Smoke:** Create two contradicting entries, run conflict detection, confirm pair is surfaced, route to Conflicts
 
+### PCONFLICT-2 — Auto-route detected conflicts + re-check nudges
+- **Auto-route on scan:** "Run conflict detection" in Canon Bible (and "Re-check resolved conflicts" on the Conflicts page) now auto-creates a Conflicts row for every detected collision. Dedup is by signature: a second click never piles up duplicate rows for the same collision.
+- Per-card "Route to Conflicts" button is gone — replaced by a passive label per group: *"Routed → Conflicts #N (new)"* for rows created by this scan, *"Tracked → Conflicts #N"* for ones that were already open.
+- Canon Bible scan status line summarizes: *"N conflicts found · M newly routed · K already tracked · J auto-archived."*
+- Conflicts workspace: inline hint above the list — *"Resolved a conflict in Canon Bible? Re-run detection to auto-archive cleared ones."*
+- Conflicts workspace: "Re-check resolved conflicts" button next to the hint; calls the same `scanAndRoute` IPC, reloads the Conflicts list, shows *"Auto-archived N resolved conflict(s) · routed M new conflict(s)."*
+- Canon Bible: toast after editing / archiving / superseding / deleting a canon entry that is currently referenced by an open Conflicts row, reminding the user to re-run detection so the now-resolved flag clears.
+- New IPCs: `canonConflicts.scanAndRoute()` (scan + dedup auto-route + auto-archive in one call), `canonConflicts.openFlagEntryIds()` (canon ids referenced by any open flag — backs the toast).
+- **Smoke:** Create two contradicting canon entries; click "Run conflict detection" in Canon Bible; confirm a Conflicts row was auto-created and the card shows "Routed → Conflicts #N (new)"; re-run the scan, confirm the same group now shows "Tracked → Conflicts #N" (no duplicate row). Resolve the collision in Canon Bible (edit/archive/supersede); confirm the re-run toast fires. Switch to Conflicts; click "Re-check resolved conflicts"; confirm the row auto-archives.
+
+### PCONFLICT-3 — Canon Bible contradiction scan + conflict lifecycle
+- On-demand scan button in Canon Bible checks all canon entries for direct contradictions against each other
+- Results surface in Conflicts workspace with source attribution (which two entries conflict)
+- Re-running the scan: toast notification confirms scan complete + count of new conflicts found (matching PCONFLICT-2 toast pattern)
+- Inline reminder visible in Canon Bible after scan if unresolved conflicts exist
+- Re-running the continuity scan from Conflicts page archives resolved/stale conflicts and updates the list
+- Model the surface + interaction after PCONFLICT-2: same toast helper, same hint-bar pattern, same scoping (canon → toast, conflicts → scan button + status)
+- **Smoke:** Create two contradicting canon entries; run scan from Canon Bible, confirm toast fires and conflict appears in Conflicts workspace; re-run scan, confirm toast updates with new count; resolve the conflict in Canon Bible; re-run from Conflicts page, confirm it archives
+
 ---
 
 ## Cross-workspace wiring
@@ -293,6 +312,17 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Work through all items logged in `POLISH_NOTES.md` up to this point
 - No new features. Fixes, consistency, rough edges only.
 - **Smoke:** Every item in POLISH_NOTES.md marked resolved
+
+
+
+### PCONFLICT3 — Canon Bible contradiction scan + conflict lifecycle
+- On-demand scan button in Canon Bible checks all canon entries for direct contradictions against each other
+- Results surface in Conflicts workspace with source attribution (which two entries conflict)
+- Re-running the scan: toast notification confirms scan complete + count of new conflicts found + reminder to use the recan button (matching PCONFLICT2 toast pattern + add to the PCONFLICT2 toast notification that confirms scan complete + count of new conflicts found + reminder to use the recan button)
+- Inline reminder visible in Canon Bible after scan if unresolved conflicts exist
+- Re-running the continuity scan from Conflicts page archives resolved/stale conflicts and updates the list
+- **Smoke:** Create two contradicting canon entries; run scan from Canon Bible, confirm toast fires and conflict appears in Conflicts workspace; re-run scan, confirm toast updates; resolve conflict, re-run from Conflicts page, confirm it archives
+
 
 ---
 

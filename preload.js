@@ -149,6 +149,22 @@ contextBridge.exposeInMainWorld('revival', {
     // versions field by field without a second round trip.
     versionChain: (id) => ipcRenderer.invoke('canon:versionChain', id),
   },
+  // PCONFLICT — on-demand conflict scan + route. scan() is read-only and
+  // returns { scannedAt, totalActiveEntries, conflicts: [...] }; each
+  // conflict is { kind, label, detail, entries: [...] }. routeToConflicts()
+  // writes one row to the Conflicts workspace summarizing the flagged group.
+  canonConflicts: {
+    scan: () => ipcRenderer.invoke('canonConflicts:scan'),
+    routeToConflicts: (payload) =>
+      ipcRenderer.invoke('canonConflicts:routeToConflicts', payload),
+    // PCONFLICT-2 (auto-route) — scan + auto-route + auto-archive in one
+    // call. Returns the scan result plus routedNew[]/alreadyTracked[].
+    scanAndRoute: () => ipcRenderer.invoke('canonConflicts:scanAndRoute'),
+    // PCONFLICT-2 — canon entry ids referenced by any open conflict flag;
+    // used by Canon Bible to fire a one-shot toast on mutations to those
+    // entries reminding the user to re-run detection on the Conflicts page.
+    openFlagEntryIds: () => ipcRenderer.invoke('canonConflicts:openFlagEntryIds'),
+  },
   // PUI3 + P35: extract-and-route stages snippets; the queue surface reads/
   // edits the JSON payload and resolves each proposal via approve/sendBack/
   // defer/reject/delete. list returns pending+sent_back+deferred (the

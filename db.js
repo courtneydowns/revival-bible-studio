@@ -1268,6 +1268,36 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '035_canon_conflict_flags',
+    up(db) {
+      // PCONFLICT — sidecar linking a Conflicts workspace row back to the
+      // canon-bible collision that produced it. Lets the next scan() decide
+      // whether the routed Conflict is now stale (collision no longer
+      // surfaced) and auto-archive it. One flag per conflicts row; cascades
+      // on conflict delete so manual cleanup stays clean.
+      //
+      // signature is a stable identifier of the collision (kind + key facts +
+      // sorted entry-id list). entry_ids_json keeps the involved canon ids
+      // for debugging / future linkback UI. auto_archived_at is the latch:
+      // once we've auto-archived a flag we never touch it again, so a manual
+      // Restore in the Conflicts workspace isn't fought on the next scan.
+      db.exec(`
+        CREATE TABLE canon_conflict_flags (
+          id               INTEGER PRIMARY KEY AUTOINCREMENT,
+          conflict_id      INTEGER NOT NULL UNIQUE REFERENCES conflicts(id) ON DELETE CASCADE,
+          kind             TEXT NOT NULL,
+          signature        TEXT NOT NULL,
+          entry_ids_json   TEXT NOT NULL,
+          created_at       TEXT NOT NULL,
+          auto_archived_at TEXT
+        );
+        CREATE INDEX canon_conflict_flags_signature_idx ON canon_conflict_flags(signature);
+        CREATE INDEX canon_conflict_flags_open_idx
+          ON canon_conflict_flags(auto_archived_at);
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -3616,6 +3646,361 @@ const links = {
   },
 };
 
+// PCONFLICT — deterministic conflict detection for the Canon Bible.
+//
+// Runs on demand, never automatically. Surfaces *pairs / groups* of active
+// canon entries whose values collide on something that should be unique:
+//
+//   1. Duplicate title within an entry_type (case/whitespace-insensitive).
+//   2. Duplicate primary legacy id (same scheme + code, is_primary = 1).
+//   3. Structural-key duplicates the schema does NOT already enforce:
+//        - (season_entry_id, episode_number) across episode entries
+//        - phase_number across viral_phase entries
+//      season_number and locked-decision code are skipped — they carry UNIQUE
+//      constraints (migration 018), so duplicates can't reach the DB.
+//
+// All checks read only active (retired = 0) rows — retired/superseded entries
+// don't count as "conflicting" with their replacements. No AI, no fuzzy text
+// matching: a contradiction is a key collision the schema doesn't enforce.
+//
+// routeToConflicts writes ONE row into `conflicts` with the pair / group
+// summarized in the body so the user can take it from there. We don't touch
+// canon_entries; per CLAUDE.md all canon mutation goes through Canon Review.
+const canonConflicts = (() => {
+  function toSummary(row) {
+    return {
+      id: row.id,
+      entry_type: row.entry_type,
+      title: row.title || '(untitled)',
+      locked: !!row.locked,
+      canon_status: row.canon_status || null,
+    };
+  }
+  function typeLabel(t) {
+    return (CANON_TYPE_CONFIG[t] && CANON_TYPE_CONFIG[t].label) || t;
+  }
+
+  return {
+    scan: () => {
+      const db = getDb();
+      const active = db
+        .prepare(
+          `SELECT id, entry_type, title, locked, canon_status
+             FROM canon_entries
+            WHERE retired = 0
+            ORDER BY id ASC`
+        )
+        .all();
+
+      const result = {
+        scannedAt: new Date().toISOString(),
+        totalActiveEntries: active.length,
+        conflicts: [],
+      };
+      if (active.length === 0) return result;
+
+      const byId = new Map(active.map((e) => [e.id, e]));
+
+      // 1) Duplicate titles within the same entry_type.
+      function sortedIds(rows) {
+        return rows.map((r) => Number(r.id)).sort((a, b) => a - b);
+      }
+
+      const byTitleKey = new Map();
+      for (const e of active) {
+        const norm = String(e.title || '').trim().toLowerCase();
+        if (!norm) continue;
+        const key = `${e.entry_type}::${norm}`;
+        if (!byTitleKey.has(key)) byTitleKey.set(key, []);
+        byTitleKey.get(key).push(e);
+      }
+      for (const group of byTitleKey.values()) {
+        if (group.length < 2) continue;
+        const tl = typeLabel(group[0].entry_type);
+        const ids = sortedIds(group);
+        const norm = String(group[0].title || '').trim().toLowerCase();
+        result.conflicts.push({
+          kind: 'duplicate_title',
+          signature: `duplicate_title|${group[0].entry_type}|${norm}|${ids.join(',')}`,
+          label: `Duplicate title "${group[0].title}" within ${tl}`,
+          detail: `${group.length} active ${tl} entries share this title (case-insensitive).`,
+          entries: group.map(toSummary),
+        });
+      }
+
+      // 2) Duplicate primary legacy ids among active entries.
+      const legacyRows = db
+        .prepare(
+          `SELECT l.scheme, l.code, l.canon_entry_id
+             FROM canon_entry_legacy_ids l
+             JOIN canon_entries e ON e.id = l.canon_entry_id
+            WHERE l.is_primary = 1 AND e.retired = 0`
+        )
+        .all();
+      const byLegacyKey = new Map();
+      for (const r of legacyRows) {
+        const key = `${r.scheme}::${r.code}`;
+        if (!byLegacyKey.has(key)) byLegacyKey.set(key, { scheme: r.scheme, code: r.code, ids: [] });
+        byLegacyKey.get(key).ids.push(r.canon_entry_id);
+      }
+      for (const v of byLegacyKey.values()) {
+        const group = v.ids.map((id) => byId.get(id)).filter(Boolean);
+        if (group.length < 2) continue;
+        const ids = sortedIds(group);
+        result.conflicts.push({
+          kind: 'duplicate_legacy_id',
+          signature: `duplicate_legacy_id|${v.scheme}|${v.code}|${ids.join(',')}`,
+          label: `Duplicate primary legacy id ${v.scheme}:${v.code}`,
+          detail: `${group.length} active canon entries hold ${v.scheme}:${v.code} as a primary id.`,
+          entries: group.map(toSummary),
+        });
+      }
+
+      // 3a) (season_entry_id, episode_number) across episode entries.
+      const episodeRows = db
+        .prepare(
+          `SELECT e.id, e.entry_type, e.title, e.locked, e.canon_status,
+                  ep.season_entry_id, ep.episode_number
+             FROM canon_entries e
+             JOIN canon_episodes ep ON ep.canon_entry_id = e.id
+            WHERE e.retired = 0
+              AND ep.season_entry_id IS NOT NULL
+              AND ep.episode_number IS NOT NULL`
+        )
+        .all();
+      const byEpisodeKey = new Map();
+      for (const r of episodeRows) {
+        const key = `${r.season_entry_id}::${r.episode_number}`;
+        if (!byEpisodeKey.has(key)) byEpisodeKey.set(key, { seasonId: r.season_entry_id, epNum: r.episode_number, rows: [] });
+        byEpisodeKey.get(key).rows.push(r);
+      }
+      for (const v of byEpisodeKey.values()) {
+        if (v.rows.length < 2) continue;
+        const seasonEntry = byId.get(Number(v.seasonId));
+        const seasonLabel = seasonEntry ? `"${seasonEntry.title}"` : `entry #${v.seasonId}`;
+        const ids = sortedIds(v.rows);
+        result.conflicts.push({
+          kind: 'duplicate_episode_number',
+          signature: `duplicate_episode_number|${v.seasonId}|${v.epNum}|${ids.join(',')}`,
+          label: `Duplicate episode ${v.epNum} in season ${seasonLabel}`,
+          detail: `${v.rows.length} Episode entries share (season_entry_id=${v.seasonId}, episode_number=${v.epNum}).`,
+          entries: v.rows.map(toSummary),
+        });
+      }
+
+      // 3b) phase_number across viral_phase entries.
+      const phaseRows = db
+        .prepare(
+          `SELECT e.id, e.entry_type, e.title, e.locked, e.canon_status, v.phase_number
+             FROM canon_entries e
+             JOIN canon_viral_phases v ON v.canon_entry_id = e.id
+            WHERE e.retired = 0 AND v.phase_number IS NOT NULL`
+        )
+        .all();
+      const byPhase = new Map();
+      for (const r of phaseRows) {
+        if (!byPhase.has(r.phase_number)) byPhase.set(r.phase_number, []);
+        byPhase.get(r.phase_number).push(r);
+      }
+      for (const [n, group] of byPhase.entries()) {
+        if (group.length < 2) continue;
+        const ids = sortedIds(group);
+        result.conflicts.push({
+          kind: 'duplicate_phase_number',
+          signature: `duplicate_phase_number|${n}|${ids.join(',')}`,
+          label: `Duplicate viral phase number ${n}`,
+          detail: `${group.length} Viral Phase entries share phase_number ${n}.`,
+          entries: group.map(toSummary),
+        });
+      }
+
+      result.conflicts.sort((a, b) => {
+        if (a.kind !== b.kind) return a.kind.localeCompare(b.kind);
+        return a.label.localeCompare(b.label);
+      });
+
+      // PCONFLICT auto-archive — for every flagged Conflicts row that's still
+      // open (not manually archived, not previously auto-archived), check
+      // whether its original collision signature still appears in this scan.
+      // If not, archive the conflicts row and stamp auto_archived_at on the
+      // flag so a later manual Restore + rescan won't re-archive it.
+      const currentSigs = new Set(result.conflicts.map((c) => c.signature));
+      const openFlags = db
+        .prepare(
+          `SELECT f.id AS flag_id, f.conflict_id, f.signature, c.title
+             FROM canon_conflict_flags f
+             JOIN conflicts c ON c.id = f.conflict_id
+            WHERE f.auto_archived_at IS NULL
+              AND c.archived_at IS NULL`
+        )
+        .all();
+
+      const autoArchived = [];
+      if (openFlags.length) {
+        const stamp = result.scannedAt;
+        const archiveStmt = db.prepare(
+          `UPDATE conflicts SET archived_at = ?, updated_at = ? WHERE id = ?`
+        );
+        const flagStmt = db.prepare(
+          `UPDATE canon_conflict_flags SET auto_archived_at = ? WHERE id = ?`
+        );
+        db.transaction(() => {
+          for (const f of openFlags) {
+            if (currentSigs.has(f.signature)) continue;
+            archiveStmt.run(stamp, stamp, f.conflict_id);
+            flagStmt.run(stamp, f.flag_id);
+            autoArchived.push({ id: f.conflict_id, title: f.title });
+          }
+        })();
+      }
+      result.autoArchived = autoArchived;
+      return result;
+    },
+
+    // PCONFLICT-2 (auto-route) — run a normal scan, then for every detected
+    // group that doesn't already have an open routed Conflicts row with the
+    // same signature, create one. Dedup is per-signature so re-running the
+    // scan never piles up duplicate Conflicts rows for the same collision.
+    //
+    // Returns the scan result enriched with:
+    //   - each conflict gets `routedRowId` (existing or freshly created)
+    //   - `routedNew`: [{ id, title, signature }] for rows created this run
+    //   - `alreadyTracked`: [{ id, title, signature }] for rows skipped
+    //
+    // `autoArchived` and `conflicts` come straight from scan(). This is the
+    // path the UI uses — explicit `routeToConflicts` stays in the API for
+    // ad-hoc / programmatic callers but the Canon Bible + Conflicts surfaces
+    // no longer ask the user to route per-card.
+    scanAndRoute: function () {
+      const result = this.scan();
+      if (!result.conflicts.length) {
+        result.routedNew = [];
+        result.alreadyTracked = [];
+        return result;
+      }
+
+      const db = getDb();
+      const openFlags = db
+        .prepare(
+          `SELECT f.signature, f.conflict_id, c.title
+             FROM canon_conflict_flags f
+             JOIN conflicts c ON c.id = f.conflict_id
+            WHERE f.auto_archived_at IS NULL
+              AND c.archived_at IS NULL`
+        )
+        .all();
+      const openBySig = new Map(openFlags.map((r) => [r.signature, r]));
+
+      const routedNew = [];
+      const alreadyTracked = [];
+      for (const c of result.conflicts) {
+        const existing = openBySig.get(c.signature);
+        if (existing) {
+          c.routedRowId = existing.conflict_id;
+          alreadyTracked.push({
+            id: existing.conflict_id,
+            title: existing.title,
+            signature: c.signature,
+          });
+          continue;
+        }
+        const row = this.routeToConflicts({
+          kind: c.kind,
+          signature: c.signature,
+          label: c.label,
+          detail: c.detail,
+          entries: c.entries,
+        });
+        c.routedRowId = row.id;
+        routedNew.push({ id: row.id, title: row.title, signature: c.signature });
+      }
+      result.routedNew = routedNew;
+      result.alreadyTracked = alreadyTracked;
+      return result;
+    },
+
+    // PCONFLICT-2 — canon_entries.id[] currently referenced by any open
+    // conflict flag (flag not auto-archived AND parent conflicts row not
+    // archived). Lets the Canon Bible toast on mutations to load-bearing
+    // entries without forcing a full scan on every click.
+    openFlagEntryIds: () => {
+      const db = getDb();
+      const rows = db
+        .prepare(
+          `SELECT f.entry_ids_json
+             FROM canon_conflict_flags f
+             JOIN conflicts c ON c.id = f.conflict_id
+            WHERE f.auto_archived_at IS NULL
+              AND c.archived_at IS NULL`
+        )
+        .all();
+      const ids = new Set();
+      for (const r of rows) {
+        try {
+          const arr = JSON.parse(r.entry_ids_json || '[]');
+          for (const id of arr) {
+            const n = Number(id);
+            if (Number.isFinite(n)) ids.add(n);
+          }
+        } catch {
+          // Bad row — skip. The flag is still tracked elsewhere; missing
+          // ids only means we won't toast for those mutations.
+        }
+      }
+      return Array.from(ids);
+    },
+
+    // Write one row into `conflicts` summarizing a flagged group, plus a
+    // sidecar `canon_conflict_flags` row carrying the signature so a later
+    // scan() can auto-archive this Conflicts row when the underlying
+    // collision is resolved. Not idempotent — clicking Route twice writes
+    // two rows, by design: the user may have already started annotating an
+    // earlier one and a re-click should land cleanly without silently
+    // merging into it. Stale ones get cleaned up by the next scan.
+    routeToConflicts: (payload = {}) => {
+      const kind = String(payload.kind || '').trim();
+      const signature = String(payload.signature || '').trim();
+      const label = String(payload.label || '').trim();
+      const detail = payload.detail ? String(payload.detail).trim() : '';
+      const entries = Array.isArray(payload.entries) ? payload.entries : [];
+      if (!label) throw new Error('Conflict label is required.');
+      if (!signature) throw new Error('Conflict signature is required.');
+      if (entries.length < 2) {
+        throw new Error('A conflict needs at least two canon entries.');
+      }
+
+      const title = `Conflict: ${label}`.slice(0, 200);
+      const lines = ['Auto-flagged by Canon Bible conflict detection.', ''];
+      if (kind) lines.push(`Kind: ${kind}`);
+      if (detail) lines.push(detail);
+      lines.push('', 'Canon entries involved:');
+      for (const e of entries) {
+        const t = e.title || '(untitled)';
+        const ty = e.entry_type || 'entry';
+        lines.push(`  • Canon Bible #${e.id} — ${t} (${ty})`);
+      }
+
+      const db = getDb();
+      const entryIds = entries
+        .map((e) => Number(e.id))
+        .filter((n) => Number.isFinite(n))
+        .sort((a, b) => a - b);
+      const now = new Date().toISOString();
+
+      let row;
+      db.transaction(() => {
+        row = conflicts.create({ title, body: lines.join('\n') });
+        db.prepare(
+          `INSERT INTO canon_conflict_flags
+             (conflict_id, kind, signature, entry_ids_json, created_at)
+           VALUES (?, ?, ?, ?, ?)`
+        ).run(row.id, kind || 'unknown', signature, JSON.stringify(entryIds), now);
+      })();
+      return row;
+    },
+  };
+})();
+
 module.exports = {
   initDatabase,
   getDb,
@@ -3623,6 +4008,7 @@ module.exports = {
   settings,
   dashboard,
   canon,
+  canonConflicts,
   canonProposals,
   tags,
   search,

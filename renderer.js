@@ -128,6 +128,33 @@ function setStatus(el, text) {
   el.style.display = text ? '' : 'none';
 }
 
+// PCONFLICT-2 — lightweight bottom-center toast used by Canon Bible to nudge
+// the user when they mutate a canon entry that's currently load-bearing for
+// an open Conflicts row. Reuses the extract-toast visual treatment but stays
+// independent so the extract module's lifecycle never owns this surface.
+// Single-toast: a second call replaces the first instead of stacking, which
+// matches the one-action-at-a-time mental model of Canon Bible edits.
+let _flagToastEl = null;
+function showFlagResolvedToast(message) {
+  if (!_flagToastEl) {
+    _flagToastEl = document.createElement('div');
+    _flagToastEl.className = 'rb-toast';
+    _flagToastEl.hidden = true;
+    document.body.appendChild(_flagToastEl);
+  }
+  const el = _flagToastEl;
+  el.textContent = message;
+  el.hidden = false;
+  // Force a reflow so the transition runs even on rapid back-to-back calls.
+  void el.offsetWidth;
+  el.classList.add('rb-toast-visible');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => {
+    el.classList.remove('rb-toast-visible');
+    setTimeout(() => { el.hidden = true; }, 220);
+  }, 3600);
+}
+
 // --- PPASSIVE: passive status bar + linked-entries indicator ---------------
 // Shared by every two-column detail panel (and mirrored in popout.js). Both
 // surfaces are read-only — they summarise state and relationships, they never
@@ -308,6 +335,73 @@ function makeEntryWorkspace(config) {
     renderDetail();
   });
   leftCol.appendChild(addBtn);
+
+  // PCONFLICT-2 — Conflicts page only: an inline hint + a "Re-check resolved
+  // conflicts" button. The scan call already auto-archives resolved
+  // Conflicts rows as a side effect; we surface the count, reload the list,
+  // and keep the user on this page instead of bouncing to Canon Bible just
+  // to clean up routed-then-resolved rows.
+  if (config.apiName === 'conflicts') {
+    const bar = document.createElement('div');
+    bar.className = 'conflict-rescan-bar';
+
+    const hint = document.createElement('div');
+    hint.className = 'conflict-rescan-hint';
+    hint.textContent =
+      'Resolved a conflict in Canon Bible? Re-run detection to auto-archive cleared ones.';
+    bar.appendChild(hint);
+
+    const row = document.createElement('div');
+    row.className = 'conflict-rescan-row';
+
+    const rescanBtn = document.createElement('button');
+    rescanBtn.type = 'button';
+    rescanBtn.className = 'btn-secondary conflict-rescan-btn';
+    rescanBtn.textContent = 'Re-check resolved conflicts';
+    rescanBtn.title =
+      'Re-runs canon conflict detection and auto-archives any routed Conflicts whose underlying collision is gone.';
+    row.appendChild(rescanBtn);
+
+    const rescanStatus = document.createElement('span');
+    rescanStatus.className = 'conflict-rescan-status placeholder';
+    row.appendChild(rescanStatus);
+
+    bar.appendChild(row);
+    leftCol.appendChild(bar);
+
+    rescanBtn.addEventListener('click', async () => {
+      rescanBtn.disabled = true;
+      const prevLabel = rescanBtn.textContent;
+      rescanBtn.textContent = 'Re-checking…';
+      rescanStatus.textContent = '';
+      try {
+        // PCONFLICT-2 (auto-route) — same call as Canon Bible's scan
+        // button: auto-archives resolved rows AND auto-routes any new
+        // collisions that surfaced since the last run.
+        const data = await window.revival.canonConflicts.scanAndRoute();
+        const newCount = (data.routedNew || []).length;
+        const archivedCount = (data.autoArchived || []).length;
+        await loadList();
+        const parts = [];
+        if (archivedCount)
+          parts.push(
+            `Auto-archived ${archivedCount} resolved conflict${archivedCount === 1 ? '' : 's'}`
+          );
+        if (newCount)
+          parts.push(
+            `routed ${newCount} new conflict${newCount === 1 ? '' : 's'}`
+          );
+        rescanStatus.textContent = parts.length
+          ? `${parts.join(' · ')}.`
+          : 'Nothing changed — no resolved or new conflicts.';
+      } catch (err) {
+        rescanStatus.textContent = `Re-check failed: ${err.message || err}`;
+      } finally {
+        rescanBtn.textContent = prevLabel;
+        rescanBtn.disabled = false;
+      }
+    });
+  }
 
   const list = document.createElement('div');
   list.className = 'tc-list';
@@ -1579,6 +1673,17 @@ function renderCanonBiblePage(section) {
   seedBar.className = 'canon-seedbar';
   topBar.appendChild(seedBar);
 
+  // PCONFLICT — Run conflict detection. Edit-Mode-only affordance. Sits next
+  // to the dev-seed slot so all edit-mode tooling is grouped before the Edit
+  // Mode toggle on the far right. Results render below in conflictsHost.
+  const scanBtn = document.createElement('button');
+  scanBtn.type = 'button';
+  scanBtn.className = 'btn-secondary canon-conflict-btn';
+  scanBtn.textContent = 'Run conflict detection';
+  scanBtn.title =
+    'Scan active canon entries for duplicate titles, duplicate primary legacy ids, and duplicate structural keys (season/episode numbers, decision codes, viral phase numbers).';
+  topBar.appendChild(scanBtn);
+
   // PCBREF — Reference Mode / Edit Mode toggle, pinned top-right. The page
   // defaults to Reference Mode (read-only, no edit affordances, clean layout);
   // Edit Mode is a deliberate switch that reveals Add / Edit / Lock /
@@ -1602,12 +1707,36 @@ function renderCanonBiblePage(section) {
   createHost.className = 'canon-create-host';
   section.appendChild(createHost);
 
+  // PCONFLICT — results host. Empty until "Run conflict detection" is clicked.
+  // Cleared whenever Edit Mode is left so Reference Mode stays clean.
+  const conflictsHost = document.createElement('div');
+  conflictsHost.className = 'canon-conflicts-host';
+  section.appendChild(conflictsHost);
+
   // PTAG filter bar.
   let tagFilter = new Set();
   let entriesCache = [];
   let retiredCache = [];
   let canonTagsById = {};
   let typeConfig = {};
+  // PCONFLICT-2 — canon entry ids currently referenced by any open conflict
+  // flag. Refreshed alongside the entry caches; mutation handlers check
+  // membership and fire a toast nudging the user to re-run detection on
+  // the Conflicts page so resolved flags get auto-archived.
+  let flaggedEntryIds = new Set();
+  function maybeFlagToast(id, verb) {
+    const n = Number(id);
+    if (!flaggedEntryIds.has(n)) {
+      console.debug(
+        `[PCONFLICT-2] ${verb} canon #${n}; flaggedEntryIds=[${Array.from(flaggedEntryIds).join(',')}] — no toast`
+      );
+      return;
+    }
+    console.debug(`[PCONFLICT-2] ${verb} canon #${n} → firing toast`);
+    showFlagResolvedToast(
+      `${verb} an entry that's part of an open conflict. Re-run detection on Conflicts to auto-archive if resolved.`
+    );
+  }
   // Per-entry edit-mode state: id -> true means render edit form, not card.
   const editing = new Set();
   // P34 — per-entry supersede-mode state. Same shape as `editing` but the
@@ -1632,11 +1761,14 @@ function renderCanonBiblePage(section) {
     modeToggle.setAttribute('aria-pressed', editMode ? 'true' : 'false');
     addBtn.style.display = editMode ? '' : 'none';
     seedBar.style.display = editMode ? '' : 'none';
+    scanBtn.style.display = editMode ? '' : 'none';
     if (!editMode) {
       editing.clear();
       superseding.clear();
       createHost.innerHTML = '';
+      conflictsHost.innerHTML = '';
       addBtn.disabled = false;
+      scanBtn.disabled = false;
     }
   }
 
@@ -1975,6 +2107,7 @@ function renderCanonBiblePage(section) {
       try {
         await window.revival.canon.archive(e.id);
         setStatus(status, `Archived “${e.title}”.`);
+        maybeFlagToast(e.id, 'Archived');
         await refresh();
       } catch (err) {
         setStatus(status, `Archive failed: ${err.message || err}`);
@@ -2381,6 +2514,7 @@ function renderCanonBiblePage(section) {
         CanonDrafts.clear(`edit:${e.id}`);
         editing.delete(e.id);
         setStatus(status, `Deleted “${e.title}”.`);
+        maybeFlagToast(e.id, 'Deleted');
         await refresh();
       } catch (err) {
         prompt.textContent = err.message || 'Could not delete entry.';
@@ -2429,6 +2563,7 @@ function renderCanonBiblePage(section) {
         });
         editing.delete(e.id);
         setStatus(status, `Saved “${payload.title}”.`);
+        maybeFlagToast(e.id, 'Edited');
         await refresh();
       },
       onCancel: () => {
@@ -2508,6 +2643,7 @@ function renderCanonBiblePage(section) {
           status,
           `Superseded “${e.title}” → “${result.title}”. Prior version moved to Retired.`
         );
+        maybeFlagToast(e.id, 'Superseded');
         await refresh();
       },
       onCancel: () => {
@@ -2590,7 +2726,7 @@ function renderCanonBiblePage(section) {
       }
     }
 
-    retiredSummary.textContent = `Retired (${filteredRetired.length})`;
+    retiredSummary.textContent = `Retired / Archived (${filteredRetired.length})`;
     retiredList.innerHTML = '';
     if (retiredCache.length === 0) {
       const empty = document.createElement('div');
@@ -2653,6 +2789,186 @@ function renderCanonBiblePage(section) {
 
   addBtn.addEventListener('click', openCreateForm);
 
+  // PCONFLICT — render the conflict-scan results panel into conflictsHost.
+  // PCONFLICT-2 (auto-route): every detected group is already routed to the
+  // Conflicts workspace (or matched to an existing open row) by the time we
+  // render — each card just shows its routed row number. No per-card Route
+  // button anymore; the click of "Run conflict detection" is the route
+  // confirmation for the whole batch.
+  function renderConflictResults(data) {
+    conflictsHost.innerHTML = '';
+
+    const panel = document.createElement('div');
+    panel.className = 'canon-conflicts-panel';
+
+    const header = document.createElement('div');
+    header.className = 'canon-conflicts-header';
+
+    const heading = document.createElement('div');
+    heading.className = 'canon-conflicts-heading';
+    const n = data.conflicts.length;
+    heading.textContent =
+      n === 0
+        ? `No conflicts detected across ${data.totalActiveEntries} active entries.`
+        : `${n} potential conflict${n === 1 ? '' : 's'} across ${data.totalActiveEntries} active entries.`;
+    header.appendChild(heading);
+
+    // PCONFLICT auto-archive notice — only present when scan() resolved one
+    // or more previously-routed Conflicts rows. Shown above the cards so the
+    // user knows what changed without having to visit the Conflicts workspace.
+    const autoArchived = Array.isArray(data.autoArchived) ? data.autoArchived : [];
+    if (autoArchived.length) {
+      const archivedNote = document.createElement('div');
+      archivedNote.className = 'canon-conflicts-autoarchived';
+      const m = autoArchived.length;
+      const titles = autoArchived.map((a) => a.title).join(' · ');
+      archivedNote.textContent =
+        `Auto-archived ${m} resolved conflict${m === 1 ? '' : 's'} in Conflicts: ${titles}`;
+      header.appendChild(archivedNote);
+    }
+
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'canon-conflicts-close';
+    closeBtn.setAttribute('aria-label', 'Close conflict results');
+    closeBtn.textContent = '×';
+    closeBtn.addEventListener('click', () => {
+      conflictsHost.innerHTML = '';
+    });
+    header.appendChild(closeBtn);
+    panel.appendChild(header);
+
+    if (n === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'placeholder canon-conflicts-empty';
+      empty.textContent =
+        'Looked for duplicate titles within an entry type, duplicate primary legacy ids, and duplicate structural keys. Nothing collides.';
+      panel.appendChild(empty);
+      conflictsHost.appendChild(panel);
+      return;
+    }
+
+    const intro = document.createElement('p');
+    intro.className = 'placeholder canon-conflicts-intro';
+    intro.textContent =
+      'Each group below shares a value that should be unique. Every group is tracked as a Conflicts entry (linked below) — resolve by superseding or editing one of the entries, then re-run detection to auto-archive cleared rows.';
+    panel.appendChild(intro);
+
+    data.conflicts.forEach((c, idx) => {
+      const card = document.createElement('div');
+      card.className = 'canon-conflict-card';
+
+      const cardHeader = document.createElement('div');
+      cardHeader.className = 'canon-conflict-card-header';
+      const kindBadge = document.createElement('span');
+      kindBadge.className = `canon-conflict-kind kind-${c.kind}`;
+      kindBadge.textContent = c.kind.replace(/_/g, ' ');
+      cardHeader.appendChild(kindBadge);
+      const labelEl = document.createElement('span');
+      labelEl.className = 'canon-conflict-label';
+      labelEl.textContent = c.label;
+      cardHeader.appendChild(labelEl);
+      card.appendChild(cardHeader);
+
+      if (c.detail) {
+        const detailEl = document.createElement('div');
+        detailEl.className = 'canon-conflict-detail';
+        detailEl.textContent = c.detail;
+        card.appendChild(detailEl);
+      }
+
+      const entriesList = document.createElement('ul');
+      entriesList.className = 'canon-conflict-entries';
+      for (const e of c.entries) {
+        const li = document.createElement('li');
+        const id = document.createElement('span');
+        id.className = 'canon-conflict-entry-id';
+        id.textContent = `#${e.id}`;
+        li.appendChild(id);
+        const title = document.createElement('span');
+        title.className = 'canon-conflict-entry-title';
+        title.textContent = ` ${e.title}`;
+        li.appendChild(title);
+        const meta = document.createElement('span');
+        meta.className = 'canon-conflict-entry-meta';
+        const bits = [e.entry_type];
+        if (e.canon_status) bits.push(e.canon_status);
+        if (e.locked) bits.push('locked');
+        meta.textContent = ` — ${bits.join(' · ')}`;
+        li.appendChild(meta);
+        entriesList.appendChild(li);
+      }
+      card.appendChild(entriesList);
+
+      // PCONFLICT-2 (auto-route) — every group already has a Conflicts row
+      // by the time we render. Two passive labels:
+      //   - "Routed → Conflicts #N (new)" for rows created by this scan
+      //   - "Already in Conflicts #N" for rows that already existed open
+      // The action row stays so the visual rhythm matches the old layout.
+      const actions = document.createElement('div');
+      actions.className = 'canon-conflict-actions';
+      const routedNote = document.createElement('span');
+      routedNote.className = 'canon-conflict-routed';
+      if (c.routedRowId) {
+        const isNew = Array.isArray(data.routedNew)
+          ? data.routedNew.some((r) => r.id === c.routedRowId)
+          : false;
+        routedNote.textContent = isNew
+          ? `Routed → Conflicts #${c.routedRowId} (new)`
+          : `Already in Conflicts #${c.routedRowId}`;
+      } else {
+        routedNote.textContent = 'Not yet routed.';
+      }
+      actions.appendChild(routedNote);
+      card.appendChild(actions);
+
+      panel.appendChild(card);
+    });
+
+    conflictsHost.appendChild(panel);
+  }
+
+  scanBtn.addEventListener('click', async () => {
+    scanBtn.disabled = true;
+    const prevLabel = scanBtn.textContent;
+    scanBtn.textContent = 'Scanning…';
+    try {
+      // PCONFLICT-2 (auto-route) — scanAndRoute() detects, auto-routes new
+      // groups (dedup by signature), and auto-archives resolved ones in one
+      // round-trip. We re-fetch the flagged-id set so the Canon Bible toast
+      // is accurate without waiting for the next refresh().
+      const data = await window.revival.canonConflicts.scanAndRoute();
+      renderConflictResults(data);
+      try {
+        const ids = await window.revival.canonConflicts.openFlagEntryIds();
+        flaggedEntryIds = new Set((ids || []).map((n) => Number(n)));
+      } catch {
+        /* non-fatal; toast set updates on next refresh() */
+      }
+      const n = data.conflicts.length;
+      const newCount = Array.isArray(data.routedNew) ? data.routedNew.length : 0;
+      const trackedCount = Array.isArray(data.alreadyTracked)
+        ? data.alreadyTracked.length
+        : 0;
+      const archivedCount = Array.isArray(data.autoArchived)
+        ? data.autoArchived.length
+        : 0;
+      const parts = [];
+      if (n === 0) parts.push('No collisions found.');
+      else parts.push(`${n} conflict${n === 1 ? '' : 's'} found`);
+      if (newCount) parts.push(`${newCount} newly routed`);
+      if (trackedCount) parts.push(`${trackedCount} already tracked`);
+      if (archivedCount)
+        parts.push(`${archivedCount} auto-archived`);
+      setStatus(status, `Conflict scan: ${parts.join(' · ')}.`);
+    } catch (err) {
+      setStatus(status, `Conflict scan failed: ${err.message || err}`);
+    } finally {
+      scanBtn.textContent = prevLabel;
+      scanBtn.disabled = false;
+    }
+  });
+
   // PCBREF — toggle Reference ⇄ Edit Mode. renderLists() reads editMode to
   // decide whether cards get action rows + editable tag bars.
   modeToggle.addEventListener('click', () => {
@@ -2690,16 +3006,30 @@ function renderCanonBiblePage(section) {
   }
 
   async function refresh() {
-    const [entries, retiredEntries, cfg] = await Promise.all([
+    const [entries, retiredEntries, cfg, flaggedIds] = await Promise.all([
       window.revival.canon.list(),
       window.revival.canon.listRetired(),
       typeConfig && Object.keys(typeConfig).length
         ? Promise.resolve(typeConfig)
         : window.revival.canon.typeConfig(),
+      // PCONFLICT-2 — refresh the set of canon ids referenced by open
+      // conflict flags so mutation handlers can fire a re-run reminder
+      // toast when one of those entries is touched. Best-effort: log
+      // failures so a missing IPC handler (e.g. main.js not restarted
+      // after a build) doesn't silently disable the nudge.
+      (window.revival.canonConflicts.openFlagEntryIds
+        ? window.revival.canonConflicts.openFlagEntryIds().catch((err) => {
+            console.warn('[PCONFLICT-2] openFlagEntryIds failed:', err);
+            return [];
+          })
+        : Promise.resolve(
+            (console.warn('[PCONFLICT-2] openFlagEntryIds IPC missing — restart Electron after pulling main.js/preload.js changes.'), [])
+          )),
     ]);
     entriesCache = entries;
     retiredCache = retiredEntries;
     typeConfig = cfg;
+    flaggedEntryIds = new Set((flaggedIds || []).map((n) => Number(n)));
     await reloadCanonTags();
 
     // Dev seed button: visible iff canon is completely empty.
