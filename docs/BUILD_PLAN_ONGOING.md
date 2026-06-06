@@ -281,7 +281,7 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Writing Lab → Canon
 
-### PWLAB — Writing Lab → Canon Review connection
+### PWLAB — Writing Lab → Canon Review connection ✅
 - From any Writing Lab draft, select text or use an action to propose a canon change
 - Proposal lands in Canon Review with source attribution to the draft
 - **Smoke:** Propose from a draft, confirm it appears in Canon Review with attribution

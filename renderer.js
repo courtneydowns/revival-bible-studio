@@ -5108,6 +5108,14 @@ function renderWritingLabPage(section) {
     const spacer = document.createElement('span');
     spacer.className = 'wl-bar-spacer';
 
+    // PWLAB — propose a canon change from this draft. Uses the selected text
+    // (if any) as the proposed body, else the whole draft; attribution points
+    // back at the draft. Hidden on archived drafts (read-only, can't flush).
+    const proposeBtn = document.createElement('button');
+    proposeBtn.type = 'button';
+    proposeBtn.className = 'btn-secondary wl-propose-btn';
+    proposeBtn.textContent = 'Propose Canon';
+
     const archiveBtn = document.createElement('button');
     archiveBtn.type = 'button';
     archiveBtn.className = 'btn-secondary';
@@ -5118,7 +5126,11 @@ function renderWritingLabPage(section) {
     deleteBtn.className = 'btn-danger';
     deleteBtn.textContent = 'Delete';
 
-    bar.append(status, counter, spacer, archiveBtn, deleteBtn);
+    if (archivedAtStart) {
+      bar.append(status, counter, spacer, archiveBtn, deleteBtn);
+    } else {
+      bar.append(status, counter, spacer, proposeBtn, archiveBtn, deleteBtn);
+    }
 
     const titleInput = document.createElement('input');
     titleInput.type = 'text';
@@ -5308,6 +5320,42 @@ function renderWritingLabPage(section) {
       no.addEventListener('click', () => row.remove());
       row.append(prompt, yes, no);
       bodyInput.insertAdjacentElement('afterend', row);
+    });
+
+    // PWLAB — capture the body selection on mousedown, before the button steals
+    // focus (some platforms collapse a textarea's selection on blur).
+    let pendingSelection = null;
+    proposeBtn.addEventListener('mousedown', () => {
+      const s = bodyInput.selectionStart;
+      const e = bodyInput.selectionEnd;
+      pendingSelection =
+        typeof s === 'number' && typeof e === 'number' && e > s
+          ? bodyInput.value.substring(s, e).trim()
+          : null;
+    });
+
+    proposeBtn.addEventListener('click', async () => {
+      proposeBtn.disabled = true;
+      try {
+        // Make sure the draft is persisted so the proposal can attribute back
+        // to a real row.
+        await flushNow();
+        const title = titleInput.value.trim();
+        const body = bodyInput.value.trim();
+        if (currentId == null || (!title && !body)) {
+          setStatus(status, 'Add a title or some text before proposing canon.');
+          return;
+        }
+        const snippet = pendingSelection;
+        openProposalModal(
+          { id: currentId, title: titleInput.value, body: bodyInput.value },
+          'writing_lab',
+          snippet ? { body: snippet } : null
+        );
+      } finally {
+        pendingSelection = null;
+        proposeBtn.disabled = false;
+      }
     });
 
     if (item && !archivedAtStart) bodyInput.focus();
@@ -6680,11 +6728,15 @@ const cpCloseBtn = document.getElementById('cp-close');
 const cpError = document.getElementById('cp-error');
 const cpSuccess = document.getElementById('cp-success');
 
-function openProposalModal(item, sourceKind) {
+// `overrides` (optional) lets a caller pre-fill the modal with something other
+// than the source item's own title/body — e.g. PWLAB passes a selected snippet
+// from a Writing Lab draft as the proposed body while keeping draft attribution.
+function openProposalModal(item, sourceKind, overrides) {
+  const ov = overrides || {};
   _cpSourceKind = sourceKind;
   _cpSourceEntryId = item.id;
-  cpTitleInput.value = item.title || '';
-  cpBodyInput.value = item.body || '';
+  cpTitleInput.value = (ov.title != null ? ov.title : item.title) || '';
+  cpBodyInput.value = (ov.body != null ? ov.body : item.body) || '';
   cpNoteInput.value = '';
   setStatus(cpError, '');
   setStatus(cpSuccess, '');
