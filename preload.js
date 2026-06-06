@@ -241,6 +241,15 @@ contextBridge.exposeInMainWorld('revival', {
     candidates: (sourceKind) =>
       ipcRenderer.invoke('crossWorkspace:candidates', sourceKind),
   },
+  // PImp1 — worldbuilding file import. pickFile opens the OS dialog and reads
+  // the chosen file; checkConflicts compares proposed titles to live canon;
+  // stageEntries writes proposals to the Canon Review queue.
+  import: {
+    pickFile: () => ipcRenderer.invoke('import:pickFile'),
+    checkConflicts: (proposals) => ipcRenderer.invoke('import:checkConflicts', proposals),
+    stageEntries: (entries, fileName) =>
+      ipcRenderer.invoke('import:stageEntries', entries, fileName),
+  },
   panic: {
     export: () => ipcRenderer.invoke('panic:export'),
   },

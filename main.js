@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const db = require('./db');
@@ -370,6 +370,33 @@ function registerIpc() {
     shell.openPath(folder);
     return { folder, count: result.count, title: result.title };
   });
+
+  // PImp1 — Worldbuilding file import.
+  //  • import:pickFile opens the system file dialog and reads the chosen file.
+  //  • import:checkConflicts compares proposed titles against active canon.
+  //  • import:stageEntries writes the approved-for-staging list to canon_proposals.
+  ipcMain.handle('import:pickFile', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select Worldbuilding File',
+      filters: [
+        { name: 'Text / Markdown', extensions: ['txt', 'md', 'markdown'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+      properties: ['openFile'],
+    });
+    if (result.canceled || !result.filePaths.length) return { canceled: true };
+    const filePath = result.filePaths[0];
+    const content = fs.readFileSync(filePath, 'utf8');
+    return { canceled: false, filePath, fileName: path.basename(filePath), content };
+  });
+
+  ipcMain.handle('import:checkConflicts', (_event, proposals) =>
+    db.canonImport.checkConflicts(proposals)
+  );
+
+  ipcMain.handle('import:stageEntries', (_event, entries, fileName) =>
+    db.canonImport.stageEntries(entries, fileName)
+  );
 
   ipcMain.handle('settings:getProjectRules', () => db.settings.getProjectRules());
   ipcMain.handle('settings:setProjectRules', (_event, text) =>

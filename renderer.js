@@ -17,6 +17,7 @@ const WORKSPACES = [
   'Decisions',
   'Brainstorm',
   'Research',
+  'Import',
   'Settings',
 ];
 
@@ -5168,6 +5169,401 @@ function renderCanonExport(section) {
   section.appendChild(block);
 }
 
+// --- Import (PImp1) ---------------------------------------------------------
+// Three-phase UI:
+//   Phase 1 — pick a file (file dialog via IPC)
+//   Phase 2 — preview parsed entries + conflict flags, then stage
+//   Phase 3 — success screen with Go-to-Canon-Review shortcut
+
+// ---- File parser ------------------------------------------------------------
+// Tries four strategies in order, returning whichever yields ≥ 2 sections.
+
+function _importParseMarkdown(lines) {
+  const sections = [];
+  let cur = null;
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    const m = line.match(/^(#{1,3})\s+(.+)/);
+    if (m) {
+      if (cur) sections.push(cur);
+      cur = { title: m[2].trim(), bodyLines: [] };
+    } else if (cur) {
+      cur.bodyLines.push(line);
+    }
+  }
+  if (cur) sections.push(cur);
+  return sections.map((s) => ({
+    title: s.title,
+    body: s.bodyLines.join('\n').trim(),
+  }));
+}
+
+function _importParseDividers(lines) {
+  // A divider line is ≥ 8 chars of =, -, ─, or ━ (box-drawing dividers common
+  // in the worldbuilding files).
+  const isDivider = (l) => /^[=\-─━]{8,}\s*$/.test(l.trim());
+
+  // Detect the triple pattern: DIVIDER → TITLE → DIVIDER → BODY (common in
+  // worldbuilding files where each section header is sandwiched between two
+  // rule lines). Collect the boundary positions first, then slice out bodies.
+  const boundaries = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!isDivider(lines[i])) continue;
+    let j = i + 1;
+    while (j < lines.length && lines[j].trim() === '') j++;
+    if (j >= lines.length || isDivider(lines[j])) continue;
+    const title = lines[j].trim();
+    if (!title) continue;
+    let k = j + 1;
+    while (k < lines.length && lines[k].trim() === '') k++;
+    if (k >= lines.length || !isDivider(lines[k])) continue;
+    boundaries.push({ divider1: i, titleIdx: j, divider2: k, title });
+    i = k;
+  }
+
+  if (boundaries.length === 0) {
+    // Fallback: simple divider-flush (no triple pattern found)
+    const sections = [];
+    let pendingLines = [];
+    function flush() {
+      const nonEmpty = pendingLines.filter((l) => l.trim());
+      if (!nonEmpty.length) { pendingLines = []; return; }
+      const title = nonEmpty[0].trim();
+      const body = nonEmpty.slice(1).join('\n').trim();
+      if (title) sections.push({ title, body });
+      pendingLines = [];
+    }
+    for (const raw of lines) {
+      if (isDivider(raw)) flush();
+      else pendingLines.push(raw.trimEnd());
+    }
+    flush();
+    return sections;
+  }
+
+  return boundaries.map((b, idx) => {
+    const bodyStart = b.divider2 + 1;
+    const bodyEnd = idx + 1 < boundaries.length ? boundaries[idx + 1].divider1 : lines.length;
+    const body = lines.slice(bodyStart, bodyEnd).join('\n').trim();
+    return { title: b.title, body };
+  });
+}
+
+function _importParseCapLines(lines) {
+  // Capitalised heading lines: a line that is ALL CAPS (≥ 4 chars, no
+  // trailing punctuation) or Title Case (every word capitalised) followed
+  // by content. Used as a fallback for files without explicit dividers.
+  const isHeading = (l) => {
+    const t = l.trim();
+    if (!t || t.length < 4) return false;
+    if (/^[=\-─━\s]+$/.test(t)) return false; // skip divider-only lines
+    // ALL CAPS
+    if (t === t.toUpperCase() && /[A-Z]{2,}/.test(t) && !/[a-z]/.test(t)) return true;
+    return false;
+  };
+  const sections = [];
+  let cur = null;
+  for (const raw of lines) {
+    if (isHeading(raw)) {
+      if (cur) sections.push(cur);
+      cur = { title: raw.trim(), bodyLines: [] };
+    } else if (cur) {
+      cur.bodyLines.push(raw.trimEnd());
+    }
+  }
+  if (cur) sections.push(cur);
+  return sections.map((s) => ({
+    title: s.title,
+    body: s.bodyLines.join('\n').trim(),
+  }));
+}
+
+function _importParseParagraphs(lines) {
+  const chunks = [];
+  let cur = [];
+  for (const raw of lines) {
+    if (raw.trim() === '') {
+      if (cur.length) { chunks.push(cur); cur = []; }
+    } else {
+      cur.push(raw.trimEnd());
+    }
+  }
+  if (cur.length) chunks.push(cur);
+  return chunks.map((ch) => ({
+    title: ch[0].trim(),
+    body: ch.slice(1).join('\n').trim(),
+  }));
+}
+
+function parseWorldbuildingFile(content) {
+  const lines = content.split('\n');
+
+  const md = _importParseMarkdown(lines);
+  if (md.length >= 2) return md;
+
+  const div = _importParseDividers(lines);
+  if (div.length >= 2) return div;
+
+  const cap = _importParseCapLines(lines);
+  if (cap.length >= 2) return cap;
+
+  return _importParseParagraphs(lines);
+}
+
+// ---- Entry type heuristic --------------------------------------------------
+// Very conservative — only fires on strong keywords so false positives stay low.
+// The user can reassign type inside Canon Review before approving.
+function _detectEntryType(title, body) {
+  const text = `${title} ${body}`.toLowerCase();
+  if (/\b(character|protagonist|antagonist)\b/.test(text)) return 'character';
+  if (/\b(season \d+|s\d+ |s\d+e\d+)\b/.test(text)) return 'season';
+  if (/\b(episode\s+\d+|ep\s+\d+|pilot|finale)\b/.test(text)) return 'episode';
+  if (/\b(craft rule|production rule|camera rule|score rule|the rule|rule \d+)\b/.test(text)) return 'production_rule';
+  if (/\bflanagan\b/.test(text)) return 'principle';
+  if (/\bmotif\b/.test(text)) return 'motif';
+  if (/\btheme\b/.test(text)) return 'theme';
+  if (/\b(location|setting)\b/.test(text)) return 'location';
+  if (/\b(institution|organization|fellowship|clinic|hospital)\b/.test(text)) return 'institution';
+  if (/\b(timeline|timeline event)\b/.test(text)) return 'timeline_event';
+  if (/\b(viral phase|phase \d)\b/.test(text)) return 'viral_phase';
+  return null;
+}
+
+// ---- Main renderer ---------------------------------------------------------
+function renderImportPage(section) {
+  const wrap = document.createElement('div');
+  wrap.className = 'entry-form settings-block';
+  section.appendChild(wrap);
+
+  // State shared across phases
+  let currentFileName = '';
+  let currentEntries = []; // annotated with conflicts[]
+
+  function showPhase(el) {
+    wrap.innerHTML = '';
+    wrap.appendChild(el);
+  }
+
+  // ---- Phase 1: pick a file -------------------------------------------------
+  function buildPhase1() {
+    const div = document.createElement('div');
+
+    const desc = document.createElement('p');
+    desc.className = 'settings-desc';
+    desc.textContent =
+      'Load a worldbuilding text or Markdown file and stage its sections as ' +
+      'pending proposals in Canon Review. Supported: .txt, .md. ' +
+      'Each parsed section becomes one proposal. Entries that share a title ' +
+      'with an existing canon entry are flagged before staging.';
+    div.appendChild(desc);
+
+    const pickBtn = document.createElement('button');
+    pickBtn.type = 'button';
+    pickBtn.textContent = 'Pick a Worldbuilding File…';
+
+    const status = document.createElement('p');
+    status.className = 'draft-status';
+    status.style.display = 'none';
+
+    pickBtn.addEventListener('click', async () => {
+      pickBtn.disabled = true;
+      setStatus(status, 'Opening file picker…');
+      try {
+        const res = await window.revival.import.pickFile();
+        if (res.canceled) {
+          setStatus(status, '');
+          pickBtn.disabled = false;
+          return;
+        }
+        setStatus(status, 'Parsing file…');
+        currentFileName = res.fileName;
+
+        const raw = parseWorldbuildingFile(res.content);
+        const withTypes = raw
+          .filter((e) => e.title.trim())
+          .map((e) => ({
+            title: e.title,
+            body: e.body || '',
+            entry_type: _detectEntryType(e.title, e.body || ''),
+          }));
+
+        if (withTypes.length === 0) {
+          setStatus(status, 'No sections detected in that file. Try a different format.');
+          pickBtn.disabled = false;
+          return;
+        }
+
+        setStatus(status, 'Checking for conflicts…');
+        currentEntries = await window.revival.import.checkConflicts(withTypes);
+        showPhase(buildPhase2());
+      } catch (err) {
+        setStatus(status, `Error: ${err.message || err}`);
+        pickBtn.disabled = false;
+      }
+    });
+
+    div.append(pickBtn, status);
+    return div;
+  }
+
+  // ---- Phase 2: preview ----------------------------------------------------
+  function buildPhase2() {
+    const div = document.createElement('div');
+
+    const fileBar = document.createElement('p');
+    fileBar.style.cssText = 'font-weight:bold;margin-bottom:4px;';
+    const conflictCount = currentEntries.filter((e) => e.conflicts && e.conflicts.length).length;
+    fileBar.textContent = `${currentFileName}  ·  ${currentEntries.length} section${currentEntries.length !== 1 ? 's' : ''} parsed`;
+    if (conflictCount) {
+      const flag = document.createElement('span');
+      flag.style.cssText = 'margin-left:10px;color:var(--warn,#e8a043);font-weight:normal;';
+      flag.textContent = `⚠ ${conflictCount} possible conflict${conflictCount !== 1 ? 's' : ''}`;
+      fileBar.appendChild(flag);
+    }
+    div.appendChild(fileBar);
+
+    const list = document.createElement('div');
+    list.style.cssText =
+      'border:1px solid var(--border,#444);border-radius:6px;max-height:420px;' +
+      'overflow-y:auto;margin-bottom:10px;';
+
+    for (let i = 0; i < currentEntries.length; i++) {
+      const entry = currentEntries[i];
+      const card = document.createElement('div');
+      card.style.cssText =
+        'padding:10px 12px;border-bottom:1px solid var(--border,#333);' +
+        (i === currentEntries.length - 1 ? 'border-bottom:none;' : '');
+
+      const titleRow = document.createElement('div');
+      titleRow.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
+
+      const titleSpan = document.createElement('span');
+      titleSpan.style.fontWeight = 'bold';
+      titleSpan.textContent = entry.title;
+      titleRow.appendChild(titleSpan);
+
+      if (entry.entry_type) {
+        const typeBadge = document.createElement('span');
+        typeBadge.className = 'status-badge';
+        typeBadge.style.cssText = 'font-size:0.75em;opacity:0.8;';
+        typeBadge.textContent = entry.entry_type.replace(/_/g, ' ');
+        titleRow.appendChild(typeBadge);
+      }
+
+      if (entry.conflicts && entry.conflicts.length) {
+        const cfBadge = document.createElement('span');
+        cfBadge.className = 'status-badge status-sent-back';
+        cfBadge.style.cssText = 'font-size:0.75em;';
+        const names = entry.conflicts.map((c) => `"${c.title}" (${c.entry_type.replace(/_/g, ' ')})`).join(', ');
+        cfBadge.textContent = `⚠ conflict: ${names}`;
+        titleRow.appendChild(cfBadge);
+      }
+
+      card.appendChild(titleRow);
+
+      if (entry.body) {
+        const preview = document.createElement('p');
+        preview.style.cssText =
+          'margin:4px 0 0;font-size:0.85em;opacity:0.7;white-space:pre-wrap;' +
+          'max-height:80px;overflow:hidden;text-overflow:ellipsis;';
+        preview.textContent = entry.body.length > 200 ? entry.body.slice(0, 200) + '…' : entry.body;
+        card.appendChild(preview);
+      }
+
+      list.appendChild(card);
+    }
+    div.appendChild(list);
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
+
+    const backBtn = document.createElement('button');
+    backBtn.type = 'button';
+    backBtn.textContent = '← Back';
+    backBtn.className = 'btn-secondary';
+
+    const stageBtn = document.createElement('button');
+    stageBtn.type = 'button';
+    stageBtn.textContent = `Stage ${currentEntries.length} as Proposals`;
+
+    const status = document.createElement('p');
+    status.className = 'draft-status';
+    status.style.display = 'none';
+
+    backBtn.addEventListener('click', () => showPhase(buildPhase1()));
+
+    stageBtn.addEventListener('click', async () => {
+      stageBtn.disabled = true;
+      backBtn.disabled = true;
+      setStatus(status, 'Staging…');
+      try {
+        // Annotate conflict entries with a note so Canon Review surfaces the flag.
+        const toStage = currentEntries.map((e) => {
+          let conflictNote = null;
+          if (e.conflicts && e.conflicts.length) {
+            const names = e.conflicts
+              .map((c) => `"${c.title}" (id: ${c.id}, type: ${c.entry_type})`)
+              .join('; ');
+            conflictNote = `⚠ Possible conflict with existing canon: ${names}`;
+          }
+          return { ...e, conflictNote };
+        });
+        const result = await window.revival.import.stageEntries(toStage, currentFileName);
+        refreshNavBadges();
+        showPhase(buildPhase3(result.staged, conflictCount));
+      } catch (err) {
+        setStatus(status, `Error: ${err.message || err}`);
+        stageBtn.disabled = false;
+        backBtn.disabled = false;
+      }
+    });
+
+    btnRow.append(backBtn, stageBtn, status);
+    div.appendChild(btnRow);
+    return div;
+  }
+
+  // ---- Phase 3: done -------------------------------------------------------
+  function buildPhase3(staged, flagged) {
+    const div = document.createElement('div');
+
+    const msg = document.createElement('p');
+    msg.style.cssText = 'font-weight:bold;margin-bottom:6px;';
+    msg.textContent =
+      `${staged} proposal${staged !== 1 ? 's' : ''} staged in Canon Review.`;
+    div.appendChild(msg);
+
+    if (flagged) {
+      const warn = document.createElement('p');
+      warn.style.cssText = 'color:var(--warn,#e8a043);margin-bottom:10px;';
+      warn.textContent =
+        `${flagged} entr${flagged !== 1 ? 'ies' : 'y'} flagged as possible conflicts — ` +
+        'check the proposer note in Canon Review before approving.';
+      div.appendChild(warn);
+    }
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;';
+
+    const goBtn = document.createElement('button');
+    goBtn.type = 'button';
+    goBtn.textContent = 'Go to Canon Review';
+    goBtn.addEventListener('click', () => route('Canon Review'));
+
+    const againBtn = document.createElement('button');
+    againBtn.type = 'button';
+    againBtn.textContent = 'Import Another File';
+    againBtn.className = 'btn-secondary';
+    againBtn.addEventListener('click', () => showPhase(buildPhase1()));
+
+    btnRow.append(goBtn, againBtn);
+    div.appendChild(btnRow);
+    return div;
+  }
+
+  showPhase(buildPhase1());
+}
+
 // --- Writing Lab (P28) ------------------------------------------------------
 // The long-form drafting surface. Unlike the entry workspaces (explicit "Add"/
 // "Save" to finalize), Writing Lab autosaves continuously to SQLite as you
@@ -6258,6 +6654,7 @@ const CONTENT_RENDERERS = {
   'Settings': renderSettingsPage,
   'Canon Bible': renderCanonBiblePage,
   'Canon Review': renderCanonReviewPage,
+  'Import': renderImportPage,
   'Unsorted': makeEntryWorkspace({
     apiName: 'unsorted',
     entityKind: 'unsorted',
@@ -6438,6 +6835,7 @@ const NAV_ICONS = {
   'Episodes': '🎬',
   'Unsorted': '📥',
   'Canon Review': '✅',
+  'Import': '📂',
   'Open Questions': '❓',
   'Conflicts': '⚔️',
   'Decisions': '⚖️',

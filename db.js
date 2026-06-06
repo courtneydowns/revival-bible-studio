@@ -4464,6 +4464,83 @@ function canonExport(params) {
   return { markdown, html: htmlParts.join('\n'), count: entries.length, title };
 }
 
+// --- PImp1 — Worldbuilding file import --------------------------------------
+// Stages parsed worldbuilding file entries as pending Canon Review proposals.
+// The renderer handles file reading and parsing; these two functions handle
+// the DB side: conflict pre-check and proposal creation.
+const canonImport = {
+  // Compare proposed entries (array of { title, entry_type? }) against existing
+  // active (non-retired) canon entries. Returns each proposal annotated with a
+  // conflicts array so the import preview UI can flag them before staging.
+  checkConflicts: (proposals) => {
+    const db = getDb();
+    const active = db
+      .prepare(`SELECT id, entry_type, title FROM canon_entries WHERE retired = 0`)
+      .all();
+
+    // Index by normalised title for O(1) lookup.
+    const byTitle = new Map();
+    for (const e of active) {
+      const norm = (e.title || '').trim().toLowerCase();
+      if (!norm) continue;
+      if (!byTitle.has(norm)) byTitle.set(norm, []);
+      byTitle.get(norm).push(e);
+    }
+
+    return proposals.map((p) => {
+      const norm = (p.title || '').trim().toLowerCase();
+      const matches = norm ? (byTitle.get(norm) || []) : [];
+      // When a type was detected, flag only same-type matches — different
+      // types sharing a title are suspicious but not always a contradiction.
+      const relevant = (p.entry_type && matches.length)
+        ? matches.filter((e) => e.entry_type === p.entry_type)
+        : matches;
+      return {
+        ...p,
+        conflicts: relevant.map((e) => ({
+          id: e.id,
+          entry_type: e.entry_type,
+          title: e.title,
+        })),
+      };
+    });
+  },
+
+  // Create one pending canon_proposal per entry. source_kind='import' +
+  // the file name in proposer_note give each proposal full source attribution.
+  // Skips entries with no title. Returns { staged } count.
+  stageEntries: (entries, fileName) => {
+    const db = getDb();
+    const now = new Date().toISOString();
+    let staged = 0;
+
+    const insertStmt = db.prepare(
+      `INSERT INTO canon_proposals
+         (created_at, updated_at, proposal_intent, proposed_fields_json,
+          source_kind, proposer_note, status)
+       VALUES (?, ?, 'new_entry', ?, 'import', ?, 'pending')`
+    );
+
+    db.transaction(() => {
+      for (const entry of entries) {
+        const cleanTitle = (entry.title || '').trim();
+        if (!cleanTitle) continue;
+
+        const fields = { title: cleanTitle, body: (entry.body || '').trim() };
+        if (entry.entry_type) fields.entry_type = entry.entry_type;
+
+        const noteParts = [`Source file: ${fileName}`];
+        if (entry.conflictNote) noteParts.push(entry.conflictNote);
+
+        insertStmt.run(now, now, JSON.stringify(fields), noteParts.join('\n'));
+        staged++;
+      }
+    })();
+
+    return { staged };
+  },
+};
+
 module.exports = {
   initDatabase,
   getDb,
@@ -4502,4 +4579,5 @@ module.exports = {
   deleteUnsorted,
   archiveUnsorted,
   restoreUnsorted,
+  canonImport,
 };
