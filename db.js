@@ -1357,10 +1357,13 @@ const MIGRATIONS = [
   {
     name: '038_api_key',
     up(db) {
-      // P39 — store the Claude API key in the settings singleton row so it
-      // persists across restarts. Stored as plain text (local-only app);
-      // never transmitted anywhere except outgoing Claude API calls.
-      db.exec(`ALTER TABLE settings ADD COLUMN claude_api_key TEXT NOT NULL DEFAULT ''`);
+      // P39 — store the Claude API key in the settings singleton row. Guard
+      // against duplicate-column if the column was added outside the migration
+      // system during development.
+      const cols = db.prepare('PRAGMA table_info(settings)').all();
+      if (!cols.some((c) => c.name === 'claude_api_key')) {
+        db.exec(`ALTER TABLE settings ADD COLUMN claude_api_key TEXT NOT NULL DEFAULT ''`);
+      }
     },
   },
 ];
