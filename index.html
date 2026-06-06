@@ -710,6 +710,47 @@
       .canon-create-host { margin-bottom: 14px; }
       .canon-create-card { border-left-color: #d6a14f; }
       .canon-edit-card { border-left-color: #d6a14f; }
+      /* P34 — supersede form card. Use a distinct accent so a card mid-
+         supersede is visually distinguishable from a card mid-edit. */
+      .canon-supersede-card { border-left-color: #c79a55; }
+      .canon-supersede-explain {
+        margin: 6px 0 2px;
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+      /* P34 — chain row. Sits between header and body on any card whose
+         replaces_entry_id / replaced_by_entry_id is set. The link is a
+         plain button styled inline so click semantics stay obvious. */
+      .canon-chain {
+        margin: 4px 0 6px;
+        font-size: 12px;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+      .canon-chain-label { letter-spacing: 0.02em; }
+      .canon-chain-link {
+        background: none;
+        border: none;
+        padding: 0;
+        margin: 0;
+        font: inherit;
+        color: #b08c4a;
+        text-decoration: underline;
+        cursor: pointer;
+      }
+      .canon-chain-link:hover { color: #d6a14f; }
+      .canon-chain-missing { font-style: italic; }
+      .canon-chain-flash {
+        animation: canon-chain-flash 1.5s ease-out;
+      }
+      @keyframes canon-chain-flash {
+        0%   { box-shadow: 0 0 0 2px #d6a14f; }
+        100% { box-shadow: 0 0 0 2px transparent; }
+      }
 
       /* P32 — canon form fields. Each field has a label above its input;
          the status-row keeps status/certainty/review/provisional inline. */

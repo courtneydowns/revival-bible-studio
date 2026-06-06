@@ -210,6 +210,12 @@ function registerIpc() {
   ipcMain.handle('canon:setLocked', (_event, id, payload) =>
     db.canon.setLocked(id, payload)
   );
+  // P34 — supersede: creates a new active entry from this one, retires the
+  // original, and migrates legacy IDs to the new row (retired row keeps
+  // is_primary=0 copies). Chain pointers wire both directions.
+  ipcMain.handle('canon:supersede', (_event, id, payload) =>
+    db.canon.supersede(id, payload)
+  );
 
   // PUI3: Canon Review's only write path for now — accept an extracted
   // snippet and stage it as a pending proposal. The full review UI lands in

@@ -139,6 +139,11 @@ contextBridge.exposeInMainWorld('revival', {
     // P33 — lock/unlock toggle. payload = { locked: bool, locked_label?: string }.
     setLocked: (id, payload) =>
       ipcRenderer.invoke('canon:setLocked', id, payload),
+    // P34 — supersede: creates a new active entry from this one, retires the
+    // original, and wires the chain pointers in both directions. payload is
+    // the same shape as canon.update() — overrides only.
+    supersede: (id, payload) =>
+      ipcRenderer.invoke('canon:supersede', id, payload),
   },
   // PUI3: extract-and-route lands new Canon Review proposals here. Full
   // review queue UI comes in P35; this is the staging write only.

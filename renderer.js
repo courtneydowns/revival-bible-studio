@@ -1359,9 +1359,10 @@ function buildCanonForm({
 // View-mode card render. The action row at the bottom is built by the
 // caller so it can wire the Edit button to flip the card into an in-place
 // edit form, etc.
-function buildCanonCard(e, typeConfig, onTagChange, actionsBuilder) {
+function buildCanonCard(e, typeConfig, onTagChange, actionsBuilder, chainHelper) {
   const card = document.createElement('div');
   card.className = 'entry-card canon-card';
+  card.dataset.canonId = String(e.id);
   if (e.locked) card.classList.add('canon-locked');
   if (e.retired) card.classList.add('canon-retired');
 
@@ -1377,6 +1378,52 @@ function buildCanonCard(e, typeConfig, onTagChange, actionsBuilder) {
   title.textContent = e.title;
   header.appendChild(title);
   card.appendChild(header);
+
+  // P34 — supersede chain navigation. "Replaces" on an active row points back
+  // to the retired prior version; "Replaced by" on a retired row points
+  // forward to the active successor. chainHelper.lookup resolves the linked
+  // entry's title (or null if it's not in this page's cache); chainHelper.goto
+  // expands the Retired section if needed and scrolls the target into view.
+  if (chainHelper) {
+    function renderChainRow(prefix, targetId, hoverTitle) {
+      const row = document.createElement('div');
+      row.className = 'canon-chain';
+      const label = document.createElement('span');
+      label.className = 'canon-chain-label';
+      label.textContent = prefix;
+      row.appendChild(label);
+      const linked = chainHelper.lookup(targetId);
+      if (linked) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'canon-chain-link';
+        btn.textContent = linked.title;
+        btn.title = hoverTitle;
+        btn.addEventListener('click', () => chainHelper.goto(targetId));
+        row.appendChild(btn);
+      } else {
+        const missing = document.createElement('span');
+        missing.className = 'canon-chain-missing';
+        missing.textContent = `entry #${targetId} (not loaded)`;
+        row.appendChild(missing);
+      }
+      card.appendChild(row);
+    }
+    if (e.replaces_entry_id) {
+      renderChainRow(
+        '← Replaces: ',
+        e.replaces_entry_id,
+        'Open the prior (retired) version'
+      );
+    }
+    if (e.replaced_by_entry_id) {
+      renderChainRow(
+        'Replaced by → ',
+        e.replaced_by_entry_id,
+        'Open the current (active) version'
+      );
+    }
+  }
 
   if (e.body) {
     const body = document.createElement('div');
@@ -1488,10 +1535,11 @@ function renderCanonBiblePage(section) {
   const sub = document.createElement('p');
   sub.className = 'placeholder';
   sub.textContent =
-    'Add, edit, archive, or delete entries below. Lock an entry to mark it as ' +
-    'currently accepted Revival canon — edits to a locked entry are still ' +
-    'allowed but prompt for confirmation first. Supersede arrives in P34, and ' +
-    'the full Canon Review queue in P35.';
+    'Add, edit, supersede, archive, or delete entries below. Lock an entry to ' +
+    'mark it as currently accepted Revival canon — edits to a locked entry ' +
+    'are still allowed but prompt for confirmation first. Superseded entries ' +
+    'move to the Retired section with a chain link to the new version. The ' +
+    'full Canon Review queue arrives in P35.';
   intro.appendChild(sub);
   section.appendChild(intro);
 
@@ -1527,6 +1575,11 @@ function renderCanonBiblePage(section) {
   let typeConfig = {};
   // Per-entry edit-mode state: id -> true means render edit form, not card.
   const editing = new Set();
+  // P34 — per-entry supersede-mode state. Same shape as `editing` but the
+  // active card flips to a supersede form (clone old → save as new active row,
+  // old auto-retires). Kept separate so a user can have one Edit and one
+  // Supersede open without state collisions.
+  const superseding = new Set();
   if (window.RevivalTags) {
     const fc = window.RevivalTags.mountFilterBar(section, 'canon_entries', {
       onChange: (sel) => {
@@ -1609,6 +1662,24 @@ function renderCanonBiblePage(section) {
       }
     });
     actions.appendChild(lockBtn);
+
+    // P34 — Supersede opens an inline form pre-filled with this entry's
+    // values; saving creates a new active entry, retires this one, and wires
+    // the chain pointers in both directions.
+    const supersedeBtn = document.createElement('button');
+    supersedeBtn.type = 'button';
+    supersedeBtn.className = 'btn-secondary';
+    supersedeBtn.textContent = CanonDrafts.get(`supersede:${e.id}`)
+      ? 'Resume supersede'
+      : 'Supersede';
+    supersedeBtn.addEventListener('click', () => {
+      superseding.add(e.id);
+      // Editing and superseding the same row at the same time would be
+      // confusing — close any open edit form for this entry first.
+      editing.delete(e.id);
+      renderLists();
+    });
+    actions.appendChild(supersedeBtn);
 
     const archiveBtn = document.createElement('button');
     archiveBtn.type = 'button';
@@ -1829,6 +1900,116 @@ function renderCanonBiblePage(section) {
     return wrap;
   }
 
+  // P34 — supersede form. Same shape as the edit form (pre-filled from the
+  // current row) but onSubmit calls canon.supersede instead of canon.update.
+  // The new active entry inherits everything except lock state and chain
+  // pointers; the old entry retires automatically with chain pointers wired.
+  //
+  // Detail-table UNIQUE columns (canon_seasons.season_number,
+  // canon_locked_decisions.code) are pre-cleared so the user can't
+  // accidentally collide with the row they're superseding — the form's
+  // required-field validation then prompts for a fresh value.
+  const SUPERSEDE_CLEARED_DETAIL_FIELDS = {
+    season: ['season_number'],
+    locked_decision: ['code'],
+  };
+  function makeSupersedeCard(e) {
+    const wrap = document.createElement('div');
+    wrap.className = 'entry-card canon-card canon-supersede-card';
+    const heading = document.createElement('div');
+    heading.className = 'canon-card-header';
+    const badge = document.createElement('span');
+    badge.className = 'canon-type-badge';
+    badge.textContent = e.entry_type;
+    heading.appendChild(badge);
+    const title = document.createElement('span');
+    title.className = 'entry-title';
+    title.textContent = `Superseding: ${e.title}`;
+    heading.appendChild(title);
+    wrap.appendChild(heading);
+
+    const cleared = SUPERSEDE_CLEARED_DETAIL_FIELDS[e.entry_type] || [];
+    const explain = document.createElement('p');
+    explain.className = 'canon-supersede-explain';
+    explain.textContent =
+      'Saving creates a new active entry with these values and retires the ' +
+      'current one. Legacy IDs migrate to the new entry; the retired entry ' +
+      'keeps copies so historical code lookups still resolve.' +
+      (cleared.length
+        ? ` The ${cleared.join(', ')} field${cleared.length === 1 ? ' is' : 's are'} ` +
+          'cleared — supply a fresh value, the old one stays on the retired entry.'
+        : '');
+    wrap.appendChild(explain);
+
+    // Clone the entry with the UNIQUE detail fields blanked so the prefilled
+    // form doesn't reuse them. Original entry untouched.
+    const seedEntry = { ...e };
+    if (cleared.length && e.detail) {
+      seedEntry.detail = { ...e.detail };
+      for (const col of cleared) seedEntry.detail[col] = null;
+    }
+
+    const form = buildCanonForm({
+      typeConfig,
+      entry: seedEntry,
+      draftSlot: `supersede:${e.id}`,
+      onSubmit: async (payload) => {
+        const result = await window.revival.canon.supersede(e.id, {
+          title: payload.title,
+          body: payload.body,
+          canon_status: payload.canon_status,
+          certainty: payload.certainty,
+          review_state: payload.review_state,
+          provisional: payload.provisional,
+          detail: payload.detail,
+        });
+        superseding.delete(e.id);
+        setStatus(
+          status,
+          `Superseded “${e.title}” → “${result.title}”. Prior version moved to Retired.`
+        );
+        await refresh();
+      },
+      onCancel: () => {
+        superseding.delete(e.id);
+        renderLists();
+      },
+    });
+    wrap.appendChild(form);
+    return wrap;
+  }
+
+  // P34 — chain navigation helper. lookup resolves an id to a minimal record
+  // (or null if it isn't in either cache); goto expands the Retired section
+  // if the target lives there and scrolls the matching card into view with a
+  // brief highlight so the eye can find it.
+  const chainHelper = {
+    lookup: (targetId) => {
+      const all = [...entriesCache, ...retiredCache];
+      const found = all.find((x) => x.id === targetId);
+      if (!found) return null;
+      return {
+        id: found.id,
+        title: found.title,
+        retired: found.retired === 1,
+      };
+    },
+    goto: (targetId) => {
+      const linked = chainHelper.lookup(targetId);
+      if (linked && linked.retired) retired.open = true;
+      // Defer the scroll so layout settles after opening <details>.
+      requestAnimationFrame(() => {
+        const card = section.querySelector(
+          `[data-canon-id="${targetId}"]`
+        );
+        if (!card) return;
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        card.classList.add('canon-chain-flash');
+        setTimeout(() => card.classList.remove('canon-chain-flash'), 1500);
+      });
+    },
+  };
+
   function renderLists() {
     const filteredActive = entriesCache.filter(matchesFilter);
     const filteredRetired = retiredCache.filter(matchesFilter);
@@ -1847,11 +2028,15 @@ function renderCanonBiblePage(section) {
       list.appendChild(empty);
     } else {
       for (const e of filteredActive) {
-        if (editing.has(e.id)) {
+        if (superseding.has(e.id)) {
+          list.appendChild(makeSupersedeCard(e));
+        } else if (editing.has(e.id)) {
           list.appendChild(makeEditCard(e));
         } else {
           list.appendChild(
-            buildCanonCard(e, typeConfig, onCanonTagChange, activeActions)
+            buildCanonCard(
+              e, typeConfig, onCanonTagChange, activeActions, chainHelper
+            )
           );
         }
       }
@@ -1872,7 +2057,9 @@ function renderCanonBiblePage(section) {
     } else {
       for (const e of filteredRetired) {
         retiredList.appendChild(
-          buildCanonCard(e, typeConfig, onCanonTagChange, retiredActions)
+          buildCanonCard(
+            e, typeConfig, onCanonTagChange, retiredActions, chainHelper
+          )
         );
       }
     }

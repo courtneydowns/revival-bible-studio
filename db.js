@@ -2719,6 +2719,205 @@ const canon = {
     return canon.getDetail(eid);
   },
 
+  // P34 — supersede. Creates a new active entry that takes the prior row's
+  // place, then retires the prior row and wires the chain pointers in both
+  // directions (new.replaces_entry_id = old.id; old.replaced_by_entry_id =
+  // new.id). Per SQ-3 of the approved schema, legacy IDs migrate to the new
+  // row as is_primary=1; the retired row keeps is_primary=0 copies so
+  // historical lookups by T-/A-/Q-/CF- codes still resolve.
+  //
+  // Payload mirrors update(): any of title/body/canon_status/certainty/
+  // review_state/provisional/detail can be overridden. Anything not in the
+  // payload is cloned from the existing row, so a no-op supersede is valid
+  // (rare, but useful for status-only versioning). Lock state is NOT cloned —
+  // the new row starts unlocked so the supersede is itself a deliberate fresh
+  // accept; user re-locks if appropriate. Provenance (origin_*) IS cloned so
+  // the source trail isn't lost.
+  //
+  // Tags are duplicated onto the new row so the new canonical version inherits
+  // categorical labels without stripping them from the historical retired row.
+  // Detail-table UNIQUE columns (e.g. canon_locked_decisions.code) that aren't
+  // overridden in payload will surface a SQL error to the form — the user
+  // then provides a fresh code and retries.
+  supersede: (id, payload = {}) => {
+    const eid = Number(id);
+    if (!Number.isFinite(eid)) throw new Error('canon id is required');
+
+    const db = getDb();
+    const existing = db
+      .prepare(
+        `SELECT id, entry_type, title, body,
+                provisional, canon_status, certainty, review_state,
+                origin_kind, origin_entry_id, origin_session_id, origin_lock_code,
+                retired
+           FROM canon_entries
+          WHERE id = ?`
+      )
+      .get(eid);
+    if (!existing) throw new Error('Canon entry not found.');
+    if (existing.retired === 1) {
+      throw new Error('Cannot supersede a retired entry. Restore it first.');
+    }
+
+    const entryType = existing.entry_type;
+    const cfg = CANON_TYPE_CONFIG[entryType];
+
+    const newTitle =
+      payload.title !== undefined
+        ? String(payload.title || '').trim()
+        : existing.title;
+    if (!newTitle) throw new Error('Title is required.');
+
+    const newBody =
+      payload.body !== undefined
+        ? payload.body == null
+          ? null
+          : String(payload.body)
+        : existing.body;
+
+    const newStatus =
+      payload.canon_status !== undefined &&
+      CANON_STATUS_VALUES.includes(payload.canon_status)
+        ? payload.canon_status
+        : existing.canon_status;
+    const newCertainty =
+      payload.certainty !== undefined
+        ? payload.certainty && CANON_CERTAINTY_VALUES.includes(payload.certainty)
+          ? payload.certainty
+          : null
+        : existing.certainty;
+    const newReviewState =
+      payload.review_state !== undefined
+        ? payload.review_state &&
+          CANON_REVIEW_STATE_VALUES.includes(payload.review_state)
+          ? payload.review_state
+          : null
+        : existing.review_state;
+    const newProvisional =
+      payload.provisional !== undefined
+        ? payload.provisional
+          ? 1
+          : 0
+        : existing.provisional;
+
+    let mergedDetail = null;
+    if (cfg && cfg.table) {
+      const existingDetail =
+        db
+          .prepare(`SELECT * FROM ${cfg.table} WHERE canon_entry_id = ?`)
+          .get(eid) || {};
+      const merged = {};
+      for (const f of cfg.fields) {
+        if (
+          payload.detail &&
+          Object.prototype.hasOwnProperty.call(payload.detail, f.col)
+        ) {
+          const v = coerceCanonField(f, payload.detail[f.col]);
+          merged[f.col] = v === undefined ? null : v;
+        } else {
+          merged[f.col] =
+            existingDetail[f.col] === undefined ? null : existingDetail[f.col];
+        }
+      }
+      ensureRequiredFields(entryType, merged);
+      mergedDetail = merged;
+    }
+
+    const now = new Date().toISOString();
+    let newId;
+
+    db.transaction(() => {
+      const info = db
+        .prepare(
+          `INSERT INTO canon_entries
+             (created_at, updated_at, entry_type, title, body,
+              locked, locked_at, locked_label,
+              retired, retired_at,
+              replaces_entry_id, replaced_by_entry_id,
+              provisional, canon_status, certainty, review_state,
+              origin_kind, origin_entry_id, origin_session_id, origin_lock_code)
+           VALUES
+             (?, ?, ?, ?, ?,
+              0, NULL, NULL,
+              0, NULL,
+              ?, NULL,
+              ?, ?, ?, ?,
+              ?, ?, ?, ?)`
+        )
+        .run(
+          now, now, entryType, newTitle, newBody,
+          eid,
+          newProvisional, newStatus, newCertainty, newReviewState,
+          existing.origin_kind, existing.origin_entry_id,
+          existing.origin_session_id, existing.origin_lock_code
+        );
+      newId = info.lastInsertRowid;
+
+      if (mergedDetail) {
+        const cols = ['canon_entry_id', ...Object.keys(mergedDetail)];
+        const placeholders = cols.map(() => '?').join(', ');
+        const vals = [newId, ...Object.values(mergedDetail)];
+        db.prepare(
+          `INSERT INTO ${cfg.table} (${cols.join(', ')}) VALUES (${placeholders})`
+        ).run(...vals);
+      }
+
+      // SQ-3: legacy IDs migrate to the new row (is_primary=1); the retired
+      // row keeps is_primary=0 copies so historical-code searches still hit it.
+      const legacyRows = db
+        .prepare(
+          `SELECT scheme, code, is_primary, parent_code, alias_of_code, note
+             FROM canon_entry_legacy_ids
+            WHERE canon_entry_id = ?`
+        )
+        .all(eid);
+      if (legacyRows.length) {
+        db.prepare(
+          `UPDATE canon_entry_legacy_ids
+              SET canon_entry_id = ?, is_primary = 1
+            WHERE canon_entry_id = ?`
+        ).run(newId, eid);
+        const insertCopy = db.prepare(
+          `INSERT INTO canon_entry_legacy_ids
+             (canon_entry_id, scheme, code, is_primary, parent_code, alias_of_code, note, created_at)
+           VALUES (?, ?, ?, 0, ?, ?, ?, ?)`
+        );
+        for (const r of legacyRows) {
+          insertCopy.run(
+            eid, r.scheme, r.code, r.parent_code, r.alias_of_code, r.note, now
+          );
+        }
+      }
+
+      db.prepare(
+        `UPDATE canon_entries
+            SET retired = 1, retired_at = ?, replaced_by_entry_id = ?,
+                updated_at = ?
+          WHERE id = ?`
+      ).run(now, newId, now, eid);
+
+      // taggable_tags is polymorphic (no FK on entity_id), so we explicitly
+      // copy. INSERT OR IGNORE because (tag_id, entity_kind, entity_id) is
+      // UNIQUE — never duplicates if a user re-runs the supersede flow.
+      const tagRows = db
+        .prepare(
+          `SELECT tag_id FROM taggable_tags
+            WHERE entity_kind = 'canon_entries' AND entity_id = ?`
+        )
+        .all(eid);
+      if (tagRows.length) {
+        const insertTag = db.prepare(
+          `INSERT OR IGNORE INTO taggable_tags
+             (tag_id, entity_kind, entity_id, created_at)
+           VALUES (?, 'canon_entries', ?, ?)`
+        );
+        for (const t of tagRows) insertTag.run(t.tag_id, newId, now);
+      }
+    })();
+
+    return canon.getDetail(newId);
+  },
+
   // P32 — archive == retire flag. We reuse the existing retired/retired_at
   // columns rather than inventing a parallel archived state, because the read
   // view already collapses retired entries to the bottom of the page (and
