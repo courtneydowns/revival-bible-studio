@@ -3054,25 +3054,25 @@
       </section>
       <!-- P39 — Request preview: shows exact Claude API payload that would be
            sent (user msg + Project Rules + active sources, nothing else).
-           Hidden until the user clicks “Preview”. -->
-      <div class=”chat-preview-wrap” id=”chat-preview-wrap” hidden>
-        <div class=”chat-preview-head”>
-          <span class=”chat-preview-label”>Request preview</span>
-          <span class=”chat-preview-hint”>Exact payload that will be sent to Claude</span>
+           Hidden until the user clicks "Preview". -->
+      <div class="chat-preview-wrap" id="chat-preview-wrap" hidden>
+        <div class="chat-preview-head">
+          <span class="chat-preview-label">Request preview</span>
+          <span class="chat-preview-hint">Exact payload that will be sent to Claude</span>
         </div>
-        <pre class=”chat-preview-body” id=”chat-preview-body”></pre>
+        <pre class="chat-preview-body" id="chat-preview-body"></pre>
       </div>
       <!-- P39: Preview button lives outside the form so it never triggers submit. -->
-      <div class=”chat-composer-bar”>
-        <button id=”chat-preview-btn” type=”button” class=”btn-secondary btn-sm”>Preview</button>
-        <form class=”chat-composer” id=”chat-composer”>
+      <div class="chat-composer-bar">
+        <button id="chat-preview-btn" type="button" class="btn-secondary btn-sm">Preview</button>
+        <form class="chat-composer" id="chat-composer">
           <textarea
-            id=”chat-input”
-            class=”chat-input”
-            rows=”2”
-            placeholder=”Message Claude — attach Source Material above to include reference content.”
+            id="chat-input"
+            class="chat-input"
+            rows="2"
+            placeholder="Message Claude — attach Source Material above to include reference content."
           ></textarea>
-          <button id=”chat-send” type=”submit” class=”btn-primary”>Send</button>
+          <button id="chat-send" type="submit" class="btn-primary">Send</button>
         </form>
       </div>
     </aside>
