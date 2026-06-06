@@ -533,7 +533,7 @@
         border-radius: 8px;
         padding: 12px 14px;
       }
-      .entry-title { font-size: 15px; font-weight: 600; }
+      .entry-title { font-size: 15px; font-weight: 600; overflow-wrap: break-word; word-break: break-word; min-width: 0; }
       .entry-body {
         font-size: 14px;
         color: var(--text);
@@ -1914,6 +1914,7 @@
       }
       .count-cell:hover { border-color: var(--accent); background: var(--hover); }
       .count-number { font-size: 16px; font-weight: 600; line-height: 1.1; }
+      .count-number--zero { color: var(--muted); }
       .count-label { font-size: 12px; color: var(--muted); }
       .count-archived { font-size: 10px; color: var(--muted); }
 

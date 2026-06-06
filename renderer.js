@@ -202,13 +202,14 @@ function buildStatusBar(workspaceName, item, archivedFlag) {
     item.updated_at && item.updated_at !== item.created_at
       ? new Date(item.updated_at).toLocaleDateString()
       : '—';
-  bar.append(
+  const segs = [
     seg('Workspace', workspaceName || '—'),
     seg('Type', ENTRY_TYPE_LABELS[workspaceName] || 'Entry'),
     seg('Created', created),
-    seg('Edited', edited),
-    seg('Status', archivedFlag ? 'Archived' : 'Unlocked')
-  );
+  ];
+  if (edited !== '—') segs.push(seg('Edited', edited));
+  segs.push(seg('Status', archivedFlag ? 'Archived' : 'Active'));
+  bar.append(...segs);
   return bar;
 }
 
@@ -793,6 +794,7 @@ function makeEntryWorkspace(config) {
   }
 
   // PTAG — AND match: the item must carry every selected filter tag.
+  // (makeEntryWorkspace instance — used by all standard workspaces incl. Conflicts)
   function matchesFilter(item) {
     if (tagFilter.size === 0) return true;
     const itemTags = tagsById[item.id] || [];
@@ -805,6 +807,10 @@ function makeEntryWorkspace(config) {
     list.innerHTML = '';
     const filteredActive = activeItems.filter(matchesFilter);
     const filteredArchived = archivedItems.filter(matchesFilter);
+
+    // PPOL2-32: hide the rescan hint when there are no active conflict entries
+    const hintEl = leftCol.querySelector('.conflict-rescan-hint');
+    if (hintEl) hintEl.style.display = activeItems.length === 0 ? 'none' : '';
 
     if (filteredActive.length === 0) {
       const empty = document.createElement('div');
@@ -2053,7 +2059,8 @@ function renderCanonBiblePage(section) {
   section.appendChild(topBar);
 
   const status = document.createElement('div');
-  status.className = 'canon-status placeholder';
+  status.className = 'canon-status';
+  status.style.display = 'none';
   section.appendChild(status);
 
   // Create-form host — fills with the inline form when addBtn is clicked,
@@ -2117,6 +2124,7 @@ function renderCanonBiblePage(section) {
     addBtn.style.display = editMode ? '' : 'none';
     seedBar.style.display = editMode ? '' : 'none';
     scanBtn.style.display = editMode ? '' : 'none';
+    retiredBulkBar.style.display = editMode ? '' : 'none';
     if (!editMode) {
       editing.clear();
       superseding.clear();
@@ -3155,7 +3163,7 @@ function renderCanonBiblePage(section) {
       }
     }
 
-    retiredSummary.textContent = `Retired / Archived (${filteredRetired.length})`;
+    retiredSummary.textContent = `Retired (${filteredRetired.length})`;
     retiredList.innerHTML = '';
     // PPOL1: Reset bulk bar and update button states
     renderRetiredBulkBar();
@@ -3546,6 +3554,19 @@ function shortenForList(text, limit = 80) {
   return oneLine.length > limit ? `${oneLine.slice(0, limit)}…` : oneLine;
 }
 
+const SOURCE_KIND_LABELS = {
+  writing_lab: 'Writing Lab',
+  characters_workspace: 'Characters',
+  episodes_workspace: 'Episodes',
+  highlight_extract: 'Highlight extract',
+  worldbuilding_import: 'Worldbuilding import',
+  characters: 'Characters',
+  episodes: 'Episodes',
+};
+function sourceKindLabel(kind) {
+  return SOURCE_KIND_LABELS[kind] || kind.replace(/_/g, ' ');
+}
+
 function renderCanonReviewPage(section, workspaceName) {
   section.classList.add('ws-canon-review');
 
@@ -3682,7 +3703,7 @@ function renderCanonReviewPage(section, workspaceName) {
     if (p.source_kind) {
       const src = document.createElement('div');
       src.className = 'tc-list-preview cr-list-source';
-      src.textContent = `from ${p.source_kind}`;
+      src.textContent = `from ${sourceKindLabel(p.source_kind)}`;
       btn.appendChild(src);
     }
 
@@ -4040,7 +4061,7 @@ function renderCanonReviewPage(section, workspaceName) {
       chunks.push(`edited ${new Date(p.updated_at).toLocaleString()}`);
     }
     if (p.source_kind) {
-      chunks.push(`from ${p.source_kind}${p.source_entry_id ? ` #${p.source_entry_id}` : ''}`);
+      chunks.push(`from ${sourceKindLabel(p.source_kind)}${p.source_entry_id ? ` #${p.source_entry_id}` : ''}`);
     }
     if (p.reviewed_at && (p.status === 'sent_back' || p.status === 'deferred')) {
       chunks.push(`${p.status === 'sent_back' ? 'Sent back' : 'Deferred'} ${new Date(p.reviewed_at).toLocaleString()}`);
@@ -4113,6 +4134,7 @@ function renderCanonReviewPage(section, workspaceName) {
         proposer_note: noteInput.value,
       });
       setStatus(formStatus, 'Draft autosaved — click Save edits to commit.');
+      header.textContent = titleInput.value.trim() || '(untitled proposal)';
     }
     titleInput.addEventListener('input', saveEditDraft);
     bodyInput.addEventListener('input', saveEditDraft);
@@ -4461,7 +4483,7 @@ function renderCanonReviewPage(section, workspaceName) {
             });
             selectedId = null;
             await loadList();
-          } catch (_) { /* fall through — user can retry via the button */ }
+          } catch (err) { showFlagResolvedToast(`Approve failed: ${err.message || err}`); }
         })();
       } else {
         e.preventDefault();
@@ -4477,7 +4499,7 @@ function renderCanonReviewPage(section, workspaceName) {
           await window.revival.canonProposals.defer(p.id, {});
           selectedId = null;
           await loadList();
-        } catch (_) { /* ignore */ }
+        } catch (err) { showFlagResolvedToast(`Defer failed: ${err.message || err}`); }
       })();
     }
   };
@@ -4784,7 +4806,7 @@ function renderHomePage(section) {
       cell.addEventListener('click', () => route(c.route));
 
       const num = document.createElement('div');
-      num.className = 'count-number';
+      num.className = c.active === 0 ? 'count-number count-number--zero' : 'count-number';
       num.textContent = String(c.active);
 
       const label = document.createElement('div');
@@ -5808,10 +5830,18 @@ function renderImportPage(section) {
         : previewTypeFilter === '__untyped__'
           ? currentEntries.filter((e) => !e.entry_type)
           : currentEntries.filter((e) => e.entry_type === previewTypeFilter);
-      for (let i = 0; i < filtered.length; i++) {
-        const card = buildCard(filtered[i]);
-        if (i === filtered.length - 1) card.style.borderBottom = 'none';
-        list.appendChild(card);
+      if (filtered.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'placeholder';
+        empty.style.cssText = 'padding:20px;text-align:center;';
+        empty.textContent = 'No entries match this filter.';
+        list.appendChild(empty);
+      } else {
+        for (let i = 0; i < filtered.length; i++) {
+          const card = buildCard(filtered[i]);
+          if (i === filtered.length - 1) card.style.borderBottom = 'none';
+          list.appendChild(card);
+        }
       }
     }
     renderCards();
@@ -6739,6 +6769,7 @@ function setupCharRelationalView(leftCol, rightCol, ctx) {
 
   function exitRelView(selectId) {
     relViewMode = false;
+    toggle.classList.remove('active');
     leftCol.style.display = '';
     if (selectId != null) {
       setSelectedId(selectId);
@@ -6749,6 +6780,7 @@ function setupCharRelationalView(leftCol, rightCol, ctx) {
 
   async function enterRelView() {
     relViewMode = true;
+    toggle.classList.add('active');
     leftCol.style.display = 'none';
     try {
       const [chars, rels] = await Promise.all([
@@ -7780,6 +7812,12 @@ const qcSave = document.getElementById('qc-save');
 const qcCancel = document.getElementById('qc-cancel');
 const qcClose = document.getElementById('qc-close');
 const qcError = document.getElementById('qc-error');
+const qcTitleLabel = document.getElementById('qc-title-label');
+
+// PPOL2-36: keep header in sync with the destination dropdown
+qcDest.addEventListener('change', () => {
+  if (qcTitleLabel) qcTitleLabel.textContent = `Quick capture → ${qcDest.value}`;
+});
 
 function openQuickCapture() {
   if (!qcOverlay.hidden) return;

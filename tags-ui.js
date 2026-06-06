@@ -125,7 +125,7 @@
       const addBtn = document.createElement('button');
       addBtn.type = 'button';
       addBtn.className = 'tag-add-btn';
-      addBtn.textContent = currentTags.length ? '+ Tag' : '+ Add tag';
+      addBtn.textContent = '+ Tag';
       addBtn.addEventListener('click', () => {
         if (pickerEl) {
           pickerEl.remove();
@@ -393,7 +393,7 @@
       const addBtn = document.createElement('button');
       addBtn.type = 'button';
       addBtn.className = 'tag-filter-add';
-      addBtn.textContent = selected.size ? '+ Add tag' : '+ Tag';
+      addBtn.textContent = '+ Tag';
       addBtn.addEventListener('click', () => {
         if (pickerEl) {
           pickerEl.remove();
