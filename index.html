@@ -698,6 +698,73 @@
         font-style: italic;
       }
 
+      /* P35b — unified filter bar. Five dimensions live in one row: entry
+         type, lock status, character, season (all in .canon-filters-main),
+         plus the PTAG tag picker (.canon-filters-tag, mounted by
+         RevivalTags). The inner .tag-filter loses its own border/background
+         here so the picker reads as part of this single bar. */
+      .canon-filters {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding: 6px 8px;
+        margin-bottom: 8px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--bg);
+      }
+      /* Sub-hosts use display: contents so their children flow as direct
+         flex items of .canon-filters — that keeps every filter on the same
+         row instead of wrapping the tag picker to a second line. */
+      .canon-filters-main { display: contents; }
+      .canon-filters-tag  { display: contents; }
+      .canon-filters .tag-filter {
+        display: contents;
+        border: none;
+        background: transparent;
+        padding: 0;
+        margin: 0;
+      }
+      /* The picker popover still needs to drop to its own row below the bar. */
+      .canon-filters .tag-filter .tag-picker {
+        flex-basis: 100%;
+        max-width: 100%;
+      }
+      /* Redundant — my "Filter:" label already covers this group. */
+      .canon-filters .tag-filter-label { display: none; }
+      .canon-filters-label {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .canon-filter-select {
+        font: inherit;
+        font-size: 12px;
+        color: var(--text);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 4px 6px;
+        cursor: pointer;
+        max-width: 200px;
+      }
+      .canon-filter-select:focus { outline: none; border-color: var(--accent); }
+      .canon-filters-clear {
+        font: inherit;
+        font-size: 12px;
+        background: transparent;
+        color: var(--muted);
+        border: none;
+        cursor: pointer;
+        text-decoration: underline;
+      }
+      .canon-filters-clear:hover { color: var(--accent); }
+      .canon-filters-hint {
+        font-size: 11px;
+        color: var(--muted);
+        margin-left: auto;
+      }
+
       /* P32 — top bar holds the + Add button and the dev-seed slot. */
       .canon-topbar {
         display: flex;

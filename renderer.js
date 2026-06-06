@@ -1598,8 +1598,28 @@ function renderCanonBiblePage(section) {
   // old auto-retires). Kept separate so a user can have one Edit and one
   // Supersede open without state collisions.
   const superseding = new Set();
+
+  // P35b — additional filter dimensions combinable with the tag filter via
+  // AND. State lives here; the bar UI is (re)built by renderFilterBar().
+  let filterEntryType = 'all';   // 'all' | one of the 18 entry_type keys
+  let filterLock = 'all';        // 'all' | 'locked' | 'unlocked'
+  let filterCharacterId = '';    // '' | canon_entries.id (string) of a character
+  let filterSeasonId = '';       // '' | canon_entries.id (string) of a season
+  const filtersBar = document.createElement('div');
+  filtersBar.className = 'canon-filters';
+  section.appendChild(filtersBar);
+  // Sub-host for the four selects + clear; rebuilt on every renderFilterBar().
+  const filtersMain = document.createElement('div');
+  filtersMain.className = 'canon-filters-main';
+  filtersBar.appendChild(filtersMain);
+  // Sub-host for the PTAG filter pills; mounted once and updated in place by
+  // RevivalTags so renderFilterBar() never wipes the picker state.
+  const filtersTagHost = document.createElement('div');
+  filtersTagHost.className = 'canon-filters-tag';
+  filtersBar.appendChild(filtersTagHost);
+
   if (window.RevivalTags) {
-    const fc = window.RevivalTags.mountFilterBar(section, 'canon_entries', {
+    const fc = window.RevivalTags.mountFilterBar(filtersTagHost, 'canon_entries', {
       onChange: (sel) => {
         tagFilter = sel;
         renderLists();
@@ -1607,6 +1627,160 @@ function renderCanonBiblePage(section) {
     });
     tagFilter = fc.selected;
   }
+
+  function renderFilterBar() {
+    filtersMain.innerHTML = '';
+
+    const label = document.createElement('span');
+    label.className = 'canon-filters-label';
+    label.textContent = 'Filter:';
+    filtersMain.appendChild(label);
+
+    // Entry type — built from typeConfig once it has loaded.
+    const typeSel = document.createElement('select');
+    typeSel.className = 'canon-filter-select';
+    typeSel.setAttribute('aria-label', 'Filter by entry type');
+    const allTypeOpt = document.createElement('option');
+    allTypeOpt.value = 'all';
+    allTypeOpt.textContent = 'All types';
+    typeSel.appendChild(allTypeOpt);
+    const typeKeys = Object.keys(typeConfig).sort((a, b) =>
+      (typeConfig[a].label || a).localeCompare(typeConfig[b].label || b)
+    );
+    for (const k of typeKeys) {
+      const opt = document.createElement('option');
+      opt.value = k;
+      opt.textContent = typeConfig[k].label || k;
+      typeSel.appendChild(opt);
+    }
+    typeSel.value = filterEntryType;
+    if (typeSel.value !== filterEntryType) {
+      filterEntryType = 'all';
+      typeSel.value = 'all';
+    }
+    typeSel.addEventListener('change', () => {
+      filterEntryType = typeSel.value || 'all';
+      renderFilterBar();
+      renderLists();
+    });
+    filtersMain.appendChild(typeSel);
+
+    // Lock status — three-state.
+    const lockSel = document.createElement('select');
+    lockSel.className = 'canon-filter-select';
+    lockSel.setAttribute('aria-label', 'Filter by lock status');
+    for (const [val, lbl] of [
+      ['all', 'Any lock'],
+      ['locked', 'Locked only'],
+      ['unlocked', 'Unlocked only'],
+    ]) {
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = lbl;
+      lockSel.appendChild(opt);
+    }
+    lockSel.value = filterLock;
+    lockSel.addEventListener('change', () => {
+      filterLock = lockSel.value || 'all';
+      renderFilterBar();
+      renderLists();
+    });
+    filtersMain.appendChild(lockSel);
+
+    // Character — built from current character entries (active + retired).
+    const charSel = document.createElement('select');
+    charSel.className = 'canon-filter-select';
+    charSel.setAttribute('aria-label', 'Filter by character');
+    const allCharOpt = document.createElement('option');
+    allCharOpt.value = '';
+    allCharOpt.textContent = 'Any character';
+    charSel.appendChild(allCharOpt);
+    const chars = [...entriesCache, ...retiredCache]
+      .filter((e) => e.entry_type === 'character')
+      .sort((a, b) => a.title.localeCompare(b.title));
+    for (const c of chars) {
+      const opt = document.createElement('option');
+      opt.value = String(c.id);
+      opt.textContent = c.title;
+      charSel.appendChild(opt);
+    }
+    charSel.value = filterCharacterId;
+    if (filterCharacterId && charSel.value !== filterCharacterId) {
+      filterCharacterId = '';
+      charSel.value = '';
+    }
+    charSel.addEventListener('change', () => {
+      filterCharacterId = charSel.value || '';
+      renderFilterBar();
+      renderLists();
+    });
+    filtersMain.appendChild(charSel);
+
+    // Season — built from current season entries, sorted by season_number.
+    const seasonSel = document.createElement('select');
+    seasonSel.className = 'canon-filter-select';
+    seasonSel.setAttribute('aria-label', 'Filter by season');
+    const allSeasonOpt = document.createElement('option');
+    allSeasonOpt.value = '';
+    allSeasonOpt.textContent = 'Any season';
+    seasonSel.appendChild(allSeasonOpt);
+    const seasons = [...entriesCache, ...retiredCache]
+      .filter((e) => e.entry_type === 'season')
+      .sort((a, b) => {
+        const an = (a.detail && a.detail.season_number) ?? Infinity;
+        const bn = (b.detail && b.detail.season_number) ?? Infinity;
+        if (an !== bn) return an - bn;
+        return a.title.localeCompare(b.title);
+      });
+    for (const s of seasons) {
+      const opt = document.createElement('option');
+      opt.value = String(s.id);
+      const num = s.detail && s.detail.season_number;
+      opt.textContent = num != null ? `S${num} — ${s.title}` : s.title;
+      seasonSel.appendChild(opt);
+    }
+    seasonSel.value = filterSeasonId;
+    if (filterSeasonId && seasonSel.value !== filterSeasonId) {
+      filterSeasonId = '';
+      seasonSel.value = '';
+    }
+    seasonSel.addEventListener('change', () => {
+      filterSeasonId = seasonSel.value || '';
+      renderFilterBar();
+      renderLists();
+    });
+    filtersMain.appendChild(seasonSel);
+
+    const activeDims =
+      (filterEntryType !== 'all' ? 1 : 0) +
+      (filterLock !== 'all' ? 1 : 0) +
+      (filterCharacterId ? 1 : 0) +
+      (filterSeasonId ? 1 : 0);
+    if (activeDims > 0) {
+      const clear = document.createElement('button');
+      clear.type = 'button';
+      clear.className = 'canon-filters-clear';
+      clear.textContent = 'Clear filters';
+      clear.addEventListener('click', () => {
+        filterEntryType = 'all';
+        filterLock = 'all';
+        filterCharacterId = '';
+        filterSeasonId = '';
+        renderFilterBar();
+        renderLists();
+      });
+      filtersMain.appendChild(clear);
+
+      const hint = document.createElement('span');
+      hint.className = 'canon-filters-hint';
+      hint.textContent =
+        activeDims === 1
+          ? '1 filter active.'
+          : `${activeDims} filters active (AND).`;
+      filtersMain.appendChild(hint);
+    }
+  }
+  renderFilterBar();
 
   // Active entries.
   const activeHeader = document.createElement('h2');
@@ -1628,10 +1802,62 @@ function renderCanonBiblePage(section) {
   retired.appendChild(retiredList);
   section.appendChild(retired);
 
-  function matchesFilter(entry) {
-    if (tagFilter.size === 0) return true;
-    const have = new Set((canonTagsById[entry.id] || []).map((t) => t.id));
-    for (const id of tagFilter) if (!have.has(id)) return false;
+  // P35b — precompute character/season expansion sets so matchesFilter stays
+  // O(1) per entry. character: the chosen char + any entry whose typed detail
+  // names that character_entry_id. season: the chosen season + its episodes +
+  // any scene/line whose episode_entry_id resolves to one of those episodes.
+  function computeFilterIndex() {
+    const charMatchIds = new Set();
+    if (filterCharacterId) {
+      const cid = Number(filterCharacterId);
+      charMatchIds.add(cid);
+      for (const e of [...entriesCache, ...retiredCache]) {
+        if (e.detail && Number(e.detail.character_entry_id) === cid) {
+          charMatchIds.add(e.id);
+        }
+      }
+    }
+    const seasonMatchIds = new Set();
+    if (filterSeasonId) {
+      const sid = Number(filterSeasonId);
+      seasonMatchIds.add(sid);
+      const episodeIdsInSeason = new Set();
+      const all = [...entriesCache, ...retiredCache];
+      for (const e of all) {
+        if (
+          e.entry_type === 'episode' &&
+          e.detail &&
+          Number(e.detail.season_entry_id) === sid
+        ) {
+          episodeIdsInSeason.add(e.id);
+          seasonMatchIds.add(e.id);
+        }
+      }
+      for (const e of all) {
+        if (
+          e.detail &&
+          e.detail.episode_entry_id != null &&
+          episodeIdsInSeason.has(Number(e.detail.episode_entry_id))
+        ) {
+          seasonMatchIds.add(e.id);
+        }
+      }
+    }
+    return { charMatchIds, seasonMatchIds };
+  }
+
+  function matchesFilter(entry, idx) {
+    if (tagFilter.size > 0) {
+      const have = new Set((canonTagsById[entry.id] || []).map((t) => t.id));
+      for (const id of tagFilter) if (!have.has(id)) return false;
+    }
+    if (filterEntryType !== 'all' && entry.entry_type !== filterEntryType) {
+      return false;
+    }
+    if (filterLock === 'locked' && !entry.locked) return false;
+    if (filterLock === 'unlocked' && entry.locked) return false;
+    if (filterCharacterId && !idx.charMatchIds.has(entry.id)) return false;
+    if (filterSeasonId && !idx.seasonMatchIds.has(entry.id)) return false;
     return true;
   }
 
@@ -2029,8 +2255,9 @@ function renderCanonBiblePage(section) {
   };
 
   function renderLists() {
-    const filteredActive = entriesCache.filter(matchesFilter);
-    const filteredRetired = retiredCache.filter(matchesFilter);
+    const idx = computeFilterIndex();
+    const filteredActive = entriesCache.filter((e) => matchesFilter(e, idx));
+    const filteredRetired = retiredCache.filter((e) => matchesFilter(e, idx));
 
     list.innerHTML = '';
     if (entriesCache.length === 0) {
@@ -2042,7 +2269,7 @@ function renderCanonBiblePage(section) {
     } else if (filteredActive.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'placeholder';
-      empty.textContent = 'No active entries match the selected tag(s).';
+      empty.textContent = 'No active entries match the current filters.';
       list.appendChild(empty);
     } else {
       for (const e of filteredActive) {
@@ -2070,7 +2297,7 @@ function renderCanonBiblePage(section) {
     } else if (filteredRetired.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'placeholder';
-      empty.textContent = 'No retired entries match the selected tag(s).';
+      empty.textContent = 'No retired entries match the current filters.';
       retiredList.appendChild(empty);
     } else {
       for (const e of filteredRetired) {
@@ -2182,6 +2409,7 @@ function renderCanonBiblePage(section) {
       seedBar.appendChild(btn);
     }
 
+    renderFilterBar();
     renderLists();
   }
 
