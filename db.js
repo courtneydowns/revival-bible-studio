@@ -1504,6 +1504,148 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '045_cwa_expand_check_constraint',
+    up(db) {
+      // PDOC-WIRE (bugfix) — migration 041 added cascade triggers for 'documents'
+      // and other new workspace kinds but never removed the table-level CHECK
+      // constraint that only permits the original five host_kinds / six source_kinds.
+      // INSERT OR IGNORE silently dropped any row whose kind wasn't in that list,
+      // so Documents (and other post-041 kinds) could never be linked.
+      //
+      // Fix: use writable_schema to patch the stored CREATE TABLE statement in
+      // sqlite_master, removing the restrictive CHECK clauses. This avoids a
+      // DROP TABLE (which, inside a transaction with foreign_keys=ON, can mis-fire
+      // the cascade triggers on other tables). The table structure is otherwise
+      // unchanged; existing rows remain valid; no data is moved.
+      //
+      // Then drop + recreate the BEFORE INSERT validity trigger to add 'documents'
+      // (and the other post-041 kinds) so referential integrity is still enforced.
+      // With legacy_alter_table = OFF (SQLite default), DROP TABLE validates all
+      // triggers that reference the table, which fires an error in the cascade
+      // triggers from migration 025. Temporarily enable legacy mode so DROP TABLE
+      // skips that reference-rewriting step, then restore immediately after rename.
+      db.pragma('legacy_alter_table = ON');
+      db.exec(`
+        CREATE TABLE cross_workspace_attachments_new (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          created_at  TEXT NOT NULL,
+          host_kind   TEXT NOT NULL,
+          host_id     INTEGER NOT NULL,
+          source_kind TEXT NOT NULL,
+          source_id   INTEGER NOT NULL,
+          note        TEXT,
+          UNIQUE(host_kind, host_id, source_kind, source_id)
+        );
+        INSERT INTO cross_workspace_attachments_new
+          (id, created_at, host_kind, host_id, source_kind, source_id, note)
+        SELECT id, created_at, host_kind, host_id, source_kind, source_id, note
+          FROM cross_workspace_attachments;
+        DROP TABLE cross_workspace_attachments;
+        ALTER TABLE cross_workspace_attachments_new
+          RENAME TO cross_workspace_attachments;
+        CREATE INDEX cross_workspace_attachments_host_idx
+          ON cross_workspace_attachments(host_kind, host_id);
+        CREATE INDEX cross_workspace_attachments_source_idx
+          ON cross_workspace_attachments(source_kind, source_id);
+      `);
+      db.pragma('legacy_alter_table = OFF');
+      // Drop old trigger (covers only original six source kinds) and replace.
+      db.exec(`
+        DROP TRIGGER IF EXISTS cross_workspace_attachments_insert_validity;
+
+        CREATE TRIGGER cross_workspace_attachments_insert_validity
+        BEFORE INSERT ON cross_workspace_attachments
+        BEGIN
+          SELECT CASE
+            WHEN NEW.host_kind = 'characters'
+                 AND NOT EXISTS (SELECT 1 FROM characters_workspace WHERE id = NEW.host_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: host characters row missing')
+            WHEN NEW.host_kind = 'episodes'
+                 AND NOT EXISTS (SELECT 1 FROM episodes_workspace   WHERE id = NEW.host_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: host episodes row missing')
+            WHEN NEW.host_kind = 'decisions'
+                 AND NOT EXISTS (SELECT 1 FROM decisions             WHERE id = NEW.host_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: host decisions row missing')
+            WHEN NEW.host_kind = 'open_questions'
+                 AND NOT EXISTS (SELECT 1 FROM open_questions        WHERE id = NEW.host_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: host open_questions row missing')
+            WHEN NEW.host_kind = 'conflicts'
+                 AND NOT EXISTS (SELECT 1 FROM conflicts             WHERE id = NEW.host_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: host conflicts row missing')
+            WHEN NEW.host_kind = 'brainstorm'
+                 AND NOT EXISTS (SELECT 1 FROM brainstorm_items      WHERE id = NEW.host_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: host brainstorm row missing')
+            WHEN NEW.host_kind = 'research'
+                 AND NOT EXISTS (SELECT 1 FROM research_items        WHERE id = NEW.host_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: host research row missing')
+            WHEN NEW.host_kind = 'documents'
+                 AND NOT EXISTS (SELECT 1 FROM documents             WHERE id = NEW.host_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: host documents row missing')
+            WHEN NEW.host_kind = 'source_material'
+                 AND NOT EXISTS (SELECT 1 FROM source_material       WHERE id = NEW.host_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: host source_material row missing')
+            WHEN NEW.host_kind = 'writing_lab'
+                 AND NOT EXISTS (SELECT 1 FROM writing_lab_drafts    WHERE id = NEW.host_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: host writing_lab row missing')
+            WHEN NEW.host_kind = 'unsorted'
+                 AND NOT EXISTS (SELECT 1 FROM unsorted_items        WHERE id = NEW.host_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: host unsorted row missing')
+          END;
+          SELECT CASE
+            WHEN NEW.source_kind = 'decisions'
+                 AND NOT EXISTS (SELECT 1 FROM decisions             WHERE id = NEW.source_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: source decisions row missing')
+            WHEN NEW.source_kind = 'open_questions'
+                 AND NOT EXISTS (SELECT 1 FROM open_questions        WHERE id = NEW.source_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: source open_questions row missing')
+            WHEN NEW.source_kind = 'conflicts'
+                 AND NOT EXISTS (SELECT 1 FROM conflicts             WHERE id = NEW.source_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: source conflicts row missing')
+            WHEN NEW.source_kind = 'brainstorm'
+                 AND NOT EXISTS (SELECT 1 FROM brainstorm_items      WHERE id = NEW.source_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: source brainstorm row missing')
+            WHEN NEW.source_kind = 'research'
+                 AND NOT EXISTS (SELECT 1 FROM research_items        WHERE id = NEW.source_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: source research row missing')
+            WHEN NEW.source_kind = 'source_material'
+                 AND NOT EXISTS (SELECT 1 FROM source_material       WHERE id = NEW.source_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: source source_material row missing')
+            WHEN NEW.source_kind = 'documents'
+                 AND NOT EXISTS (SELECT 1 FROM documents             WHERE id = NEW.source_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: source documents row missing')
+            WHEN NEW.source_kind = 'writing_lab'
+                 AND NOT EXISTS (SELECT 1 FROM writing_lab_drafts    WHERE id = NEW.source_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: source writing_lab row missing')
+            WHEN NEW.source_kind = 'characters'
+                 AND NOT EXISTS (SELECT 1 FROM characters_workspace  WHERE id = NEW.source_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: source characters row missing')
+            WHEN NEW.source_kind = 'episodes'
+                 AND NOT EXISTS (SELECT 1 FROM episodes_workspace    WHERE id = NEW.source_id)
+              THEN RAISE(ABORT, 'cross_workspace_attachments: source episodes row missing')
+          END;
+        END;
+      `);
+    },
+  },
+  {
+    name: '044_chat_document_attachments',
+    up(db) {
+      // PDOC-WIRE — Documents now attachable to Chat (keep-active / next-message-only).
+      // Parallel to chat_source_attachments but joined to the documents table.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_document_attachments (
+          chat_id    INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+          document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY (chat_id, document_id)
+        );
+
+        CREATE INDEX idx_chat_document_attachments_chat
+          ON chat_document_attachments(chat_id);
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -1961,6 +2103,41 @@ const chatSources = {
       .prepare('DELETE FROM chat_source_attachments WHERE chat_id = ? AND source_id = ?')
       .run(chatId, sourceId);
     return chatSources.list(chatId);
+  },
+};
+
+// --- Chat document attachments (PDOC-WIRE) ------------------------------------
+// Parallel to chatSources but joins against the documents table.
+const chatDocuments = {
+  list: (chatId) =>
+    getDb()
+      .prepare(
+        `SELECT d.id, d.title, d.body, d.archived_at,
+                cda.created_at AS attached_at
+           FROM chat_document_attachments cda
+           JOIN documents d ON d.id = cda.document_id
+          WHERE cda.chat_id = ?
+          ORDER BY cda.created_at ASC, d.id ASC`
+      )
+      .all(chatId),
+  attach: (chatId, documentId) => {
+    if (!chats.get(chatId)) throw new Error('Chat not found.');
+    const doc = getDb()
+      .prepare('SELECT id FROM documents WHERE id = ?')
+      .get(documentId);
+    if (!doc) throw new Error('Document not found.');
+    getDb()
+      .prepare(
+        'INSERT OR IGNORE INTO chat_document_attachments (chat_id, document_id, created_at) VALUES (?, ?, ?)'
+      )
+      .run(chatId, documentId, new Date().toISOString());
+    return chatDocuments.list(chatId);
+  },
+  detach: (chatId, documentId) => {
+    getDb()
+      .prepare('DELETE FROM chat_document_attachments WHERE chat_id = ? AND document_id = ?')
+      .run(chatId, documentId);
+    return chatDocuments.list(chatId);
   },
 };
 
@@ -4850,6 +5027,7 @@ module.exports = {
   writingLab,
   chats,
   chatSources,
+  chatDocuments,
   chatMessages,
   flanaganAnalyses,
   listUnsorted,

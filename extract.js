@@ -8,7 +8,7 @@
 //
 // Target workspaces:
 //   Unsorted, Brainstorm, Open Questions, Decisions, Conflicts, Research,
-//   Canon Review.
+//   Documents, Canon Review.
 //
 // Canon Review is the only target that does not write to its own workspace
 // table — it stages a pending row in canon_proposals so the future review
@@ -60,6 +60,13 @@
       workspaceName: 'Research',
       create: (title, body) =>
         window.revival.research.create({ title, body }),
+    },
+    {
+      key: 'documents',
+      label: 'Documents',
+      workspaceName: 'Documents',
+      create: (title, body) =>
+        window.revival.documents.create({ title, body }),
     },
     {
       key: 'canonReview',

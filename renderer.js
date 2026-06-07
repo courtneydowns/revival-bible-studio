@@ -8999,6 +8999,16 @@ const CONTENT_RENDERERS = {
     entityKind: 'documents',
     draftPrefix: 'documents',
     addLabel: 'Add Document',
+    detailExtra(rightCol, item, archivedFlag) {
+      if (!archivedFlag) mountProposeCanonSection(rightCol, item, 'documents');
+      const callbacks = {};
+      if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
+        entityKind: 'documents',
+        workspaceName: 'Documents',
+      });
+      const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'documents');
+      callbacks.refreshHistory = refresh;
+    },
   }),
   'Open Questions': makeEntryWorkspace({
     apiName: 'openQuestions',
@@ -9347,10 +9357,14 @@ let archivedChats = [];
 let activeChatId = null;
 // Keep-active sources for the current chat (persisted; loaded from SQLite).
 let activeSources = [];
+// Keep-active documents for the current chat (persisted; loaded from SQLite).
+let activeDocuments = [];
 // "Next message only" sources (P19): ephemeral and per-chat, held in memory
 // only so they never survive a send or a restart. Keyed by chat id → array of
 // source objects, so switching chats keeps each chat's pending picks separate.
 const nextSourcesByChat = new Map();
+// "Next message only" documents: same pattern as nextSourcesByChat but for Documents.
+const nextDocsByChat = new Map();
 // P40 — in-memory message history for the active chat; loaded from DB on switch.
 let chatMessageHistory = [];
 let _sendInProgress = false;
@@ -9548,7 +9562,7 @@ async function loadChatMessages() {
   }
 }
 
-// Build the system prompt: project rules + any attached sources.
+// Build the system prompt: project rules + any attached sources + documents.
 async function buildSystemPrompt() {
   let rules = '';
   try {
@@ -9559,6 +9573,9 @@ async function buildSystemPrompt() {
   const keptSrcs = activeSources;
   const nextSrcs = activeChatId != null ? nextSourcesFor(activeChatId) : [];
   const allSrcs = [...keptSrcs, ...nextSrcs];
+  const keptDocs = activeDocuments;
+  const nextDocs = activeChatId != null ? nextDocsFor(activeChatId) : [];
+  const allDocs = [...keptDocs, ...nextDocs];
   const parts = [];
   if (rules) parts.push(rules);
   if (allSrcs.length) {
@@ -9566,6 +9583,12 @@ async function buildSystemPrompt() {
       (s) => `### ${s.title}\n\n${s.body || '(no content)'}`
     );
     parts.push(`## Source Material\n\n${sections.join('\n\n---\n\n')}`);
+  }
+  if (allDocs.length) {
+    const sections = allDocs.map(
+      (d) => `### ${d.title}\n\n${d.body || '(no content)'}`
+    );
+    parts.push(`## Documents\n\n${sections.join('\n\n---\n\n')}`);
   }
   return parts.join('\n\n');
 }
@@ -9636,8 +9659,8 @@ function renderArchivedChats() {
 
 // --- Active sources (P18 keep-active + P19 next-message-only) ---------------
 // The sources a chat would use are always visible above the composer so the
-// user knows exactly what Claude would draw on. Source Material is the only
-// attachable type. Two modes:
+// user knows exactly what Claude would draw on. Attachable types: Source Material
+// and Documents. Two modes:
 //   • "keep active"        — persisted in SQLite, stays listed for the chat.
 //   • "next message only"  — in-memory only, cleared on the next draft send.
 // Every chip carries a one-click remove (P19). Composer enablement rides along
@@ -9645,25 +9668,38 @@ function renderArchivedChats() {
 function nextSourcesFor(chatId) {
   return nextSourcesByChat.get(chatId) || [];
 }
+function nextDocsFor(chatId) {
+  return nextDocsByChat.get(chatId) || [];
+}
 
+// mode: 'keep' | 'next' (Source Material) or 'keepDoc' | 'nextDoc' (Documents).
 function buildSourceChip(src, mode) {
+  const isNext = mode === 'next' || mode === 'nextDoc';
+  const isDoc = mode === 'keepDoc' || mode === 'nextDoc';
   const chip = document.createElement('span');
-  chip.className = mode === 'next' ? 'source-chip chip-next' : 'source-chip';
+  chip.className = isNext ? 'source-chip chip-next' : 'source-chip';
+
+  if (isDoc) {
+    const typeTag = document.createElement('span');
+    typeTag.className = 'chip-type';
+    typeTag.textContent = 'Doc';
+    chip.appendChild(typeTag);
+  }
 
   const title = document.createElement('span');
   title.className = 'chip-title';
   title.textContent = src.title;
   chip.appendChild(title);
 
-  // A keep-active source archived after attaching stays active but is flagged.
-  if (mode === 'keep' && src.archived_at) {
+  // A keep-active attachment archived after attaching stays active but is flagged.
+  if ((mode === 'keep' || mode === 'keepDoc') && src.archived_at) {
     const note = document.createElement('span');
     note.className = 'chip-archived';
     note.textContent = '(archived)';
     chip.appendChild(note);
   }
 
-  if (mode === 'next') {
+  if (isNext) {
     const badge = document.createElement('span');
     badge.className = 'chip-mode';
     badge.textContent = 'next message only';
@@ -9674,7 +9710,7 @@ function buildSourceChip(src, mode) {
   remove.type = 'button';
   remove.className = 'chip-remove';
   remove.textContent = '✕';
-  remove.title = 'Remove source';
+  remove.title = 'Remove';
   remove.setAttribute('aria-label', `Remove ${src.title}`);
   remove.addEventListener('click', () => removeSource(src.id, mode));
   chip.appendChild(remove);
@@ -9700,7 +9736,9 @@ function renderActiveSources() {
   }
 
   const nextSources = nextSourcesFor(activeChatId);
-  if (activeSources.length === 0 && nextSources.length === 0) {
+  const nextDocs = nextDocsFor(activeChatId);
+  if (activeSources.length === 0 && nextSources.length === 0 &&
+      activeDocuments.length === 0 && nextDocs.length === 0) {
     const p = document.createElement('p');
     p.className = 'chat-sources-empty';
     p.textContent =
@@ -9715,6 +9753,12 @@ function renderActiveSources() {
   for (const src of nextSources) {
     chatSourcesList.appendChild(buildSourceChip(src, 'next'));
   }
+  for (const doc of activeDocuments) {
+    chatSourcesList.appendChild(buildSourceChip(doc, 'keepDoc'));
+  }
+  for (const doc of nextDocs) {
+    chatSourcesList.appendChild(buildSourceChip(doc, 'nextDoc'));
+  }
 }
 
 // One-click remove. Keep-active detaches in SQLite; next-message-only just
@@ -9722,13 +9766,22 @@ function renderActiveSources() {
 async function removeSource(sourceId, mode) {
   if (activeChatId == null) return;
   if (mode === 'keep') {
-    activeSources = await window.revival.chatSources.detach(
-      activeChatId,
-      sourceId
-    );
+    activeSources = await window.revival.chatSources.detach(activeChatId, sourceId);
     renderActiveSources();
     return;
   }
+  if (mode === 'keepDoc') {
+    activeDocuments = await window.revival.chatDocuments.detach(activeChatId, sourceId);
+    renderActiveSources();
+    return;
+  }
+  if (mode === 'nextDoc') {
+    const list = nextDocsFor(activeChatId).filter((d) => d.id !== sourceId);
+    nextDocsByChat.set(activeChatId, list);
+    renderActiveSources();
+    return;
+  }
+  // mode === 'next'
   const list = nextSourcesFor(activeChatId).filter((s) => s.id !== sourceId);
   nextSourcesByChat.set(activeChatId, list);
   renderActiveSources();
@@ -9737,20 +9790,26 @@ async function removeSource(sourceId, mode) {
 async function loadActiveSources() {
   if (activeChatId == null) {
     activeSources = [];
+    activeDocuments = [];
     renderActiveSources();
     return;
   }
-  activeSources = await window.revival.chatSources.list(activeChatId);
-  // Prune any next-message-only picks whose source was deleted elsewhere, so a
-  // stale chip can't linger after the underlying source is gone.
+  [activeSources, activeDocuments] = await Promise.all([
+    window.revival.chatSources.list(activeChatId),
+    window.revival.chatDocuments.list(activeChatId),
+  ]);
+  // Prune any next-message-only picks whose source/document was deleted elsewhere.
   const next = nextSourcesByChat.get(activeChatId);
   if (next && next.length) {
     const allSources = await window.revival.sourceMaterial.list();
     const liveIds = new Set(allSources.map((s) => s.id));
-    nextSourcesByChat.set(
-      activeChatId,
-      next.filter((s) => liveIds.has(s.id))
-    );
+    nextSourcesByChat.set(activeChatId, next.filter((s) => liveIds.has(s.id)));
+  }
+  const nextDocs = nextDocsByChat.get(activeChatId);
+  if (nextDocs && nextDocs.length) {
+    const allDocs = await window.revival.documents.list();
+    const liveIds = new Set(allDocs.map((d) => d.id));
+    nextDocsByChat.set(activeChatId, nextDocs.filter((d) => liveIds.has(d.id)));
   }
   renderActiveSources();
 }
@@ -9760,76 +9819,131 @@ function hidePicker() {
   chatSourcePicker.innerHTML = '';
 }
 
-// The picker lists Source Material only (no other types, no Context Packets),
-// excluding sources already attached in either mode so the choices are valid.
-// Each row offers both attach modes (P19): keep active vs. next message only.
+// Tabbed picker: Source Material tab + Documents tab.
+// Each tab excludes entries already attached in either mode.
+// Each row offers both attach modes: keep active vs. next message only.
 async function showPicker() {
   if (activeChatId == null) return;
-  const sources = await window.revival.sourceMaterial.list();
-  const usedIds = new Set([
+  const [sources, docs] = await Promise.all([
+    window.revival.sourceMaterial.list(),
+    window.revival.documents.list(),
+  ]);
+  const usedSourceIds = new Set([
     ...activeSources.map((s) => s.id),
     ...nextSourcesFor(activeChatId).map((s) => s.id),
   ]);
-  const available = sources.filter((s) => !usedIds.has(s.id));
+  const usedDocIds = new Set([
+    ...activeDocuments.map((d) => d.id),
+    ...nextDocsFor(activeChatId).map((d) => d.id),
+  ]);
+  const availableSources = sources.filter((s) => !usedSourceIds.has(s.id));
+  const availableDocs = docs.filter((d) => !usedDocIds.has(d.id));
 
   chatSourcePicker.innerHTML = '';
-  if (available.length === 0) {
-    const hint = document.createElement('p');
-    hint.className = 'picker-hint';
-    hint.textContent = sources.length
-      ? 'All Source Material is already attached to this chat.'
-      : 'No Source Material yet. Add some in the Source Material workspace.';
-    chatSourcePicker.appendChild(hint);
-  } else {
-    for (const src of available) {
+
+  // Tab bar
+  const tabs = document.createElement('div');
+  tabs.className = 'picker-tabs';
+  const tabSource = document.createElement('button');
+  tabSource.type = 'button';
+  tabSource.className = 'picker-tab picker-tab-active';
+  tabSource.textContent = 'Source Material';
+  const tabDoc = document.createElement('button');
+  tabDoc.type = 'button';
+  tabDoc.className = 'picker-tab';
+  tabDoc.textContent = 'Documents';
+  tabs.appendChild(tabSource);
+  tabs.appendChild(tabDoc);
+  chatSourcePicker.appendChild(tabs);
+
+  const sourcePanel = document.createElement('div');
+  sourcePanel.className = 'picker-panel';
+  const docPanel = document.createElement('div');
+  docPanel.className = 'picker-panel picker-panel-hidden';
+
+  function buildPickerRows(items, panel, keepMode, nextMode) {
+    if (items.length === 0) {
+      const hint = document.createElement('p');
+      hint.className = 'picker-hint';
+      hint.textContent = keepMode === 'keep'
+        ? (sources.length ? 'All Source Material is already attached.' : 'No Source Material yet.')
+        : (docs.length ? 'All Documents are already attached.' : 'No Documents yet.');
+      panel.appendChild(hint);
+      return;
+    }
+    for (const item of items) {
       const row = document.createElement('div');
       row.className = 'picker-item';
-
-      const title = document.createElement('span');
-      title.className = 'picker-title';
-      title.textContent = src.title;
-      row.appendChild(title);
-
+      const titleEl = document.createElement('span');
+      titleEl.className = 'picker-title';
+      titleEl.textContent = item.title;
+      row.appendChild(titleEl);
       const keepBtn = document.createElement('button');
       keepBtn.type = 'button';
       keepBtn.className = 'picker-mode-btn';
       keepBtn.textContent = 'Keep active';
-      keepBtn.addEventListener('click', () => attachSource(src, 'keep', row));
+      keepBtn.addEventListener('click', () => attachItem(item, keepMode, row));
       row.appendChild(keepBtn);
-
       const nextBtn = document.createElement('button');
       nextBtn.type = 'button';
       nextBtn.className = 'picker-mode-btn';
       nextBtn.textContent = 'Next message only';
-      nextBtn.addEventListener('click', () => attachSource(src, 'next', row));
+      nextBtn.addEventListener('click', () => attachItem(item, nextMode, row));
       row.appendChild(nextBtn);
-
-      chatSourcePicker.appendChild(row);
+      panel.appendChild(row);
     }
   }
+
+  buildPickerRows(availableSources, sourcePanel, 'keep', 'next');
+  buildPickerRows(availableDocs, docPanel, 'keepDoc', 'nextDoc');
+
+  chatSourcePicker.appendChild(sourcePanel);
+  chatSourcePicker.appendChild(docPanel);
+
+  tabSource.addEventListener('click', () => {
+    tabSource.classList.add('picker-tab-active');
+    tabDoc.classList.remove('picker-tab-active');
+    sourcePanel.classList.remove('picker-panel-hidden');
+    docPanel.classList.add('picker-panel-hidden');
+  });
+  tabDoc.addEventListener('click', () => {
+    tabDoc.classList.add('picker-tab-active');
+    tabSource.classList.remove('picker-tab-active');
+    docPanel.classList.remove('picker-panel-hidden');
+    sourcePanel.classList.add('picker-panel-hidden');
+  });
+
   chatSourcePicker.hidden = false;
 }
 
-// Attach a source in the chosen mode. Keep-active persists via SQLite;
-// next-message-only is held in memory for the active chat only.
-async function attachSource(src, mode, row) {
+// Attach an item (source or document) in the chosen mode.
+// mode: 'keep' | 'next' for Source Material, 'keepDoc' | 'nextDoc' for Documents.
+async function attachItem(item, mode, row) {
   if (activeChatId == null) return;
   row.querySelectorAll('button').forEach((b) => (b.disabled = true));
   try {
     if (mode === 'keep') {
-      activeSources = await window.revival.chatSources.attach(
-        activeChatId,
-        src.id
-      );
+      activeSources = await window.revival.chatSources.attach(activeChatId, item.id);
+    } else if (mode === 'keepDoc') {
+      activeDocuments = await window.revival.chatDocuments.attach(activeChatId, item.id);
+    } else if (mode === 'nextDoc') {
+      const list = nextDocsFor(activeChatId);
+      nextDocsByChat.set(activeChatId, [...list, item]);
     } else {
+      // mode === 'next'
       const list = nextSourcesFor(activeChatId);
-      nextSourcesByChat.set(activeChatId, [...list, src]);
+      nextSourcesByChat.set(activeChatId, [...list, item]);
     }
     renderActiveSources();
     hidePicker();
   } catch (e) {
     row.querySelectorAll('button').forEach((b) => (b.disabled = false));
   }
+}
+
+// Legacy alias used by Source Material onChange callback.
+function attachSource(src, mode, row) {
+  return attachItem(src, mode, row);
 }
 
 function setActiveChat(id) {
@@ -9929,12 +10043,13 @@ chatComposer.addEventListener('submit', async (e) => {
   chatSend.disabled = true;
   chatInput.disabled = true;
 
-  // Clear composer and next-message-only sources.
+  // Clear composer and next-message-only sources/documents.
   chatInput.value = '';
-  if (nextSourcesFor(activeChatId).length) {
-    nextSourcesByChat.set(activeChatId, []);
-    renderActiveSources();
-  }
+  const hadNextSrcs = nextSourcesFor(activeChatId).length > 0;
+  const hadNextDocs = nextDocsFor(activeChatId).length > 0;
+  if (hadNextSrcs) nextSourcesByChat.set(activeChatId, []);
+  if (hadNextDocs) nextDocsByChat.set(activeChatId, []);
+  if (hadNextSrcs || hadNextDocs) renderActiveSources();
   // Collapse preview so it doesn't show a stale payload.
   _previewOpen = false;
   chatPreviewWrap.hidden = true;
@@ -10037,9 +10152,12 @@ async function buildPreviewPayload() {
   const keptSrcs = activeSources;
   const nextSrcs = activeChatId != null ? nextSourcesFor(activeChatId) : [];
   const allSrcs = [...keptSrcs, ...nextSrcs];
+  const keptDocs = activeDocuments;
+  const nextDocs = activeChatId != null ? nextDocsFor(activeChatId) : [];
+  const allDocs = [...keptDocs, ...nextDocs];
 
   // Build the system prompt the same way the real send does: project rules +
-  // source material. This matches what will actually be sent to Claude.
+  // source material + documents. This matches what will actually be sent to Claude.
   const systemParts = [];
   if (_cachedProjectRules) systemParts.push(_cachedProjectRules);
   if (allSrcs.length) {
@@ -10048,6 +10166,13 @@ async function buildPreviewPayload() {
       return `### ${s.title}${mode}\n\n${s.body || '(no content)'}`;
     });
     systemParts.push(`## Source Material\n\n${sections.join('\n\n---\n\n')}`);
+  }
+  if (allDocs.length) {
+    const sections = allDocs.map((d) => {
+      const mode = nextDocs.includes(d) ? ' (next message only)' : ' (keep active)';
+      return `### ${d.title}${mode}\n\n${d.body || '(no content)'}`;
+    });
+    systemParts.push(`## Documents\n\n${sections.join('\n\n---\n\n')}`);
   }
   const systemPrompt = systemParts.join('\n\n');
 

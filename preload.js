@@ -128,6 +128,13 @@ contextBridge.exposeInMainWorld('revival', {
     detach: (chatId, sourceId) =>
       ipcRenderer.invoke('chatSources:detach', chatId, sourceId),
   },
+  chatDocuments: {
+    list: (chatId) => ipcRenderer.invoke('chatDocuments:list', chatId),
+    attach: (chatId, documentId) =>
+      ipcRenderer.invoke('chatDocuments:attach', chatId, documentId),
+    detach: (chatId, documentId) =>
+      ipcRenderer.invoke('chatDocuments:detach', chatId, documentId),
+  },
   // P40 — persisted chat message history
   chatMessages: {
     list: (chatId) => ipcRenderer.invoke('chatMessages:list', chatId),

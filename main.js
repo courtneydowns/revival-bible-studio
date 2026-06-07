@@ -169,6 +169,13 @@ function registerIpc() {
   ipcMain.handle('chatSources:detach', (_event, chatId, sourceId) =>
     db.chatSources.detach(chatId, sourceId)
   );
+  ipcMain.handle('chatDocuments:list', (_event, chatId) => db.chatDocuments.list(chatId));
+  ipcMain.handle('chatDocuments:attach', (_event, chatId, documentId) =>
+    db.chatDocuments.attach(chatId, documentId)
+  );
+  ipcMain.handle('chatDocuments:detach', (_event, chatId, documentId) =>
+    db.chatDocuments.detach(chatId, documentId)
+  );
 
   // Panic Export (P21): always saves to a fixed, predictable location —
   // ~/Documents/revival-bible-studio/panic_exports/<timestamp>/ — so the user
