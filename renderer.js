@@ -4369,7 +4369,72 @@ function renderCanonReviewPage(section, workspaceName) {
       actions.appendChild(popoutBtn);
     }
 
+    // P43 — AI conflict check. Button lives in the verb row; results render
+    // in a separate area below so they don't displace the action buttons.
+    const conflictCheckBtn = document.createElement('button');
+    conflictCheckBtn.type = 'button';
+    conflictCheckBtn.className = 'btn-secondary';
+    conflictCheckBtn.textContent = 'Check conflicts (AI)';
+    conflictCheckBtn.title =
+      'Ask Claude to compare this proposal against locked canon entries and flag contradictions.';
+    actions.appendChild(conflictCheckBtn);
+
     rightCol.appendChild(actions);
+
+    // Results area — only populated after the button is clicked.
+    const conflictArea = document.createElement('div');
+    conflictArea.className = 'cr-conflict-area';
+    rightCol.appendChild(conflictArea);
+
+    conflictCheckBtn.addEventListener('click', async () => {
+      conflictCheckBtn.disabled = true;
+      conflictArea.innerHTML = '';
+      const checking = document.createElement('p');
+      checking.className = 'cr-conflict-status';
+      checking.textContent = 'Checking against locked canon entries…';
+      conflictArea.appendChild(checking);
+      const selectedModel = chatModelSelect.value || 'claude-sonnet-4-6';
+      try {
+        const res = await window.revival.claude.conflictCheck(p.id, selectedModel);
+        conflictArea.innerHTML = '';
+        const summary = document.createElement('p');
+        summary.className = 'cr-conflict-status';
+        if (res.skipped) {
+          summary.textContent = 'Proposal has no content to check.';
+        } else if (res.checkedCount === 0) {
+          summary.textContent = 'No locked canon entries to check against.';
+        } else if (res.flags.length === 0) {
+          summary.textContent =
+            `No contradictions found (checked ${res.checkedCount} locked entr${res.checkedCount === 1 ? 'y' : 'ies'}).`;
+        } else {
+          summary.textContent =
+            `${res.flags.length} contradiction${res.flags.length === 1 ? '' : 's'} flagged ` +
+            `(checked ${res.checkedCount} locked entr${res.checkedCount === 1 ? 'y' : 'ies'}):`;
+          conflictArea.appendChild(summary);
+          for (const f of res.flags) {
+            const flag = document.createElement('div');
+            flag.className = 'cr-conflict-flag';
+            const label = document.createElement('strong');
+            label.textContent = `${f.tcode} — ${f.title}`;
+            const reason = document.createElement('p');
+            reason.className = 'cr-conflict-reason';
+            reason.textContent = f.reason;
+            flag.append(label, reason);
+            conflictArea.appendChild(flag);
+          }
+          return;
+        }
+        conflictArea.appendChild(summary);
+      } catch (err) {
+        conflictArea.innerHTML = '';
+        const errEl = document.createElement('p');
+        errEl.className = 'cr-conflict-status';
+        errEl.textContent = `Error: ${err.message || 'AI check failed.'}`;
+        conflictArea.appendChild(errEl);
+      } finally {
+        conflictCheckBtn.disabled = false;
+      }
+    });
   }
 
   // Approve form: pick entry type, fill required detail fields, click

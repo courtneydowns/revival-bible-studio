@@ -614,6 +614,100 @@ function registerIpc() {
     return { text: textBlock.text, entryCount: entries.length };
   });
 
+  // P43 — On-demand conflict check for a single canon proposal against locked
+  // canon entries. Never runs automatically; user triggers it from Canon Review.
+  // Returns { flags: [{entryId, tcode, title, reason}], checkedCount } or
+  // { flags: [], checkedCount } if no contradictions detected.
+  ipcMain.handle('claude:conflictCheck', async (_e, proposalId, model) => {
+    const apiKey = db.settings.getClaudeApiKey();
+    if (!apiKey) throw new Error('No Claude API key configured. Add one in Settings.');
+
+    const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
+
+    const proposal = db.canonProposals.getById(proposalId);
+    if (!proposal) throw new Error('Proposal not found.');
+
+    const fields = proposal.proposed_fields || {};
+    const proposalTitle = fields.title || '(untitled)';
+    const proposalBody  = fields.body  || '';
+    if (!proposalTitle && !proposalBody) {
+      return { flags: [], checkedCount: 0, skipped: true };
+    }
+
+    // Only check against locked entries — those are the committed facts.
+    const allEntries = db.canon.list();
+    const locked = allEntries.filter((e) => e.locked);
+    if (locked.length === 0) {
+      return { flags: [], checkedCount: 0 };
+    }
+
+    const blocks = locked.map((e) => {
+      const primaryId = (e.legacy_ids || []).find((l) => l.isPrimary);
+      const tcode = primaryId ? primaryId.code : `#${e.id}`;
+      return `[${tcode}] ${e.entry_type.toUpperCase()}: ${e.title}\n${e.body || ''}`;
+    });
+
+    const systemPrompt =
+      'You are a continuity analyst for a TV writers\' room. ' +
+      'Your job is to detect DIRECT CONTRADICTIONS between a proposed new canon entry ' +
+      'and the locked canon entries provided. ' +
+      'A contradiction means the proposal explicitly states something that conflicts with ' +
+      'a locked fact (e.g. different dates, mutually exclusive states, impossible sequences). ' +
+      'Do NOT flag thematic tension, ambiguity, gaps, or things that could coexist. ' +
+      'Only flag clear, direct factual contradictions.\n\n' +
+      'Respond with a JSON object in this exact shape — no markdown, no explanation outside JSON:\n' +
+      '{\n' +
+      '  "flags": [\n' +
+      '    { "entryId": <number or null>, "tcode": "<T-code or #id string>", "title": "<entry title>", "reason": "<one sentence describing the contradiction>" }\n' +
+      '  ]\n' +
+      '}\n' +
+      'If there are no contradictions, return { "flags": [] }.\n\n' +
+      '## Locked Canon Entries\n\n' +
+      blocks.join('\n\n---\n\n');
+
+    const userMessage =
+      `## Proposed Canon Entry\n\nTitle: ${proposalTitle}\n\n${proposalBody}`;
+
+    const data = await callClaudeAPI(apiKey, {
+      model: safeModel,
+      max_tokens: 2048,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    });
+
+    const textBlock = (data.content || []).find((b) => b.type === 'text');
+    if (!textBlock) throw new Error('Unexpected response shape from Claude API.');
+
+    let parsed;
+    try {
+      // Strip any accidental markdown fences before parsing.
+      const raw = textBlock.text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error('Claude returned malformed JSON. Try again.');
+    }
+
+    const flags = Array.isArray(parsed.flags) ? parsed.flags : [];
+
+    // Enrich flags with the numeric entryId from our locked set when possible,
+    // so the renderer can link directly to the entry.
+    const enriched = flags.map((f) => {
+      const match = locked.find((e) => {
+        const primaryId = (e.legacy_ids || []).find((l) => l.isPrimary);
+        const tcode = primaryId ? primaryId.code : `#${e.id}`;
+        return tcode === f.tcode || e.title === f.title;
+      });
+      return {
+        entryId: match ? match.id : (f.entryId || null),
+        tcode: f.tcode || (match ? `#${match.id}` : '?'),
+        title: f.title || (match ? match.title : '?'),
+        reason: f.reason || '',
+      };
+    });
+
+    return { flags: enriched, checkedCount: locked.length };
+  });
+
   // PUI2 popout wiring.
   //  • popout:open spawns a new BrowserWindow for a single entry.
   //  • popout:changed is a one-way fan-out: whoever just mutated an entry

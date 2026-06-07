@@ -141,6 +141,9 @@ contextBridge.exposeInMainWorld('revival', {
     // P42 — natural-language search over approved canon entries.
     canonSearch: (query, model) =>
       ipcRenderer.invoke('claude:canonSearch', query, model),
+    // P43 — on-demand conflict check: proposal vs locked canon entries.
+    conflictCheck: (proposalId, model) =>
+      ipcRenderer.invoke('claude:conflictCheck', proposalId, model),
   },
   dashboard: {
     summary: (limit) => ipcRenderer.invoke('dashboard:summary', limit),
