@@ -533,7 +533,7 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Undo
 
-### PUNDO — App-level undo
+### PUNDO — App-level undo ✅
 - Cmd+Z undo for destructive actions: archive, delete, resolve, approve, reject
 - Not for autosave content edits (draft preservation already handled)
 - Undo history: last 20 actions, session-only (does not persist across restarts)

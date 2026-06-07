@@ -157,10 +157,13 @@ function registerIpc() {
 
   ipcMain.handle('chats:list', () => db.chats.list());
   ipcMain.handle('chats:listArchived', () => db.chats.listArchived());
+  ipcMain.handle('chats:listWithMeta', () => db.chats.listWithMeta());
+  ipcMain.handle('chats:listArchivedWithMeta', () => db.chats.listArchivedWithMeta());
   ipcMain.handle('chats:create', (_event, chat) => db.chats.create(chat));
   ipcMain.handle('chats:rename', (_event, id, chat) => db.chats.rename(id, chat));
   ipcMain.handle('chats:archive', (_event, id) => db.chats.archive(id));
   ipcMain.handle('chats:restore', (_event, id) => db.chats.restore(id));
+  ipcMain.handle('chats:delete', (_event, id) => db.chats.delete(id));
 
   ipcMain.handle('chatSources:list', (_event, chatId) => db.chatSources.list(chatId));
   ipcMain.handle('chatSources:attach', (_event, chatId, sourceId) =>

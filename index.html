@@ -1191,6 +1191,7 @@
       }
       .btn-danger:hover { background: #e06c6c; color: #fff; }
       .btn-danger:disabled { opacity: 0.5; cursor: default; }
+      .btn-danger-confirming { background: #e06c6c; color: #fff; }
       .confirm-row { align-items: center; flex-wrap: wrap; }
       .confirm-text { font-size: 13px; color: var(--muted); margin-right: 4px; }
 
@@ -1533,6 +1534,26 @@
         margin-right: 5px;
         opacity: 0.7;
       }
+      .tc-statusbar-undo { color: var(--accent, #d6a14f); }
+      /* PUNDO — persistent pill in the bottom-right of #content. Stays fixed
+         within the scroll context so it's always visible when the stack has
+         entries, regardless of which workspace or entry is shown. */
+      #undo-pill {
+        position: fixed;
+        bottom: 14px;
+        right: 18px;
+        font-size: 11px;
+        color: var(--accent, #d6a14f);
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 3px 9px;
+        opacity: 0.85;
+        z-index: 50;
+        pointer-events: none;
+        user-select: none;
+      }
+      #undo-pill[hidden] { display: none; }
       /* Conflicts accent in the list — borrow the existing red accent so the
          two-column list still reads as distinctly conflict-y. */
       .ws-conflicts .tc-list-item { border-left: 3px solid #e06c6c; }
@@ -2570,6 +2591,17 @@
       .chat-msg-archived { display: flex; align-items: center; gap: 10px; padding: 4px 0; margin-bottom: 18px; }
       .chat-msg-archived-note { color: var(--muted); font-size: 12px; font-style: italic; }
       .chat-msg-unarchive { font-size: 11px; }
+
+      /* PCHAT-HISTORY — history page transcript in the right detail panel */
+      .chat-history-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      .chat-history-header .tc-detail-header { margin: 0; flex: 1; min-width: 0; }
+      .chat-history-transcript { display: flex; flex-direction: column; }
 
       /* --- Active sources bar (P18) ----------------------------------- */
       .chat-sources {

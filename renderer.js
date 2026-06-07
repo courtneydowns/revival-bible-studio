@@ -132,6 +132,73 @@ function setStatus(el, text) {
   el.style.display = text ? '' : 'none';
 }
 
+// PUNDO — session-only undo stack for destructive actions (archive, delete).
+// Max 20 entries, cleared on app restart. Canon Bible lock/supersede/retire
+// and Canon Review approve/reject are excluded.
+const UndoStack = (() => {
+  const MAX = 20;
+  const stack = [];
+  const listeners = new Set();
+  function notify() { listeners.forEach((fn) => fn(stack.length)); }
+  return {
+    push(action) {
+      stack.unshift(action);
+      if (stack.length > MAX) stack.pop();
+      notify();
+    },
+    peek() { return stack[0] || null; },
+    pop() { const a = stack.shift() || null; notify(); return a; },
+    size() { return stack.length; },
+    clear() { stack.length = 0; notify(); },
+    onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+  };
+})();
+
+let _undoToastEl = null;
+function showUndoToast(message) {
+  if (!_undoToastEl) {
+    _undoToastEl = document.createElement('div');
+    _undoToastEl.className = 'rb-toast rb-toast-bottom';
+    _undoToastEl.hidden = true;
+    document.body.appendChild(_undoToastEl);
+  }
+  const el = _undoToastEl;
+  el.textContent = message;
+  el.hidden = false;
+  void el.offsetWidth;
+  el.classList.add('rb-toast-visible');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => {
+    el.classList.remove('rb-toast-visible');
+    setTimeout(() => { el.hidden = true; }, 220);
+  }, 2400);
+}
+
+async function performUndo(action) {
+  try {
+    if (action.type === 'archive') {
+      const api = window.revival[action.apiName];
+      if (!api || !api.restore) throw new Error('Cannot restore this entry.');
+      await api.restore(action.id);
+      showUndoToast(`Restored "${action.title}"`);
+    } else if (action.type === 'delete') {
+      const api = window.revival[action.apiName];
+      if (!api || !api.create) throw new Error('Cannot recreate this entry.');
+      await api.create({ title: action.title, body: action.body || '' });
+      showUndoToast(`Restored "${action.title}"`);
+    } else if (action.type === 'canonArchive') {
+      await window.revival.canon.restore(action.id);
+      showUndoToast(`Restored "${action.title}"`);
+    } else if (action.type === 'chatArchive') {
+      await window.revival.chats.restore(action.id);
+      showUndoToast(`Restored chat "${action.title}"`);
+    }
+    if (currentWorkspaceRefresh) await currentWorkspaceRefresh();
+  } catch (err) {
+    showUndoToast(`Undo failed: ${err.message || 'Unknown error'}`);
+  }
+}
+
 // PCONFLICT-2 — lightweight bottom-center toast used by Canon Bible to nudge
 // the user when they mutate a canon entry that's currently load-bearing for
 // an open Conflicts row. Reuses the extract-toast visual treatment but stays
@@ -236,6 +303,11 @@ function buildStatusBar(workspaceName, item, archivedFlag) {
   ];
   if (edited !== '—') segs.push(seg('Edited', edited));
   segs.push(seg('Status', archivedFlag ? 'Archived' : 'Active'));
+  if (UndoStack.size() > 0) {
+    const undoSeg = seg('Undo', '⌘Z available');
+    undoSeg.classList.add('tc-statusbar-undo');
+    segs.push(undoSeg);
+  }
   bar.append(...segs);
   return bar;
 }
@@ -1225,6 +1297,7 @@ function makeEntryWorkspace(config) {
         archiveBtn.disabled = true;
         try {
           await api.archive(item.id);
+          UndoStack.push({ type: 'archive', apiName, id: item.id, title: item.title || '(untitled)' });
           await loadList();
         } catch {
           archiveBtn.disabled = false;
@@ -1303,7 +1376,7 @@ function makeEntryWorkspace(config) {
 
     const prompt = document.createElement('span');
     prompt.className = 'confirm-text';
-    prompt.textContent = 'Delete this entry? This cannot be undone.';
+    prompt.textContent = 'Delete this entry? You can undo with ⌘Z.';
 
     const yes = document.createElement('button');
     yes.type = 'button';
@@ -1312,7 +1385,10 @@ function makeEntryWorkspace(config) {
     yes.addEventListener('click', async () => {
       yes.disabled = true;
       try {
+        const savedTitle = item.title || '(untitled)';
+        const savedBody = item.body || '';
         await api.delete(item.id);
+        UndoStack.push({ type: 'delete', apiName, title: savedTitle, body: savedBody });
         Drafts.clear(item.id);
         selectedId = null;
         await loadList();
@@ -1500,15 +1576,309 @@ function makeEntryWorkspace(config) {
   };
 }
 
-// Chat workspace page: the chat itself lives in the global drawer, so this
-// page's job is to explain that and offer a way in.
+// PCHAT-HISTORY — Chat history page: two-column layout showing past chats on
+// the left and a read-only transcript on the right. "Continue" opens the
+// selected chat in the global drawer. "New Chat" creates a fresh session in
+// the drawer. The drawer itself is unchanged.
 function renderChatPage(section) {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'btn-primary';
-  btn.textContent = 'Open chat drawer';
-  btn.addEventListener('click', () => setChatOpen(true));
-  section.appendChild(btn);
+  const layout = document.createElement('div');
+  layout.className = 'tc-layout';
+  const leftCol = document.createElement('div');
+  leftCol.className = 'tc-left';
+  const rightCol = document.createElement('div');
+  rightCol.className = 'tc-right';
+  layout.append(leftCol, rightCol);
+  section.appendChild(layout);
+
+  let selectedChatId = null;
+  let activeChats = [];
+  let archivedChatsList = [];
+
+  // "New Chat" — creates in the drawer's list then opens the drawer.
+  const newBtn = document.createElement('button');
+  newBtn.type = 'button';
+  newBtn.className = 'tc-add';
+  newBtn.textContent = '+ New Chat';
+  newBtn.addEventListener('click', async () => {
+    newBtn.disabled = true;
+    try {
+      const created = await window.revival.chats.create({
+        title: `Chat ${chatList.length + 1}`,
+      });
+      chatList.push(created);
+      setActiveChat(created.id);
+      setChatOpen(true);
+      await loadData();
+    } finally {
+      newBtn.disabled = false;
+    }
+  });
+  leftCol.appendChild(newBtn);
+
+  const list = document.createElement('div');
+  list.className = 'tc-list';
+  leftCol.appendChild(list);
+
+  const archivedDetails = document.createElement('details');
+  archivedDetails.className = 'tc-archived-section';
+  const archivedSummary = document.createElement('summary');
+  archivedDetails.appendChild(archivedSummary);
+  const archivedList = document.createElement('div');
+  archivedList.className = 'tc-list';
+  archivedDetails.appendChild(archivedList);
+  leftCol.appendChild(archivedDetails);
+
+  function makeListItem(chat, isArchived) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'tc-list-item' + (chat.id === selectedChatId ? ' active' : '');
+
+    const titleEl = document.createElement('div');
+    titleEl.className = 'tc-list-title';
+    titleEl.textContent = chat.title;
+    item.appendChild(titleEl);
+
+    const dateStr = isArchived
+      ? new Date(chat.archived_at).toLocaleDateString()
+      : new Date(chat.last_message_at || chat.created_at).toLocaleDateString();
+    const dateEl = document.createElement('div');
+    dateEl.className = 'tc-list-preview';
+    dateEl.textContent = dateStr;
+    item.appendChild(dateEl);
+
+    if (chat.last_message) {
+      const preview = document.createElement('div');
+      preview.className = 'tc-list-preview';
+      const text = String(chat.last_message).replace(/\s+/g, ' ').trim();
+      preview.textContent = text.length > 80 ? text.slice(0, 80) + '…' : text;
+      item.appendChild(preview);
+    }
+
+    item.addEventListener('click', () => {
+      selectedChatId = chat.id;
+      renderList();
+      renderArchivedList();
+      renderRight();
+    });
+    return item;
+  }
+
+  function renderList() {
+    list.innerHTML = '';
+    if (activeChats.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'tc-list-empty';
+      empty.textContent = 'No chats yet.';
+      list.appendChild(empty);
+      return;
+    }
+    for (const chat of activeChats) {
+      list.appendChild(makeListItem(chat, false));
+    }
+  }
+
+  function renderArchivedList() {
+    archivedList.innerHTML = '';
+    archivedSummary.textContent = `Archived (${archivedChatsList.length})`;
+    archivedDetails.hidden = archivedChatsList.length === 0;
+    for (const chat of archivedChatsList) {
+      archivedList.appendChild(makeListItem(chat, true));
+    }
+  }
+
+  function renderRight() {
+    rightCol.innerHTML = '';
+    if (!selectedChatId) {
+      const empty = document.createElement('div');
+      empty.className = 'tc-empty';
+      const title = document.createElement('div');
+      title.className = 'tc-empty-title';
+      title.textContent = 'Select a chat to view its transcript';
+      empty.appendChild(title);
+      rightCol.appendChild(empty);
+      return;
+    }
+
+    const loadingEl = document.createElement('p');
+    loadingEl.className = 'placeholder';
+    loadingEl.textContent = 'Loading…';
+    rightCol.appendChild(loadingEl);
+
+    window.revival.chatMessages.list(selectedChatId).then((messages) => {
+      if (selectedChatId == null) return; // selection changed while loading
+      const chat = activeChats.find((c) => c.id === selectedChatId)
+                || archivedChatsList.find((c) => c.id === selectedChatId);
+      const isArchived = !!archivedChatsList.find((c) => c.id === selectedChatId);
+      rightCol.innerHTML = '';
+
+      // Header: title + Continue button
+      const headerRow = document.createElement('div');
+      headerRow.className = 'chat-history-header';
+      const titleEl = document.createElement('h2');
+      titleEl.className = 'tc-detail-header';
+      titleEl.textContent = chat ? chat.title : 'Chat';
+      headerRow.appendChild(titleEl);
+
+      const continueBtn = document.createElement('button');
+      continueBtn.type = 'button';
+      continueBtn.className = 'btn-primary';
+      continueBtn.textContent = isArchived ? 'Restore & Continue' : 'Continue';
+      continueBtn.title = 'Open this chat in the drawer';
+      continueBtn.addEventListener('click', async () => {
+        continueBtn.disabled = true;
+        try {
+          if (isArchived) {
+            await window.revival.chats.restore(selectedChatId);
+            await loadChats();
+          }
+          setActiveChat(selectedChatId);
+          setChatOpen(true);
+          await loadData();
+        } finally {
+          continueBtn.disabled = false;
+        }
+      });
+      headerRow.appendChild(continueBtn);
+      rightCol.appendChild(headerRow);
+
+      const meta = document.createElement('div');
+      meta.className = 'tc-detail-meta';
+      const dateVal = chat ? new Date(chat.created_at).toLocaleDateString() : '';
+      meta.textContent = `Created ${dateVal}${isArchived ? ' · Archived' : ''}`;
+      rightCol.appendChild(meta);
+
+      // Actions: Archive/Restore + Delete
+      const actions = document.createElement('div');
+      actions.className = 'tc-detail-actions';
+
+      if (!isArchived) {
+        const archiveBtn = document.createElement('button');
+        archiveBtn.type = 'button';
+        archiveBtn.className = 'btn-secondary';
+        archiveBtn.textContent = 'Archive';
+        archiveBtn.addEventListener('click', async () => {
+          archiveBtn.disabled = true;
+          try {
+            const chatTitle = chat ? chat.title || '(untitled chat)' : '(untitled chat)';
+            const chatId = selectedChatId;
+            await window.revival.chats.archive(chatId);
+            UndoStack.push({ type: 'chatArchive', id: chatId, title: chatTitle });
+            // If this was the active chat in the drawer, reload the drawer list.
+            if (activeChatId === chatId) await loadChats();
+            selectedChatId = null;
+            await loadData();
+          } catch {
+            archiveBtn.disabled = false;
+          }
+        });
+        actions.appendChild(archiveBtn);
+      } else {
+        const restoreBtn = document.createElement('button');
+        restoreBtn.type = 'button';
+        restoreBtn.className = 'btn-secondary';
+        restoreBtn.textContent = 'Restore';
+        restoreBtn.addEventListener('click', async () => {
+          restoreBtn.disabled = true;
+          try {
+            await window.revival.chats.restore(selectedChatId);
+            await loadChats();
+            selectedChatId = null;
+            await loadData();
+          } catch {
+            restoreBtn.disabled = false;
+          }
+        });
+        actions.appendChild(restoreBtn);
+      }
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'btn-danger';
+      deleteBtn.textContent = 'Delete';
+      let deleteConfirming = false;
+      deleteBtn.addEventListener('click', async () => {
+        if (!deleteConfirming) {
+          deleteConfirming = true;
+          deleteBtn.textContent = 'Confirm delete?';
+          deleteBtn.classList.add('btn-danger-confirming');
+          setTimeout(() => {
+            if (deleteConfirming) {
+              deleteConfirming = false;
+              deleteBtn.textContent = 'Delete';
+              deleteBtn.classList.remove('btn-danger-confirming');
+            }
+          }, 3000);
+          return;
+        }
+        deleteBtn.disabled = true;
+        try {
+          const deletedId = selectedChatId;
+          if (activeChatId === deletedId) {
+            // Switch drawer to another chat before deleting.
+            const next = chatList.find((c) => c.id !== deletedId);
+            setActiveChat(next ? next.id : null);
+            chatList.splice(chatList.findIndex((c) => c.id === deletedId), 1);
+          }
+          await window.revival.chats.delete(deletedId);
+          selectedChatId = null;
+          await loadData();
+        } catch {
+          deleteBtn.disabled = false;
+          deleteConfirming = false;
+          deleteBtn.textContent = 'Delete';
+        }
+      });
+      actions.appendChild(deleteBtn);
+      rightCol.appendChild(actions);
+
+      // Read-only transcript
+      const transcript = document.createElement('div');
+      transcript.className = 'chat-history-transcript';
+      const activeMessages = messages.filter((m) => !m.is_archived);
+      if (activeMessages.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'chat-empty';
+        empty.textContent = 'No messages in this chat.';
+        transcript.appendChild(empty);
+      } else {
+        for (const msg of activeMessages) {
+          const wrap = document.createElement('div');
+          wrap.className = `chat-msg chat-msg-${msg.role}`;
+          const label = document.createElement('span');
+          label.className = 'chat-msg-label';
+          label.textContent = msg.role === 'user' ? 'You' : 'Claude';
+          const body = document.createElement('p');
+          body.className = 'chat-msg-body';
+          body.textContent = msg.content;
+          wrap.append(label, body);
+          transcript.appendChild(wrap);
+        }
+      }
+      rightCol.appendChild(transcript);
+    });
+  }
+
+  async function loadData() {
+    [activeChats, archivedChatsList] = await Promise.all([
+      window.revival.chats.listWithMeta(),
+      window.revival.chats.listArchivedWithMeta(),
+    ]);
+    // Auto-select on initial load: prefer active drawer chat, then first chat
+    // with messages, then just the first chat — so history is visible immediately.
+    if (!selectedChatId) {
+      const toSelect =
+        activeChats.find((c) => c.id === activeChatId && c.last_message) ||
+        activeChats.find((c) => c.last_message) ||
+        activeChats[0];
+      if (toSelect) selectedChatId = toSelect.id;
+    }
+    renderList();
+    renderArchivedList();
+    renderRight();
+  }
+
+  setActiveWorkspaceRefresh('Chat', loadData);
+  loadData();
 }
 
 // --- Canon Bible (P31 read view + P32 create/edit/archive/delete) ---------
@@ -2826,6 +3196,7 @@ function renderCanonBiblePage(section) {
       archiveBtn.disabled = true;
       try {
         await window.revival.canon.archive(e.id);
+        UndoStack.push({ type: 'canonArchive', id: e.id, title: e.title || '(untitled)' });
         setStatus(status, `Archived “${e.title}”.`);
         maybeFlagToast(e.id, 'Archived');
         await refresh();
@@ -11456,5 +11827,26 @@ window.addEventListener('keydown', (e) => {
     _ffOpenFilter();
   }
 });
+
+// PUNDO — Cmd+Z to undo the last destructive action (archive/delete).
+// Skipped when focus is inside a text input so native text undo still works.
+window.addEventListener('keydown', async (e) => {
+  if (!(e.metaKey || e.ctrlKey) || e.shiftKey || (e.key !== 'z' && e.key !== 'Z')) return;
+  const tag = document.activeElement ? document.activeElement.tagName : '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable) return;
+  const action = UndoStack.pop();
+  if (!action) return;
+  e.preventDefault();
+  await performUndo(action);
+});
+
+// PUNDO — global undo available pill in the bottom-right corner.
+// Appended to body (not #content) so route() clears don't remove it.
+const _undoPill = document.createElement('div');
+_undoPill.id = 'undo-pill';
+_undoPill.hidden = true;
+_undoPill.textContent = '⌘Z  Undo available';
+document.body.appendChild(_undoPill);
+UndoStack.onChange((count) => { _undoPill.hidden = count === 0; });
 
 route('Home');

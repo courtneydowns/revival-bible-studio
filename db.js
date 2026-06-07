@@ -2094,6 +2094,44 @@ const chats = {
     getDb().prepare('UPDATE chats SET archived_at = NULL WHERE id = ?').run(id);
     return chats.get(id);
   },
+  delete: (id) => {
+    if (!chats.get(id)) throw new Error('Chat not found.');
+    getDb().prepare('DELETE FROM chats WHERE id = ?').run(id);
+  },
+  listWithMeta: () =>
+    getDb()
+      .prepare(
+        `SELECT c.*,
+           m.content    AS last_message,
+           m.role       AS last_role,
+           m.created_at AS last_message_at
+         FROM chats c
+         LEFT JOIN chat_messages m ON m.id = (
+           SELECT id FROM chat_messages
+           WHERE chat_id = c.id AND is_archived = 0
+           ORDER BY id DESC LIMIT 1
+         )
+         WHERE c.archived_at IS NULL
+         ORDER BY COALESCE(m.created_at, c.created_at) DESC, c.id DESC`
+      )
+      .all(),
+  listArchivedWithMeta: () =>
+    getDb()
+      .prepare(
+        `SELECT c.*,
+           m.content    AS last_message,
+           m.role       AS last_role,
+           m.created_at AS last_message_at
+         FROM chats c
+         LEFT JOIN chat_messages m ON m.id = (
+           SELECT id FROM chat_messages
+           WHERE chat_id = c.id AND is_archived = 0
+           ORDER BY id DESC LIMIT 1
+         )
+         WHERE c.archived_at IS NOT NULL
+         ORDER BY c.archived_at DESC, c.id DESC`
+      )
+      .all(),
 };
 
 // --- Chat ↔ Source attachments repository ----------------------------------
