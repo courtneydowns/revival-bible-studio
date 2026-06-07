@@ -9686,7 +9686,16 @@ chatRoutePicker.addEventListener('click', async (e) => {
 
   chatRouteBtn.disabled = true;
   try {
-    await window.revival[apiName].create({ title, body });
+    if (apiName === 'canonProposals') {
+      await window.revival.canonProposals.createFromExtract({
+        title,
+        body,
+        source_kind: 'chat',
+        source_entry_id: activeChatId,
+      });
+    } else {
+      await window.revival[apiName].create({ title, body });
+    }
     showRoutedToast(destLabel);
   } finally {
     chatRouteBtn.disabled = false;

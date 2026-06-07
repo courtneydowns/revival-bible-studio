@@ -329,7 +329,7 @@ Polish pass after P46-C is complete. Scoped to print/PDF only.
 
 ## Chat routing ✅
 
-- **PCHAT-ROUTE** (implemented): "Route →" button in chat toolbar sends full non-archived transcript to Brainstorm, Research, Writing Lab, Decisions, or Unsorted as a new entry. Toast confirms with "Open →" jump link.
+- **PCHAT-ROUTE** (implemented): "Route →" button in chat toolbar sends full non-archived transcript to Brainstorm, Research, Writing Lab, Documents, Open Questions, Canon Review, Decisions, or Unsorted as a new entry. Canon Review routes as a proposal via `createFromExtract`. Toast confirms with "Open →" jump link.
 - PUI3 highlight-extract-route also wired to individual chat message bodies for selective routing.
 
 ## Chat search + export (deferred)

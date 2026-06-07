@@ -480,7 +480,7 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 ## Chat routing
 
 ### PCHAT-ROUTE — Chat: route full chat to workspace ✅
-- "Route →" button in chat toolbar opens a destination picker: Brainstorm, Research, Writing Lab, Decisions, Unsorted
+- "Route →" button in chat toolbar opens a destination picker: Brainstorm, Research, Writing Lab, Documents, Open Questions, Canon Review, Decisions, Unsorted
 - Creates a new entry in the target workspace with the full non-archived message transcript as the body, attributed to the source chat
 - Archived messages are excluded from the routed transcript (same as Claude context exclusion)
 - Route stays on current workspace; "Sent to X — Open →" toast confirms and provides one-click jump
