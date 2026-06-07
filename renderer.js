@@ -2227,6 +2227,13 @@ function renderCanonBiblePage(section) {
   csMeta.className = 'canon-search-meta';
   csResultWrap.appendChild(csMeta);
 
+  // PAI-WIRE — P42→P43: conflict check results area (populated on demand).
+  const csConflictArea = document.createElement('div');
+  csConflictArea.className = 'cr-conflict-area';
+  csConflictArea.style.cssText = 'margin-top:8px;';
+  csConflictArea.hidden = true;
+  csResultWrap.appendChild(csConflictArea);
+
   section.appendChild(canonSearchPanel);
 
   csInput.addEventListener('keydown', (e) => {
@@ -2247,6 +2254,8 @@ function renderCanonBiblePage(section) {
     csResult.className = 'canon-search-result cs-thinking';
     csResult.textContent = 'Searching canon…';
     csMeta.innerHTML = '';
+    csConflictArea.hidden = true;
+    csConflictArea.innerHTML = '';
 
     try {
       const selectedModel = chatModelSelect.value || 'claude-sonnet-4-6';
@@ -2263,6 +2272,8 @@ function renderCanonBiblePage(section) {
         csResultWrap.hidden = true;
         csResult.textContent = '';
         csMeta.innerHTML = '';
+        csConflictArea.hidden = true;
+        csConflictArea.innerHTML = '';
         csInput.value = '';
         csInput.focus();
       });
@@ -2270,6 +2281,71 @@ function renderCanonBiblePage(section) {
       countSpan.textContent = `Searched ${entryCount} canon entr${entryCount === 1 ? 'y' : 'ies'}`;
       csMeta.appendChild(countSpan);
       csMeta.appendChild(clearBtn);
+
+      // PAI-WIRE — P42→P43: conflict check button on canon search results.
+      const ccBtn = document.createElement('button');
+      ccBtn.type = 'button';
+      ccBtn.className = 'canon-search-clear';
+      ccBtn.textContent = 'Run conflict check';
+      ccBtn.title = 'Check this content against locked canon entries for direct contradictions';
+      csMeta.appendChild(ccBtn);
+
+      ccBtn.addEventListener('click', async () => {
+        ccBtn.disabled = true;
+        ccBtn.textContent = 'Checking…';
+        csConflictArea.hidden = false;
+        csConflictArea.innerHTML = '';
+        const checking = document.createElement('p');
+        checking.className = 'cr-conflict-status';
+        checking.textContent = 'Checking against locked canon entries…';
+        csConflictArea.appendChild(checking);
+        try {
+          const ccModel = chatModelSelect.value || 'claude-sonnet-4-6';
+          const ccRes = await window.revival.claude.conflictCheckText(
+            { title: query, body: result.text },
+            ccModel
+          );
+          csConflictArea.innerHTML = '';
+          const ccSum = document.createElement('p');
+          ccSum.className = 'cr-conflict-status';
+          if (ccRes.skipped) {
+            ccSum.textContent = 'No content to check.';
+          } else if (ccRes.checkedCount === 0) {
+            ccSum.textContent = 'No locked canon entries to check against.';
+          } else if (ccRes.flags.length === 0) {
+            ccSum.textContent =
+              `No contradictions found (checked ${ccRes.checkedCount} locked entr${ccRes.checkedCount === 1 ? 'y' : 'ies'}).`;
+          } else {
+            ccSum.textContent =
+              `${ccRes.flags.length} contradiction${ccRes.flags.length === 1 ? '' : 's'} flagged ` +
+              `(checked ${ccRes.checkedCount} locked entr${ccRes.checkedCount === 1 ? 'y' : 'ies'}):`;
+            csConflictArea.appendChild(ccSum);
+            for (const f of ccRes.flags) {
+              const flag = document.createElement('div');
+              flag.className = 'cr-conflict-flag';
+              const lbl = document.createElement('strong');
+              lbl.textContent = `${f.tcode} — ${f.title}`;
+              const rsn = document.createElement('p');
+              rsn.className = 'cr-conflict-reason';
+              rsn.textContent = f.reason;
+              flag.append(lbl, rsn);
+              csConflictArea.appendChild(flag);
+            }
+            return;
+          }
+          csConflictArea.appendChild(ccSum);
+        } catch (ccErr) {
+          csConflictArea.innerHTML = '';
+          const errEl = document.createElement('p');
+          errEl.className = 'cr-conflict-status';
+          const cleanErr = (ccErr.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+          errEl.textContent = `Error: ${cleanErr || 'Conflict check failed.'}`;
+          csConflictArea.appendChild(errEl);
+        } finally {
+          ccBtn.disabled = false;
+          ccBtn.textContent = 'Run conflict check';
+        }
+      });
     } catch (err) {
       const rawMsg = err.message || 'Canon search failed';
       const cleanMsg = rawMsg.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
@@ -6296,6 +6372,77 @@ function renderImportPage(section) {
           dupEl.style.cssText = 'margin-top:4px;color:var(--warn,#e8a043);';
           dupEl.textContent = `⚠ Possible duplicate of existing proposal: "${sugg.duplicate_of_title}"`;
           suggBanner.appendChild(dupEl);
+
+          // PAI-WIRE — P45→P43: conflict check button on duplicate-flagged import entries.
+          const ccImportBtn = document.createElement('button');
+          ccImportBtn.type = 'button';
+          ccImportBtn.className = 'btn-secondary';
+          ccImportBtn.style.cssText = 'font-size:0.8em;padding:2px 8px;margin-top:4px;';
+          ccImportBtn.textContent = 'Run conflict check';
+          ccImportBtn.title = 'Check this entry against locked canon for direct contradictions';
+          suggBanner.appendChild(ccImportBtn);
+          const ccImportResult = document.createElement('div');
+          ccImportResult.className = 'cr-conflict-area';
+          ccImportResult.style.cssText = 'margin-top:4px;font-size:0.85em;';
+          ccImportResult.hidden = true;
+          suggBanner.appendChild(ccImportResult);
+
+          ccImportBtn.addEventListener('click', async () => {
+            ccImportBtn.disabled = true;
+            ccImportBtn.textContent = 'Checking…';
+            ccImportResult.hidden = false;
+            ccImportResult.innerHTML = '';
+            const checking = document.createElement('p');
+            checking.className = 'cr-conflict-status';
+            checking.textContent = 'Checking against locked canon entries…';
+            ccImportResult.appendChild(checking);
+            try {
+              const ccModel = (typeof chatModelSelect !== 'undefined' && chatModelSelect.value)
+                ? chatModelSelect.value : 'claude-sonnet-4-6';
+              const ccRes = await window.revival.claude.conflictCheckText(
+                { title: entry.title, body: entry.body || '' },
+                ccModel
+              );
+              ccImportResult.innerHTML = '';
+              const ccSum = document.createElement('p');
+              ccSum.className = 'cr-conflict-status';
+              if (ccRes.skipped) {
+                ccSum.textContent = 'No content to check.';
+              } else if (ccRes.checkedCount === 0) {
+                ccSum.textContent = 'No locked canon entries to check against.';
+              } else if (ccRes.flags.length === 0) {
+                ccSum.textContent =
+                  `No contradictions (checked ${ccRes.checkedCount} locked entr${ccRes.checkedCount === 1 ? 'y' : 'ies'}).`;
+              } else {
+                ccSum.textContent =
+                  `${ccRes.flags.length} contradiction${ccRes.flags.length === 1 ? '' : 's'} flagged:`;
+                ccImportResult.appendChild(ccSum);
+                for (const f of ccRes.flags) {
+                  const fEl = document.createElement('div');
+                  fEl.className = 'cr-conflict-flag';
+                  const lbl = document.createElement('strong');
+                  lbl.textContent = `${f.tcode} — ${f.title}`;
+                  const rsn = document.createElement('p');
+                  rsn.className = 'cr-conflict-reason';
+                  rsn.textContent = f.reason;
+                  fEl.append(lbl, rsn);
+                  ccImportResult.appendChild(fEl);
+                }
+                return;
+              }
+              ccImportResult.appendChild(ccSum);
+            } catch (ccErr) {
+              ccImportResult.innerHTML = '';
+              const errEl = document.createElement('p');
+              errEl.className = 'cr-conflict-status';
+              const cleanErr = (ccErr.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+              errEl.textContent = `Error: ${cleanErr || 'Check failed.'}`;
+              ccImportResult.appendChild(errEl);
+            } finally {
+              ccImportBtn.disabled = false;
+              ccImportBtn.textContent = 'Run conflict check';
+            }
+          });
         }
 
         acceptBtn.addEventListener('click', () => {
@@ -6320,6 +6467,77 @@ function renderImportPage(section) {
         dupEl.style.cssText = 'margin-top:4px;color:var(--warn,#e8a043);font-size:0.85em;';
         dupEl.textContent = `⚠ Possible duplicate of existing proposal: "${entry.aiSuggestion.duplicate_of_title}"`;
         card.appendChild(dupEl);
+
+        // PAI-WIRE — P45→P43: conflict check button (persistent, post-accept/skip).
+        const ccPersistBtn = document.createElement('button');
+        ccPersistBtn.type = 'button';
+        ccPersistBtn.className = 'btn-secondary';
+        ccPersistBtn.style.cssText = 'font-size:0.8em;padding:2px 8px;margin-top:4px;';
+        ccPersistBtn.textContent = 'Run conflict check';
+        ccPersistBtn.title = 'Check this entry against locked canon for direct contradictions';
+        card.appendChild(ccPersistBtn);
+        const ccPersistResult = document.createElement('div');
+        ccPersistResult.className = 'cr-conflict-area';
+        ccPersistResult.style.cssText = 'margin-top:4px;font-size:0.85em;';
+        ccPersistResult.hidden = true;
+        card.appendChild(ccPersistResult);
+
+        ccPersistBtn.addEventListener('click', async () => {
+          ccPersistBtn.disabled = true;
+          ccPersistBtn.textContent = 'Checking…';
+          ccPersistResult.hidden = false;
+          ccPersistResult.innerHTML = '';
+          const checking = document.createElement('p');
+          checking.className = 'cr-conflict-status';
+          checking.textContent = 'Checking against locked canon entries…';
+          ccPersistResult.appendChild(checking);
+          try {
+            const ccModel = (typeof chatModelSelect !== 'undefined' && chatModelSelect.value)
+              ? chatModelSelect.value : 'claude-sonnet-4-6';
+            const ccRes = await window.revival.claude.conflictCheckText(
+              { title: entry.title, body: entry.body || '' },
+              ccModel
+            );
+            ccPersistResult.innerHTML = '';
+            const ccSum = document.createElement('p');
+            ccSum.className = 'cr-conflict-status';
+            if (ccRes.skipped) {
+              ccSum.textContent = 'No content to check.';
+            } else if (ccRes.checkedCount === 0) {
+              ccSum.textContent = 'No locked canon entries to check against.';
+            } else if (ccRes.flags.length === 0) {
+              ccSum.textContent =
+                `No contradictions (checked ${ccRes.checkedCount} locked entr${ccRes.checkedCount === 1 ? 'y' : 'ies'}).`;
+            } else {
+              ccSum.textContent =
+                `${ccRes.flags.length} contradiction${ccRes.flags.length === 1 ? '' : 's'} flagged:`;
+              ccPersistResult.appendChild(ccSum);
+              for (const f of ccRes.flags) {
+                const fEl = document.createElement('div');
+                fEl.className = 'cr-conflict-flag';
+                const lbl = document.createElement('strong');
+                lbl.textContent = `${f.tcode} — ${f.title}`;
+                const rsn = document.createElement('p');
+                rsn.className = 'cr-conflict-reason';
+                rsn.textContent = f.reason;
+                fEl.append(lbl, rsn);
+                ccPersistResult.appendChild(fEl);
+              }
+              return;
+            }
+            ccPersistResult.appendChild(ccSum);
+          } catch (ccErr) {
+            ccPersistResult.innerHTML = '';
+            const errEl = document.createElement('p');
+            errEl.className = 'cr-conflict-status';
+            const cleanErr = (ccErr.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+            errEl.textContent = `Error: ${cleanErr || 'Check failed.'}`;
+            ccPersistResult.appendChild(errEl);
+          } finally {
+            ccPersistBtn.disabled = false;
+            ccPersistBtn.textContent = 'Run conflict check';
+          }
+        });
       }
 
       return card;
@@ -7270,7 +7488,7 @@ function renderWritingLabPage(section) {
         );
 
         thinking.remove();
-        appendMsg('assistant', result.text);
+        const assistantMsg = appendMsg('assistant', result.text);
         draftThread.push({ role: 'assistant', content: result.text });
 
         if (result.proposalsCreated && result.proposalsCreated.length > 0) {
@@ -7280,6 +7498,83 @@ function renderWritingLabPage(section) {
             'Sent to Canon Review: ' + result.proposalsCreated.map((p) => p.title).join(', ');
           aThread.appendChild(notice);
         }
+
+        // PAI-WIRE — P44→P41: manual "Propose to Canon Review" action on each
+        // assistant message. User clicks, confirms title/body, then stages.
+        const proposeRow = document.createElement('div');
+        proposeRow.style.cssText = 'margin-top:4px;';
+        const proposeBtn = document.createElement('button');
+        proposeBtn.type = 'button';
+        proposeBtn.className = 'btn-secondary';
+        proposeBtn.style.cssText = 'font-size:11px;padding:2px 8px;';
+        proposeBtn.textContent = 'Propose to Canon Review';
+        proposeBtn.title = 'Stage a canon proposal from this response — you confirm before it is queued';
+        proposeRow.appendChild(proposeBtn);
+        assistantMsg.appendChild(proposeRow);
+
+        proposeBtn.addEventListener('click', () => {
+          proposeBtn.hidden = true;
+          const proposeForm = document.createElement('div');
+          proposeForm.style.cssText =
+            'margin-top:6px;padding:6px;background:rgba(74,158,255,0.07);border-radius:4px;';
+          const pfTitle = document.createElement('input');
+          pfTitle.type = 'text';
+          pfTitle.style.cssText =
+            'width:100%;box-sizing:border-box;margin-bottom:4px;padding:4px 6px;' +
+            'background:var(--bg,#1a1a1a);color:var(--text,#ddd);' +
+            'border:1px solid var(--border,#444);border-radius:3px;font-size:12px;';
+          pfTitle.placeholder = 'Proposal title…';
+          pfTitle.value = `From Writing Lab: ${(titleInput.value || 'Untitled').slice(0, 60)}`;
+          const pfNote = document.createElement('div');
+          pfNote.style.cssText = 'font-size:11px;opacity:0.6;margin-bottom:4px;';
+          pfNote.textContent = 'Message text will be the proposal body. Edit title before staging.';
+          const pfBtns = document.createElement('div');
+          pfBtns.style.cssText = 'display:flex;gap:6px;align-items:center;';
+          const pfConfirm = document.createElement('button');
+          pfConfirm.type = 'button';
+          pfConfirm.className = 'btn-primary';
+          pfConfirm.style.fontSize = '11px';
+          pfConfirm.textContent = 'Stage in Canon Review';
+          const pfCancel = document.createElement('button');
+          pfCancel.type = 'button';
+          pfCancel.className = 'btn-secondary';
+          pfCancel.style.fontSize = '11px';
+          pfCancel.textContent = 'Cancel';
+          pfBtns.append(pfConfirm, pfCancel);
+          proposeForm.append(pfTitle, pfNote, pfBtns);
+          assistantMsg.appendChild(proposeForm);
+
+          pfCancel.addEventListener('click', () => {
+            proposeForm.remove();
+            proposeBtn.hidden = false;
+          });
+
+          pfConfirm.addEventListener('click', async () => {
+            pfConfirm.disabled = true;
+            pfConfirm.textContent = 'Staging…';
+            try {
+              await window.revival.canonProposals.createFromAI({
+                entry_type: null,
+                title: pfTitle.value.trim() || 'Canon Proposal',
+                body: result.text,
+                proposer_note: `From Writing Lab draft assistant — draft: "${titleInput.value || 'Untitled'}"`,
+              });
+              proposeForm.innerHTML = '';
+              const doneEl = document.createElement('span');
+              doneEl.style.cssText = 'font-size:11px;color:var(--accent,#4a9eff);';
+              doneEl.textContent = 'Staged in Canon Review.';
+              proposeForm.appendChild(doneEl);
+            } catch (propErr) {
+              pfConfirm.disabled = false;
+              pfConfirm.textContent = 'Stage in Canon Review';
+              const errMsg = (propErr.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+              const errEl = document.createElement('span');
+              errEl.style.cssText = 'font-size:11px;color:var(--error,#f87171);margin-left:4px;';
+              errEl.textContent = errMsg || 'Failed to stage.';
+              pfBtns.appendChild(errEl);
+            }
+          });
+        });
       } catch (err) {
         thinking.remove();
         const raw = err.message || 'Request failed';
@@ -8362,7 +8657,85 @@ function mountFlanaganFilter(container, item, callbacks, ctx) {
         });
         routeBar.appendChild(routeBtn);
       }
+      // PAI-WIRE — P46→P41: "→ Canon Review" button with inline confirm form.
+      const canonProposeBtn = document.createElement('button');
+      canonProposeBtn.type = 'button';
+      canonProposeBtn.className = 'btn-secondary ff-route-btn';
+      canonProposeBtn.textContent = '→ Canon Review';
+      canonProposeBtn.title = 'Propose a canon entry from this analysis (you confirm before it is staged)';
+      routeBar.appendChild(canonProposeBtn);
+
       resultArea.appendChild(routeBar);
+
+      const canonProposeForm = document.createElement('div');
+      canonProposeForm.hidden = true;
+      canonProposeForm.style.cssText =
+        'margin-top:8px;padding:8px;background:rgba(74,158,255,0.07);border-radius:4px;';
+      const cpTitle = document.createElement('input');
+      cpTitle.type = 'text';
+      cpTitle.style.cssText =
+        'width:100%;box-sizing:border-box;margin-bottom:4px;padding:4px 6px;' +
+        'background:var(--bg,#1a1a1a);color:var(--text,#ddd);' +
+        'border:1px solid var(--border,#444);border-radius:3px;font-size:12px;';
+      cpTitle.placeholder = 'Proposal title…';
+      cpTitle.value = item.title ? `"${item.title.slice(0, 60)}" — Canon Proposal` : 'Canon Proposal';
+      const cpNote = document.createElement('div');
+      cpNote.style.cssText = 'font-size:11px;opacity:0.6;margin-bottom:6px;';
+      cpNote.textContent = 'Analysis summary and breakdown will be included as supporting context.';
+      const cpBtns = document.createElement('div');
+      cpBtns.style.cssText = 'display:flex;gap:6px;align-items:center;';
+      const cpConfirm = document.createElement('button');
+      cpConfirm.type = 'button';
+      cpConfirm.className = 'btn-primary';
+      cpConfirm.style.fontSize = '12px';
+      cpConfirm.textContent = 'Stage in Canon Review';
+      const cpCancel = document.createElement('button');
+      cpCancel.type = 'button';
+      cpCancel.className = 'btn-secondary';
+      cpCancel.style.fontSize = '12px';
+      cpCancel.textContent = 'Cancel';
+      cpBtns.append(cpConfirm, cpCancel);
+      canonProposeForm.append(cpTitle, cpNote, cpBtns);
+      resultArea.appendChild(canonProposeForm);
+
+      canonProposeBtn.addEventListener('click', () => {
+        canonProposeForm.hidden = false;
+        cpTitle.focus();
+      });
+      cpCancel.addEventListener('click', () => {
+        canonProposeForm.hidden = true;
+      });
+      cpConfirm.addEventListener('click', async () => {
+        cpConfirm.disabled = true;
+        cpConfirm.textContent = 'Staging…';
+        try {
+          const propTitle = cpTitle.value.trim() || 'Canon Proposal';
+          const propBody = _ffBuildRoutedBody(item, res, mode, workspaceName);
+          await window.revival.canonProposals.createFromAI({
+            entry_type: null,
+            title: propTitle,
+            body: propBody,
+            proposer_note: `Flanagan Filter — ${FF_MODE_LABELS[mode] || mode} on "${item.title || '(untitled)'}" in ${workspaceName}`,
+          });
+          canonProposeForm.innerHTML = '';
+          const doneEl = document.createElement('span');
+          doneEl.style.cssText = 'font-size:12px;color:var(--accent,#4a9eff);';
+          doneEl.textContent = 'Staged in Canon Review.';
+          canonProposeForm.appendChild(doneEl);
+          showRoutedToast('Canon Review');
+          canonProposeBtn.textContent = '✓ Sent to Canon Review';
+          canonProposeBtn.disabled = true;
+        } catch (cpErr) {
+          cpConfirm.disabled = false;
+          cpConfirm.textContent = 'Stage in Canon Review';
+          const errMsg = (cpErr.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+          const errEl = document.createElement('span');
+          errEl.style.cssText = 'font-size:11px;color:var(--error,#f87171);margin-left:6px;';
+          errEl.textContent = errMsg || 'Failed to stage.';
+          cpBtns.appendChild(errEl);
+        }
+      });
+
       resultArea.appendChild(tagSuggestPanel);
     } catch (err) {
       resultArea.innerHTML = '';

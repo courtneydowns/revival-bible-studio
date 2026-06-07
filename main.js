@@ -710,6 +710,83 @@ function registerIpc() {
     return { flags: enriched, checkedCount: locked.length };
   });
 
+  // PAI-WIRE — Cross-AI conflict check on raw text (P42→P43, P45→P43).
+  // Same logic as claude:conflictCheck but takes a {title, body} payload
+  // directly instead of fetching a proposal from the DB.
+  ipcMain.handle('claude:conflictCheckText', async (_e, payload, model) => {
+    const apiKey = db.settings.getClaudeApiKey();
+    if (!apiKey) throw new Error('No Claude API key configured. Add one in Settings.');
+
+    const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
+    const { title = '(untitled)', body = '' } = payload || {};
+    if (!title && !body) return { flags: [], checkedCount: 0, skipped: true };
+
+    const allEntries = db.canon.list();
+    const locked = allEntries.filter((e) => e.locked);
+    if (locked.length === 0) return { flags: [], checkedCount: 0 };
+
+    const blocks = locked.map((e) => {
+      const primaryId = (e.legacy_ids || []).find((l) => l.isPrimary);
+      const tcode = primaryId ? primaryId.code : `#${e.id}`;
+      return `[${tcode}] ${e.entry_type.toUpperCase()}: ${e.title}\n${e.body || ''}`;
+    });
+
+    const systemPrompt =
+      'You are a continuity analyst for a TV writers\' room. ' +
+      'Your job is to detect DIRECT CONTRADICTIONS between the provided content ' +
+      'and the locked canon entries. ' +
+      'A contradiction means the content explicitly states something that conflicts with ' +
+      'a locked fact (e.g. different dates, mutually exclusive states, impossible sequences). ' +
+      'Do NOT flag thematic tension, ambiguity, gaps, or things that could coexist. ' +
+      'Only flag clear, direct factual contradictions.\n\n' +
+      'Respond with a JSON object in this exact shape — no markdown, no explanation outside JSON:\n' +
+      '{\n' +
+      '  "flags": [\n' +
+      '    { "entryId": <number or null>, "tcode": "<T-code or #id string>", "title": "<entry title>", "reason": "<one sentence describing the contradiction>" }\n' +
+      '  ]\n' +
+      '}\n' +
+      'If there are no contradictions, return { "flags": [] }.\n\n' +
+      '## Locked Canon Entries\n\n' +
+      blocks.join('\n\n---\n\n');
+
+    const userMessage = `## Content to Check\n\nTitle: ${title}\n\n${body}`;
+
+    const data = await callClaudeAPI(apiKey, {
+      model: safeModel,
+      max_tokens: 2048,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    });
+
+    const textBlock = (data.content || []).find((b) => b.type === 'text');
+    if (!textBlock) throw new Error('Unexpected response shape from Claude API.');
+
+    let parsed;
+    try {
+      const raw = textBlock.text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error('Claude returned malformed JSON. Try again.');
+    }
+
+    const flags = Array.isArray(parsed.flags) ? parsed.flags : [];
+    const enriched = flags.map((f) => {
+      const match = locked.find((e) => {
+        const primaryId = (e.legacy_ids || []).find((l) => l.isPrimary);
+        const tcode = primaryId ? primaryId.code : `#${e.id}`;
+        return tcode === f.tcode || e.title === f.title;
+      });
+      return {
+        entryId: match ? match.id : (f.entryId || null),
+        tcode: f.tcode || (match ? `#${match.id}` : '?'),
+        title: f.title || (match ? match.title : '?'),
+        reason: f.reason || '',
+      };
+    });
+
+    return { flags: enriched, checkedCount: locked.length };
+  });
+
   // P44 — Writing Lab draft assistant. Injects the current draft and any
   // attached source materials into the system prompt. Multi-turn; caller
   // maintains message history. propose_canon_entry tool is available.

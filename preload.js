@@ -146,6 +146,9 @@ contextBridge.exposeInMainWorld('revival', {
     // P43 — on-demand conflict check: proposal vs locked canon entries.
     conflictCheck: (proposalId, model) =>
       ipcRenderer.invoke('claude:conflictCheck', proposalId, model),
+    // PAI-WIRE — cross-AI conflict check on raw text (P42→P43, P45→P43).
+    conflictCheckText: (payload, model) =>
+      ipcRenderer.invoke('claude:conflictCheckText', payload, model),
     // P44 — Writing Lab draft assistant.
     draftAssist: (draftTitle, draftBody, sources, messages, model) =>
       ipcRenderer.invoke('claude:draftAssist', draftTitle, draftBody, sources, messages, model),
