@@ -1646,6 +1646,41 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '045_chat_entity_attachments',
+    up(db) {
+      // PCHAT-ATTACH — Canon Bible entries, Characters, and Episodes now attachable to Chat.
+      // Same keep-active / next-message-only semantics as source_material / documents.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_canon_attachments (
+          chat_id        INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+          canon_entry_id INTEGER NOT NULL REFERENCES canon_entries(id) ON DELETE CASCADE,
+          created_at     TEXT NOT NULL,
+          PRIMARY KEY (chat_id, canon_entry_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_chat_canon_attachments_chat
+          ON chat_canon_attachments(chat_id);
+
+        CREATE TABLE IF NOT EXISTS chat_characters_attachments (
+          chat_id      INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+          character_id INTEGER NOT NULL REFERENCES characters_workspace(id) ON DELETE CASCADE,
+          created_at   TEXT NOT NULL,
+          PRIMARY KEY (chat_id, character_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_chat_characters_attachments_chat
+          ON chat_characters_attachments(chat_id);
+
+        CREATE TABLE IF NOT EXISTS chat_episodes_attachments (
+          chat_id    INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+          episode_id INTEGER NOT NULL REFERENCES episodes_workspace(id) ON DELETE CASCADE,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY (chat_id, episode_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_chat_episodes_attachments_chat
+          ON chat_episodes_attachments(chat_id);
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -2138,6 +2173,110 @@ const chatDocuments = {
       .prepare('DELETE FROM chat_document_attachments WHERE chat_id = ? AND document_id = ?')
       .run(chatId, documentId);
     return chatDocuments.list(chatId);
+  },
+};
+
+// --- Chat canon attachments (PCHAT-ATTACH) ------------------------------------
+// Canon Bible entries attachable to Chat. keep-active mode persisted here;
+// next-message-only lives in renderer memory only (same pattern as chatSources).
+const chatCanon = {
+  list: (chatId) =>
+    getDb()
+      .prepare(
+        `SELECT ce.id, ce.title, ce.body, ce.entry_type, ce.locked,
+                cca.created_at AS attached_at
+           FROM chat_canon_attachments cca
+           JOIN canon_entries ce ON ce.id = cca.canon_entry_id
+          WHERE cca.chat_id = ?
+          ORDER BY cca.created_at ASC, ce.id ASC`
+      )
+      .all(chatId),
+  attach: (chatId, canonEntryId) => {
+    if (!chats.get(chatId)) throw new Error('Chat not found.');
+    const entry = getDb()
+      .prepare('SELECT id FROM canon_entries WHERE id = ?')
+      .get(canonEntryId);
+    if (!entry) throw new Error('Canon entry not found.');
+    getDb()
+      .prepare(
+        'INSERT OR IGNORE INTO chat_canon_attachments (chat_id, canon_entry_id, created_at) VALUES (?, ?, ?)'
+      )
+      .run(chatId, canonEntryId, new Date().toISOString());
+    return chatCanon.list(chatId);
+  },
+  detach: (chatId, canonEntryId) => {
+    getDb()
+      .prepare('DELETE FROM chat_canon_attachments WHERE chat_id = ? AND canon_entry_id = ?')
+      .run(chatId, canonEntryId);
+    return chatCanon.list(chatId);
+  },
+};
+
+// --- Chat characters attachments (PCHAT-ATTACH) -------------------------------
+const chatCharacters = {
+  list: (chatId) =>
+    getDb()
+      .prepare(
+        `SELECT cw.id, cw.title, cw.body, cw.archived_at,
+                cca.created_at AS attached_at
+           FROM chat_characters_attachments cca
+           JOIN characters_workspace cw ON cw.id = cca.character_id
+          WHERE cca.chat_id = ?
+          ORDER BY cca.created_at ASC, cw.id ASC`
+      )
+      .all(chatId),
+  attach: (chatId, characterId) => {
+    if (!chats.get(chatId)) throw new Error('Chat not found.');
+    const char = getDb()
+      .prepare('SELECT id FROM characters_workspace WHERE id = ?')
+      .get(characterId);
+    if (!char) throw new Error('Character not found.');
+    getDb()
+      .prepare(
+        'INSERT OR IGNORE INTO chat_characters_attachments (chat_id, character_id, created_at) VALUES (?, ?, ?)'
+      )
+      .run(chatId, characterId, new Date().toISOString());
+    return chatCharacters.list(chatId);
+  },
+  detach: (chatId, characterId) => {
+    getDb()
+      .prepare('DELETE FROM chat_characters_attachments WHERE chat_id = ? AND character_id = ?')
+      .run(chatId, characterId);
+    return chatCharacters.list(chatId);
+  },
+};
+
+// --- Chat episodes attachments (PCHAT-ATTACH) ---------------------------------
+const chatEpisodes = {
+  list: (chatId) =>
+    getDb()
+      .prepare(
+        `SELECT ew.id, ew.title, ew.body, ew.archived_at,
+                cea.created_at AS attached_at
+           FROM chat_episodes_attachments cea
+           JOIN episodes_workspace ew ON ew.id = cea.episode_id
+          WHERE cea.chat_id = ?
+          ORDER BY cea.created_at ASC, ew.id ASC`
+      )
+      .all(chatId),
+  attach: (chatId, episodeId) => {
+    if (!chats.get(chatId)) throw new Error('Chat not found.');
+    const ep = getDb()
+      .prepare('SELECT id FROM episodes_workspace WHERE id = ?')
+      .get(episodeId);
+    if (!ep) throw new Error('Episode not found.');
+    getDb()
+      .prepare(
+        'INSERT OR IGNORE INTO chat_episodes_attachments (chat_id, episode_id, created_at) VALUES (?, ?, ?)'
+      )
+      .run(chatId, episodeId, new Date().toISOString());
+    return chatEpisodes.list(chatId);
+  },
+  detach: (chatId, episodeId) => {
+    getDb()
+      .prepare('DELETE FROM chat_episodes_attachments WHERE chat_id = ? AND episode_id = ?')
+      .run(chatId, episodeId);
+    return chatEpisodes.list(chatId);
   },
 };
 
@@ -5028,6 +5167,9 @@ module.exports = {
   chats,
   chatSources,
   chatDocuments,
+  chatCanon,
+  chatCharacters,
+  chatEpisodes,
   chatMessages,
   flanaganAnalyses,
   listUnsorted,

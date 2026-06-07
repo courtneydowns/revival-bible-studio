@@ -176,6 +176,27 @@ function registerIpc() {
   ipcMain.handle('chatDocuments:detach', (_event, chatId, documentId) =>
     db.chatDocuments.detach(chatId, documentId)
   );
+  ipcMain.handle('chatCanon:list', (_event, chatId) => db.chatCanon.list(chatId));
+  ipcMain.handle('chatCanon:attach', (_event, chatId, canonEntryId) =>
+    db.chatCanon.attach(chatId, canonEntryId)
+  );
+  ipcMain.handle('chatCanon:detach', (_event, chatId, canonEntryId) =>
+    db.chatCanon.detach(chatId, canonEntryId)
+  );
+  ipcMain.handle('chatCharacters:list', (_event, chatId) => db.chatCharacters.list(chatId));
+  ipcMain.handle('chatCharacters:attach', (_event, chatId, characterId) =>
+    db.chatCharacters.attach(chatId, characterId)
+  );
+  ipcMain.handle('chatCharacters:detach', (_event, chatId, characterId) =>
+    db.chatCharacters.detach(chatId, characterId)
+  );
+  ipcMain.handle('chatEpisodes:list', (_event, chatId) => db.chatEpisodes.list(chatId));
+  ipcMain.handle('chatEpisodes:attach', (_event, chatId, episodeId) =>
+    db.chatEpisodes.attach(chatId, episodeId)
+  );
+  ipcMain.handle('chatEpisodes:detach', (_event, chatId, episodeId) =>
+    db.chatEpisodes.detach(chatId, episodeId)
+  );
 
   // Panic Export (P21): always saves to a fixed, predictable location —
   // ~/Documents/revival-bible-studio/panic_exports/<timestamp>/ — so the user

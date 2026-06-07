@@ -9365,6 +9365,18 @@ let activeDocuments = [];
 const nextSourcesByChat = new Map();
 // "Next message only" documents: same pattern as nextSourcesByChat but for Documents.
 const nextDocsByChat = new Map();
+// Keep-active Canon Bible entries for the current chat (persisted; loaded from SQLite).
+let activeCanonEntries = [];
+// Keep-active Characters entries for the current chat (persisted; loaded from SQLite).
+let activeCharEntries = [];
+// Keep-active Episodes entries for the current chat (persisted; loaded from SQLite).
+let activeEpisodeEntries = [];
+// "Next message only" Canon entries: ephemeral, per-chat.
+const nextCanonByChat = new Map();
+// "Next message only" Characters entries: ephemeral, per-chat.
+const nextCharsByChat = new Map();
+// "Next message only" Episodes entries: ephemeral, per-chat.
+const nextEpisodesByChat = new Map();
 // P40 — in-memory message history for the active chat; loaded from DB on switch.
 let chatMessageHistory = [];
 let _sendInProgress = false;
@@ -9590,6 +9602,33 @@ async function buildSystemPrompt() {
     );
     parts.push(`## Documents\n\n${sections.join('\n\n---\n\n')}`);
   }
+  const keptCanon = activeCanonEntries;
+  const nextCanon = activeChatId != null ? nextCanonFor(activeChatId) : [];
+  const allCanon = [...keptCanon, ...nextCanon];
+  const keptChars = activeCharEntries;
+  const nextChars = activeChatId != null ? nextCharsFor(activeChatId) : [];
+  const allChars = [...keptChars, ...nextChars];
+  const keptEps = activeEpisodeEntries;
+  const nextEps = activeChatId != null ? nextEpisodesFor(activeChatId) : [];
+  const allEps = [...keptEps, ...nextEps];
+  if (allCanon.length) {
+    const sections = allCanon.map(
+      (c) => `### ${c.title} [${c.entry_type}${c.locked ? ' · locked' : ''}]\n\n${c.body || '(no content)'}`
+    );
+    parts.push(`## Canon Bible\n\n${sections.join('\n\n---\n\n')}`);
+  }
+  if (allChars.length) {
+    const sections = allChars.map(
+      (c) => `### ${c.title}\n\n${c.body || '(no content)'}`
+    );
+    parts.push(`## Characters\n\n${sections.join('\n\n---\n\n')}`);
+  }
+  if (allEps.length) {
+    const sections = allEps.map(
+      (ep) => `### ${ep.title}\n\n${ep.body || '(no content)'}`
+    );
+    parts.push(`## Episodes\n\n${sections.join('\n\n---\n\n')}`);
+  }
   return parts.join('\n\n');
 }
 
@@ -9671,18 +9710,34 @@ function nextSourcesFor(chatId) {
 function nextDocsFor(chatId) {
   return nextDocsByChat.get(chatId) || [];
 }
+function nextCanonFor(chatId) {
+  return nextCanonByChat.get(chatId) || [];
+}
+function nextCharsFor(chatId) {
+  return nextCharsByChat.get(chatId) || [];
+}
+function nextEpisodesFor(chatId) {
+  return nextEpisodesByChat.get(chatId) || [];
+}
 
-// mode: 'keep' | 'next' (Source Material) or 'keepDoc' | 'nextDoc' (Documents).
+// mode: 'keep'|'next' (Source Material), 'keepDoc'|'nextDoc' (Documents),
+//       'keepCanon'|'nextCanon' (Canon Bible), 'keepChar'|'nextChar' (Characters),
+//       'keepEp'|'nextEp' (Episodes).
 function buildSourceChip(src, mode) {
-  const isNext = mode === 'next' || mode === 'nextDoc';
-  const isDoc = mode === 'keepDoc' || mode === 'nextDoc';
+  const isNext = ['next', 'nextDoc', 'nextCanon', 'nextChar', 'nextEp'].includes(mode);
+  const typeLabel = {
+    keepDoc: 'Doc',    nextDoc: 'Doc',
+    keepCanon: 'Canon', nextCanon: 'Canon',
+    keepChar: 'Character', nextChar: 'Character',
+    keepEp: 'Episode', nextEp: 'Episode',
+  }[mode] || null;
   const chip = document.createElement('span');
   chip.className = isNext ? 'source-chip chip-next' : 'source-chip';
 
-  if (isDoc) {
+  if (typeLabel) {
     const typeTag = document.createElement('span');
     typeTag.className = 'chip-type';
-    typeTag.textContent = 'Doc';
+    typeTag.textContent = typeLabel;
     chip.appendChild(typeTag);
   }
 
@@ -9692,7 +9747,7 @@ function buildSourceChip(src, mode) {
   chip.appendChild(title);
 
   // A keep-active attachment archived after attaching stays active but is flagged.
-  if ((mode === 'keep' || mode === 'keepDoc') && src.archived_at) {
+  if (['keep', 'keepDoc', 'keepChar', 'keepEp'].includes(mode) && src.archived_at) {
     const note = document.createElement('span');
     note.className = 'chip-archived';
     note.textContent = '(archived)';
@@ -9737,8 +9792,14 @@ function renderActiveSources() {
 
   const nextSources = nextSourcesFor(activeChatId);
   const nextDocs = nextDocsFor(activeChatId);
+  const nextCanon = nextCanonFor(activeChatId);
+  const nextChars = nextCharsFor(activeChatId);
+  const nextEps = nextEpisodesFor(activeChatId);
   if (activeSources.length === 0 && nextSources.length === 0 &&
-      activeDocuments.length === 0 && nextDocs.length === 0) {
+      activeDocuments.length === 0 && nextDocs.length === 0 &&
+      activeCanonEntries.length === 0 && nextCanon.length === 0 &&
+      activeCharEntries.length === 0 && nextChars.length === 0 &&
+      activeEpisodeEntries.length === 0 && nextEps.length === 0) {
     const p = document.createElement('p');
     p.className = 'chat-sources-empty';
     p.textContent =
@@ -9758,6 +9819,24 @@ function renderActiveSources() {
   }
   for (const doc of nextDocs) {
     chatSourcesList.appendChild(buildSourceChip(doc, 'nextDoc'));
+  }
+  for (const entry of activeCanonEntries) {
+    chatSourcesList.appendChild(buildSourceChip(entry, 'keepCanon'));
+  }
+  for (const entry of nextCanon) {
+    chatSourcesList.appendChild(buildSourceChip(entry, 'nextCanon'));
+  }
+  for (const char of activeCharEntries) {
+    chatSourcesList.appendChild(buildSourceChip(char, 'keepChar'));
+  }
+  for (const char of nextChars) {
+    chatSourcesList.appendChild(buildSourceChip(char, 'nextChar'));
+  }
+  for (const ep of activeEpisodeEntries) {
+    chatSourcesList.appendChild(buildSourceChip(ep, 'keepEp'));
+  }
+  for (const ep of nextEps) {
+    chatSourcesList.appendChild(buildSourceChip(ep, 'nextEp'));
   }
 }
 
@@ -9781,6 +9860,39 @@ async function removeSource(sourceId, mode) {
     renderActiveSources();
     return;
   }
+  if (mode === 'keepCanon') {
+    activeCanonEntries = await window.revival.chatCanon.detach(activeChatId, sourceId);
+    renderActiveSources();
+    return;
+  }
+  if (mode === 'nextCanon') {
+    const list = nextCanonFor(activeChatId).filter((e) => e.id !== sourceId);
+    nextCanonByChat.set(activeChatId, list);
+    renderActiveSources();
+    return;
+  }
+  if (mode === 'keepChar') {
+    activeCharEntries = await window.revival.chatCharacters.detach(activeChatId, sourceId);
+    renderActiveSources();
+    return;
+  }
+  if (mode === 'nextChar') {
+    const list = nextCharsFor(activeChatId).filter((c) => c.id !== sourceId);
+    nextCharsByChat.set(activeChatId, list);
+    renderActiveSources();
+    return;
+  }
+  if (mode === 'keepEp') {
+    activeEpisodeEntries = await window.revival.chatEpisodes.detach(activeChatId, sourceId);
+    renderActiveSources();
+    return;
+  }
+  if (mode === 'nextEp') {
+    const list = nextEpisodesFor(activeChatId).filter((e) => e.id !== sourceId);
+    nextEpisodesByChat.set(activeChatId, list);
+    renderActiveSources();
+    return;
+  }
   // mode === 'next'
   const list = nextSourcesFor(activeChatId).filter((s) => s.id !== sourceId);
   nextSourcesByChat.set(activeChatId, list);
@@ -9791,13 +9903,20 @@ async function loadActiveSources() {
   if (activeChatId == null) {
     activeSources = [];
     activeDocuments = [];
+    activeCanonEntries = [];
+    activeCharEntries = [];
+    activeEpisodeEntries = [];
     renderActiveSources();
     return;
   }
-  [activeSources, activeDocuments] = await Promise.all([
-    window.revival.chatSources.list(activeChatId),
-    window.revival.chatDocuments.list(activeChatId),
-  ]);
+  [activeSources, activeDocuments, activeCanonEntries, activeCharEntries, activeEpisodeEntries] =
+    await Promise.all([
+      window.revival.chatSources.list(activeChatId),
+      window.revival.chatDocuments.list(activeChatId),
+      window.revival.chatCanon.list(activeChatId),
+      window.revival.chatCharacters.list(activeChatId),
+      window.revival.chatEpisodes.list(activeChatId),
+    ]);
   // Prune any next-message-only picks whose source/document was deleted elsewhere.
   const next = nextSourcesByChat.get(activeChatId);
   if (next && next.length) {
@@ -9811,6 +9930,24 @@ async function loadActiveSources() {
     const liveIds = new Set(allDocs.map((d) => d.id));
     nextDocsByChat.set(activeChatId, nextDocs.filter((d) => liveIds.has(d.id)));
   }
+  const nextCanon = nextCanonByChat.get(activeChatId);
+  if (nextCanon && nextCanon.length) {
+    const allCanon = await window.revival.canon.list();
+    const liveIds = new Set(allCanon.map((e) => e.id));
+    nextCanonByChat.set(activeChatId, nextCanon.filter((e) => liveIds.has(e.id)));
+  }
+  const nextChars = nextCharsByChat.get(activeChatId);
+  if (nextChars && nextChars.length) {
+    const allChars = await window.revival.characters.list();
+    const liveIds = new Set(allChars.map((c) => c.id));
+    nextCharsByChat.set(activeChatId, nextChars.filter((c) => liveIds.has(c.id)));
+  }
+  const nextEps = nextEpisodesByChat.get(activeChatId);
+  if (nextEps && nextEps.length) {
+    const allEps = await window.revival.episodes.list();
+    const liveIds = new Set(allEps.map((e) => e.id));
+    nextEpisodesByChat.set(activeChatId, nextEps.filter((e) => liveIds.has(e.id)));
+  }
   renderActiveSources();
 }
 
@@ -9819,14 +9956,17 @@ function hidePicker() {
   chatSourcePicker.innerHTML = '';
 }
 
-// Tabbed picker: Source Material tab + Documents tab.
+// Tabbed picker: Source Material, Documents, Canon Bible, Characters, Episodes.
 // Each tab excludes entries already attached in either mode.
 // Each row offers both attach modes: keep active vs. next message only.
 async function showPicker() {
   if (activeChatId == null) return;
-  const [sources, docs] = await Promise.all([
+  const [sources, docs, canonAll, charsAll, episodesAll] = await Promise.all([
     window.revival.sourceMaterial.list(),
     window.revival.documents.list(),
+    window.revival.canon.list(),
+    window.revival.characters.list(),
+    window.revival.episodes.list(),
   ]);
   const usedSourceIds = new Set([
     ...activeSources.map((s) => s.id),
@@ -9836,88 +9976,103 @@ async function showPicker() {
     ...activeDocuments.map((d) => d.id),
     ...nextDocsFor(activeChatId).map((d) => d.id),
   ]);
+  const usedCanonIds = new Set([
+    ...activeCanonEntries.map((e) => e.id),
+    ...nextCanonFor(activeChatId).map((e) => e.id),
+  ]);
+  const usedCharIds = new Set([
+    ...activeCharEntries.map((c) => c.id),
+    ...nextCharsFor(activeChatId).map((c) => c.id),
+  ]);
+  const usedEpIds = new Set([
+    ...activeEpisodeEntries.map((e) => e.id),
+    ...nextEpisodesFor(activeChatId).map((e) => e.id),
+  ]);
   const availableSources = sources.filter((s) => !usedSourceIds.has(s.id));
   const availableDocs = docs.filter((d) => !usedDocIds.has(d.id));
+  const availableCanon = canonAll.filter((e) => !usedCanonIds.has(e.id));
+  const availableChars = charsAll.filter((c) => !usedCharIds.has(c.id));
+  const availableEps = episodesAll.filter((e) => !usedEpIds.has(e.id));
 
   chatSourcePicker.innerHTML = '';
 
   // Tab bar
   const tabs = document.createElement('div');
   tabs.className = 'picker-tabs';
-  const tabSource = document.createElement('button');
-  tabSource.type = 'button';
-  tabSource.className = 'picker-tab picker-tab-active';
-  tabSource.textContent = 'Source Material';
-  const tabDoc = document.createElement('button');
-  tabDoc.type = 'button';
-  tabDoc.className = 'picker-tab';
-  tabDoc.textContent = 'Documents';
-  tabs.appendChild(tabSource);
-  tabs.appendChild(tabDoc);
+  const tabDefs = [
+    { label: 'Source Material' },
+    { label: 'Documents' },
+    { label: 'Canon Bible' },
+    { label: 'Characters' },
+    { label: 'Episodes' },
+  ];
+  const tabEls = tabDefs.map(({ label }, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = i === 0 ? 'picker-tab picker-tab-active' : 'picker-tab';
+    btn.textContent = label;
+    tabs.appendChild(btn);
+    return btn;
+  });
   chatSourcePicker.appendChild(tabs);
 
-  const sourcePanel = document.createElement('div');
-  sourcePanel.className = 'picker-panel';
-  const docPanel = document.createElement('div');
-  docPanel.className = 'picker-panel picker-panel-hidden';
-
-  function buildPickerRows(items, panel, keepMode, nextMode) {
-    if (items.length === 0) {
+  const panelDefs = [
+    { available: availableSources, all: sources,    keepMode: 'keep',      nextMode: 'next',      emptyLabel: 'Source Material' },
+    { available: availableDocs,    all: docs,       keepMode: 'keepDoc',   nextMode: 'nextDoc',   emptyLabel: 'Documents' },
+    { available: availableCanon,   all: canonAll,   keepMode: 'keepCanon', nextMode: 'nextCanon', emptyLabel: 'Canon Bible entries' },
+    { available: availableChars,   all: charsAll,   keepMode: 'keepChar',  nextMode: 'nextChar',  emptyLabel: 'Characters' },
+    { available: availableEps,     all: episodesAll,keepMode: 'keepEp',    nextMode: 'nextEp',    emptyLabel: 'Episodes' },
+  ];
+  const panelEls = panelDefs.map(({ available, all, keepMode, nextMode, emptyLabel }, i) => {
+    const panel = document.createElement('div');
+    panel.className = i === 0 ? 'picker-panel' : 'picker-panel picker-panel-hidden';
+    if (available.length === 0) {
       const hint = document.createElement('p');
       hint.className = 'picker-hint';
-      hint.textContent = keepMode === 'keep'
-        ? (sources.length ? 'All Source Material is already attached.' : 'No Source Material yet.')
-        : (docs.length ? 'All Documents are already attached.' : 'No Documents yet.');
+      hint.textContent = all.length
+        ? `All ${emptyLabel} already attached.`
+        : `No ${emptyLabel} yet.`;
       panel.appendChild(hint);
-      return;
+    } else {
+      for (const item of available) {
+        const row = document.createElement('div');
+        row.className = 'picker-item';
+        const titleEl = document.createElement('span');
+        titleEl.className = 'picker-title';
+        titleEl.textContent = item.title;
+        row.appendChild(titleEl);
+        const keepBtn = document.createElement('button');
+        keepBtn.type = 'button';
+        keepBtn.className = 'picker-mode-btn';
+        keepBtn.textContent = 'Keep active';
+        keepBtn.addEventListener('click', () => attachItem(item, keepMode, row));
+        row.appendChild(keepBtn);
+        const nextBtn = document.createElement('button');
+        nextBtn.type = 'button';
+        nextBtn.className = 'picker-mode-btn';
+        nextBtn.textContent = 'Next message only';
+        nextBtn.addEventListener('click', () => attachItem(item, nextMode, row));
+        row.appendChild(nextBtn);
+        panel.appendChild(row);
+      }
     }
-    for (const item of items) {
-      const row = document.createElement('div');
-      row.className = 'picker-item';
-      const titleEl = document.createElement('span');
-      titleEl.className = 'picker-title';
-      titleEl.textContent = item.title;
-      row.appendChild(titleEl);
-      const keepBtn = document.createElement('button');
-      keepBtn.type = 'button';
-      keepBtn.className = 'picker-mode-btn';
-      keepBtn.textContent = 'Keep active';
-      keepBtn.addEventListener('click', () => attachItem(item, keepMode, row));
-      row.appendChild(keepBtn);
-      const nextBtn = document.createElement('button');
-      nextBtn.type = 'button';
-      nextBtn.className = 'picker-mode-btn';
-      nextBtn.textContent = 'Next message only';
-      nextBtn.addEventListener('click', () => attachItem(item, nextMode, row));
-      row.appendChild(nextBtn);
-      panel.appendChild(row);
-    }
-  }
-
-  buildPickerRows(availableSources, sourcePanel, 'keep', 'next');
-  buildPickerRows(availableDocs, docPanel, 'keepDoc', 'nextDoc');
-
-  chatSourcePicker.appendChild(sourcePanel);
-  chatSourcePicker.appendChild(docPanel);
-
-  tabSource.addEventListener('click', () => {
-    tabSource.classList.add('picker-tab-active');
-    tabDoc.classList.remove('picker-tab-active');
-    sourcePanel.classList.remove('picker-panel-hidden');
-    docPanel.classList.add('picker-panel-hidden');
+    chatSourcePicker.appendChild(panel);
+    return panel;
   });
-  tabDoc.addEventListener('click', () => {
-    tabDoc.classList.add('picker-tab-active');
-    tabSource.classList.remove('picker-tab-active');
-    docPanel.classList.remove('picker-panel-hidden');
-    sourcePanel.classList.add('picker-panel-hidden');
+
+  tabEls.forEach((tabEl, idx) => {
+    tabEl.addEventListener('click', () => {
+      tabEls.forEach((t, i) => {
+        t.classList.toggle('picker-tab-active', i === idx);
+        panelEls[i].classList.toggle('picker-panel-hidden', i !== idx);
+      });
+    });
   });
 
   chatSourcePicker.hidden = false;
 }
 
-// Attach an item (source or document) in the chosen mode.
-// mode: 'keep' | 'next' for Source Material, 'keepDoc' | 'nextDoc' for Documents.
+// Attach an item in the chosen mode.
 async function attachItem(item, mode, row) {
   if (activeChatId == null) return;
   row.querySelectorAll('button').forEach((b) => (b.disabled = true));
@@ -9926,9 +10081,24 @@ async function attachItem(item, mode, row) {
       activeSources = await window.revival.chatSources.attach(activeChatId, item.id);
     } else if (mode === 'keepDoc') {
       activeDocuments = await window.revival.chatDocuments.attach(activeChatId, item.id);
+    } else if (mode === 'keepCanon') {
+      activeCanonEntries = await window.revival.chatCanon.attach(activeChatId, item.id);
+    } else if (mode === 'keepChar') {
+      activeCharEntries = await window.revival.chatCharacters.attach(activeChatId, item.id);
+    } else if (mode === 'keepEp') {
+      activeEpisodeEntries = await window.revival.chatEpisodes.attach(activeChatId, item.id);
     } else if (mode === 'nextDoc') {
       const list = nextDocsFor(activeChatId);
       nextDocsByChat.set(activeChatId, [...list, item]);
+    } else if (mode === 'nextCanon') {
+      const list = nextCanonFor(activeChatId);
+      nextCanonByChat.set(activeChatId, [...list, item]);
+    } else if (mode === 'nextChar') {
+      const list = nextCharsFor(activeChatId);
+      nextCharsByChat.set(activeChatId, [...list, item]);
+    } else if (mode === 'nextEp') {
+      const list = nextEpisodesFor(activeChatId);
+      nextEpisodesByChat.set(activeChatId, [...list, item]);
     } else {
       // mode === 'next'
       const list = nextSourcesFor(activeChatId);
@@ -10047,9 +10217,15 @@ chatComposer.addEventListener('submit', async (e) => {
   chatInput.value = '';
   const hadNextSrcs = nextSourcesFor(activeChatId).length > 0;
   const hadNextDocs = nextDocsFor(activeChatId).length > 0;
+  const hadNextCanon = nextCanonFor(activeChatId).length > 0;
+  const hadNextChars = nextCharsFor(activeChatId).length > 0;
+  const hadNextEps = nextEpisodesFor(activeChatId).length > 0;
   if (hadNextSrcs) nextSourcesByChat.set(activeChatId, []);
   if (hadNextDocs) nextDocsByChat.set(activeChatId, []);
-  if (hadNextSrcs || hadNextDocs) renderActiveSources();
+  if (hadNextCanon) nextCanonByChat.set(activeChatId, []);
+  if (hadNextChars) nextCharsByChat.set(activeChatId, []);
+  if (hadNextEps) nextEpisodesByChat.set(activeChatId, []);
+  if (hadNextSrcs || hadNextDocs || hadNextCanon || hadNextChars || hadNextEps) renderActiveSources();
   // Collapse preview so it doesn't show a stale payload.
   _previewOpen = false;
   chatPreviewWrap.hidden = true;
