@@ -1081,6 +1081,68 @@ function registerIpc() {
   ipcMain.handle('flanaganAnalyses:delete', (_e, id) =>
     db.flanaganAnalyses.delete(id));
 
+  // P46-C — Tag suggestions for a saved Flanagan analysis.
+  // Takes the analysis text and the full tag library; returns up to 5 tag names
+  // that genuinely fit. Never auto-applies — caller must confirm.
+  ipcMain.handle('claude:flanaganTagSuggest', async (_e, { summary, breakdown, northStar, questionTitle }, tags, model) => {
+    const apiKey = db.settings.getClaudeApiKey();
+    if (!apiKey) throw new Error('No Claude API key configured.');
+    const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
+
+    if (!tags || tags.length === 0) return [];
+
+    const tagList = tags.map((t) => `  ${t.id}: ${t.name}`).join('\n');
+    const analysisText = [
+      questionTitle ? `Question: ${questionTitle}` : '',
+      summary ? `Summary: ${summary}` : '',
+      breakdown ? `Breakdown:\n${breakdown}` : '',
+      northStar ? `North Star: ${northStar}` : '',
+    ].filter(Boolean).join('\n\n');
+
+    const systemPrompt =
+      'You are a tagging assistant for a television production workspace. ' +
+      'Given a Flanagan Filter analysis, suggest which tags from the provided library best apply to the question being analyzed. ' +
+      'Only suggest tags that genuinely fit the content. Return 2–5 tag IDs. If no tags fit, return an empty array.';
+
+    const userMsg =
+      `Analysis:\n\n${analysisText}\n\n` +
+      `Available tags:\n${tagList}\n\n` +
+      'Return the IDs of the tags that best apply to this question and analysis.';
+
+    const TAG_TOOL = {
+      name: 'suggest_tags',
+      description: 'Return the IDs of tags from the library that best apply to this analysis.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          tag_ids: {
+            type: 'array',
+            items: { type: 'number' },
+            description: 'Array of tag IDs from the library that apply. Empty array if none fit.',
+          },
+        },
+        required: ['tag_ids'],
+      },
+    };
+
+    const data = await callClaudeAPI(apiKey, {
+      model: safeModel,
+      max_tokens: 256,
+      system: systemPrompt,
+      tools: [TAG_TOOL],
+      tool_choice: { type: 'tool', name: 'suggest_tags' },
+      messages: [{ role: 'user', content: userMsg }],
+    });
+
+    const toolBlock = (data.content || []).find(
+      (b) => b.type === 'tool_use' && b.name === 'suggest_tags'
+    );
+    if (!toolBlock || !toolBlock.input) return [];
+
+    const suggestedIds = new Set(toolBlock.input.tag_ids || []);
+    return tags.filter((t) => suggestedIds.has(t.id));
+  });
+
   // PUI2 popout wiring.
   //  • popout:open spawns a new BrowserWindow for a single entry.
   //  • popout:changed is a one-way fan-out: whoever just mutated an entry

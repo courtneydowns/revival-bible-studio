@@ -7804,6 +7804,128 @@ const FF_MODES = [
 
 const FF_CANON_NAMES = ['megan', 'jordan', 'diane', 'caroline', 'ray', 'marcus', 'renee'];
 
+// P46-C helpers ───────────────────────────────────────────────────────────────
+
+// Build the body for a routed analysis entry (Brainstorm / Research).
+function _ffBuildRoutedBody(item, res, mode) {
+  const modeName = FF_MODE_LABELS[mode] || mode || 'Analysis';
+  const conf = res.confidence === 'clear' ? 'Clear verdict' : 'Genuine tension';
+  const lines = [
+    `[Flanagan Filter — ${modeName} | ${conf}]`,
+    '',
+    res.summary ? `Summary: ${res.summary}` : '',
+    '',
+    res.breakdown ? `Breakdown:\n${res.breakdown}` : '',
+    '',
+    res.northStar ? `North Star Check:\n${res.northStar}` : '',
+    '',
+    `— Analysis from Open Question: "${item.title || '(untitled)'}"`,
+  ];
+  return lines.filter((l, i, arr) => !(l === '' && arr[i - 1] === '')).join('\n').trim();
+}
+
+// Create a new entry in `apiName` workspace pre-filled with analysis content.
+async function _ffRouteAnalysis(item, res, mode, apiName) {
+  const modeName = FF_MODE_LABELS[mode] || mode || 'Analysis';
+  const title = `${item.title ? `"${item.title.slice(0, 60)}"` : 'Untitled'} — Flanagan ${modeName}`;
+  const body = _ffBuildRoutedBody(item, res, mode);
+  return window.revival[apiName].create({ title, body });
+}
+
+// Fetch tag suggestions and render a confirmation panel inside `container`.
+async function _ffSuggestTags(container, item, res, mode) {
+  container.innerHTML = '';
+  container.hidden = false;
+  const loading = document.createElement('span');
+  loading.className = 'ff-tag-suggest-loading';
+  loading.textContent = 'Suggesting tags…';
+  container.appendChild(loading);
+
+  try {
+    const model = (typeof chatModelSelect !== 'undefined' && chatModelSelect && chatModelSelect.value)
+      || 'claude-sonnet-4-6';
+    const allTags = await window.revival.tags.listAll();
+    if (!allTags || allTags.length === 0) {
+      container.hidden = true;
+      return;
+    }
+    const suggested = await window.revival.claude.flanaganTagSuggest(
+      { summary: res.summary, breakdown: res.breakdown, northStar: res.northStar, questionTitle: item.title },
+      allTags,
+      model
+    );
+    container.innerHTML = '';
+    if (!suggested || suggested.length === 0) {
+      container.hidden = true;
+      return;
+    }
+
+    const header = document.createElement('div');
+    header.className = 'ff-tag-suggest-header';
+    header.textContent = 'Suggested tags — confirm to apply:';
+    container.appendChild(header);
+
+    const chips = document.createElement('div');
+    chips.className = 'ff-tag-suggest-chips';
+    const checked = new Set(suggested.map((t) => t.id));
+
+    for (const tag of suggested) {
+      const label = document.createElement('label');
+      label.className = 'ff-tag-chip';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = true;
+      cb.value = tag.id;
+      cb.addEventListener('change', () => {
+        if (cb.checked) checked.add(tag.id); else checked.delete(tag.id);
+      });
+      label.appendChild(cb);
+      label.append(` ${tag.name}`);
+      chips.appendChild(label);
+    }
+    container.appendChild(chips);
+
+    const actions = document.createElement('div');
+    actions.className = 'ff-tag-suggest-actions';
+    const applyBtn = document.createElement('button');
+    applyBtn.type = 'button';
+    applyBtn.className = 'btn-secondary';
+    applyBtn.style.fontSize = '12px';
+    applyBtn.textContent = 'Apply selected';
+    applyBtn.addEventListener('click', async () => {
+      applyBtn.disabled = true;
+      try {
+        for (const tag of suggested) {
+          if (checked.has(tag.id)) {
+            await window.revival.tags.attach('open_questions', item.id, tag.id).catch(() => {});
+          }
+        }
+        container.innerHTML = '';
+        const done = document.createElement('span');
+        done.className = 'ff-tag-suggest-done';
+        done.textContent = `Tags applied.`;
+        container.appendChild(done);
+        setTimeout(() => { container.hidden = true; container.innerHTML = ''; }, 2500);
+      } catch {
+        applyBtn.disabled = false;
+      }
+    });
+    const skipBtn = document.createElement('button');
+    skipBtn.type = 'button';
+    skipBtn.className = 'btn-secondary';
+    skipBtn.style.fontSize = '12px';
+    skipBtn.textContent = 'Skip';
+    skipBtn.addEventListener('click', () => {
+      container.hidden = true;
+      container.innerHTML = '';
+    });
+    actions.append(applyBtn, skipBtn);
+    container.appendChild(actions);
+  } catch {
+    container.hidden = true;
+  }
+}
+
 // mountFlanaganFilter(rightCol, item, callbacks)
 // — Adds a "Flanagan Filter" button to the existing actions row so it's
 //   always visible at the top of the detail panel without scrolling.
@@ -8050,9 +8172,18 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
       northStarEl.append(nsLabel, nsText);
       resultArea.appendChild(northStarEl);
 
+      // P46-C: attach extract-and-route to output text
+      if (window.RevivalExtract) {
+        window.RevivalExtract.attach(resultArea, {
+          workspace: 'Open Questions',
+          id: item.id,
+          title: item.title,
+        });
+      }
+
       resultArea.appendChild(buildRerunBar(mode));
 
-      // P46-B — save bar: one-click to attach this analysis to the entry.
+      // P46-B/C — save bar + route buttons + tag suggestions.
       const saveBar = document.createElement('div');
       saveBar.className = 'ff-save-bar';
       const saveBtn = document.createElement('button');
@@ -8063,6 +8194,12 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
       saveConfirm.className = 'ff-save-confirm';
       saveConfirm.hidden = true;
       saveConfirm.textContent = 'Saved to history.';
+
+      // P46-C: tag suggestion panel, shown after save
+      const tagSuggestPanel = document.createElement('div');
+      tagSuggestPanel.className = 'ff-tag-suggest-panel';
+      tagSuggestPanel.hidden = true;
+
       saveBtn.addEventListener('click', async () => {
         saveBtn.disabled = true;
         try {
@@ -8077,6 +8214,8 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
           saveBtn.textContent = 'Saved';
           saveConfirm.hidden = false;
           if (callbacks && callbacks.refreshHistory) callbacks.refreshHistory();
+          // P46-C: request tag suggestions
+          _ffSuggestTags(tagSuggestPanel, item, res, mode);
         } catch {
           saveBtn.disabled = false;
           saveBtn.textContent = 'Save failed — try again';
@@ -8093,6 +8232,41 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
       });
       saveBar.append(saveBtn, saveConfirm, dismissBtn);
       resultArea.appendChild(saveBar);
+
+      // P46-C: route buttons — send full analysis to Brainstorm or Research
+      const routeBar = document.createElement('div');
+      routeBar.className = 'ff-route-bar';
+      const routeLabel = document.createElement('span');
+      routeLabel.className = 'ff-route-label';
+      routeLabel.textContent = 'Route analysis to:';
+      routeBar.appendChild(routeLabel);
+      for (const dest of [
+        { label: 'Brainstorm', apiName: 'brainstorm', kind: 'brainstorm' },
+        { label: 'Research', apiName: 'research', kind: 'research' },
+      ]) {
+        const routeBtn = document.createElement('button');
+        routeBtn.type = 'button';
+        routeBtn.className = 'btn-secondary ff-route-btn';
+        routeBtn.textContent = `→ ${dest.label}`;
+        routeBtn.addEventListener('click', async () => {
+          routeBtn.disabled = true;
+          try {
+            const created = await _ffRouteAnalysis(item, res, mode, dest.apiName);
+            if (created) {
+              // CWA: link new entry back to the Open Question
+              await window.revival.crossWorkspace.attach(
+                dest.kind, created.id, 'open_questions', item.id
+              ).catch(() => {});
+              routeBtn.textContent = `✓ Sent to ${dest.label}`;
+            }
+          } catch {
+            routeBtn.disabled = false;
+          }
+        });
+        routeBar.appendChild(routeBtn);
+      }
+      resultArea.appendChild(routeBar);
+      resultArea.appendChild(tagSuggestPanel);
     } catch (err) {
       resultArea.innerHTML = '';
       const errEl = document.createElement('p');
@@ -8245,6 +8419,33 @@ function mountFlanaganHistory(rightCol, item, archivedFlag, callbacks) {
       lockedNote.className = 'ff-history-locked-note';
       lockedNote.textContent = 'Analysis locked — question is resolved.';
       card.appendChild(lockedNote);
+    }
+
+    // P46-C: route this saved analysis to Brainstorm or Research
+    for (const dest of [
+      { label: 'Brainstorm', apiName: 'brainstorm', kind: 'brainstorm' },
+      { label: 'Research', apiName: 'research', kind: 'research' },
+    ]) {
+      const routeBtn = document.createElement('button');
+      routeBtn.type = 'button';
+      routeBtn.className = 'btn-secondary';
+      routeBtn.style.cssText = 'font-size:11px;padding:3px 8px;';
+      routeBtn.textContent = `→ ${dest.label}`;
+      routeBtn.addEventListener('click', async () => {
+        routeBtn.disabled = true;
+        try {
+          const created = await _ffRouteAnalysis(item, analysis, analysis.scan_mode, dest.apiName);
+          if (created) {
+            await window.revival.crossWorkspace.attach(
+              dest.kind, created.id, 'open_questions', item.id
+            ).catch(() => {});
+            routeBtn.textContent = `✓ ${dest.label}`;
+          }
+        } catch {
+          routeBtn.disabled = false;
+        }
+      });
+      cardActions.appendChild(routeBtn);
     }
 
     // Delete always available (even on stale / archived question)

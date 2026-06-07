@@ -155,6 +155,8 @@ contextBridge.exposeInMainWorld('revival', {
     // P46-A — Flanagan Filter: craft analysis for Open Questions entries.
     flanaganFilter: (payload, model) =>
       ipcRenderer.invoke('claude:flanaganFilter', payload, model),
+    flanaganTagSuggest: (analysisData, tags, model) =>
+      ipcRenderer.invoke('claude:flanaganTagSuggest', analysisData, tags, model),
   },
   // P46-B — save Flanagan Filter analyses to Open Questions entries.
   flanaganAnalyses: {
