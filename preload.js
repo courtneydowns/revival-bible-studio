@@ -147,6 +147,9 @@ contextBridge.exposeInMainWorld('revival', {
     // P44 — Writing Lab draft assistant.
     draftAssist: (draftTitle, draftBody, sources, messages, model) =>
       ipcRenderer.invoke('claude:draftAssist', draftTitle, draftBody, sources, messages, model),
+    // P45 — AI import assistant: type suggestions + duplicate flags.
+    importAssist: (entries, model) =>
+      ipcRenderer.invoke('claude:importAssist', entries, model),
   },
   dashboard: {
     summary: (limit) => ipcRenderer.invoke('dashboard:summary', limit),

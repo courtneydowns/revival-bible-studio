@@ -796,6 +796,116 @@ function registerIpc() {
     };
   });
 
+  // P45 — AI import assistant. Analyzes parsed worldbuilding entries and returns
+  // type suggestions + duplicate flags. Fetches existing pending proposals from
+  // the DB directly so the renderer doesn't need to pass them.
+  ipcMain.handle('claude:importAssist', async (_e, entries, model) => {
+    const apiKey = db.settings.getClaudeApiKey();
+    if (!apiKey) throw new Error('No Claude API key configured. Add one in Settings.');
+
+    const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
+
+    const existingProposals = db.canonProposals.list().map((p) => ({
+      title: ((p.proposed_fields || {}).title) || '(untitled)',
+    }));
+
+    const ENTRY_TYPES = [
+      'character', 'location', 'event', 'rule', 'theme', 'symbol',
+      'relationship', 'faction', 'timeline_event', 'subplot', 'motif',
+      'artifact', 'institution', 'dialogue_sample', 'world_rule',
+      'belief_system', 'technology', 'misc',
+    ];
+
+    const CLASSIFY_TOOL = {
+      name: 'classify_import_entries',
+      description:
+        'Return a type suggestion for each imported worldbuilding entry. ' +
+        'Call exactly once with one suggestion per entry in input order.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          suggestions: {
+            type: 'array',
+            description: 'One item per entry, in the same order as the input list.',
+            items: {
+              type: 'object',
+              properties: {
+                index: {
+                  type: 'integer',
+                  description: 'Zero-based index of this entry in the input list.',
+                },
+                suggested_type: {
+                  type: 'string',
+                  description:
+                    'Best-fit entry type. One of: ' + ENTRY_TYPES.join(', ') +
+                    '. Use "misc" if unclear.',
+                },
+                reason: {
+                  type: 'string',
+                  description: 'One sentence explaining the type suggestion.',
+                },
+                is_duplicate: {
+                  type: 'boolean',
+                  description:
+                    'True if this entry looks like a near-duplicate of an existing pending proposal.',
+                },
+                duplicate_of_title: {
+                  type: 'string',
+                  description: 'Title of the existing proposal this entry duplicates, if any.',
+                },
+              },
+              required: ['index', 'is_duplicate'],
+            },
+          },
+        },
+        required: ['suggestions'],
+      },
+    };
+
+    const entriesList = entries.map((e, i) => {
+      const typeLine = e.entry_type ? ` (auto-detected: ${e.entry_type})` : ' (type: unknown)';
+      const bodySnip = e.body ? e.body.slice(0, 300) : '(no body)';
+      return `[${i}] "${e.title}"${typeLine}\n${bodySnip}`;
+    }).join('\n\n---\n\n');
+
+    const proposalsList = existingProposals.length > 0
+      ? 'Existing pending proposals in Canon Review:\n' +
+        existingProposals.map((p) => `  • "${p.title}"`).join('\n')
+      : 'No existing pending proposals.';
+
+    const systemPrompt =
+      'You are an entry-type classifier for a TV writers\' room canon system.\n\n' +
+      'Allowed entry types: ' + ENTRY_TYPES.join(', ') + '.\n\n' +
+      'For each imported entry: suggest the most fitting type. ' +
+      'If an entry already has an auto-detected type, only override it if you are confident ' +
+      'a different type is more accurate — otherwise confirm the existing type. ' +
+      'Also flag entries that look like near-duplicates of existing pending proposals ' +
+      '(same topic or same facts rephrased). ' +
+      'Provide a one-sentence reason for each suggestion.';
+
+    const userMsg =
+      `Classify these ${entries.length} imported worldbuilding entries:\n\n` +
+      entriesList + '\n\n' + proposalsList;
+
+    const data = await callClaudeAPI(apiKey, {
+      model: safeModel,
+      max_tokens: 4096,
+      system: systemPrompt,
+      tools: [CLASSIFY_TOOL],
+      tool_choice: { type: 'tool', name: 'classify_import_entries' },
+      messages: [{ role: 'user', content: userMsg }],
+    });
+
+    const toolBlock = (data.content || []).find(
+      (b) => b.type === 'tool_use' && b.name === 'classify_import_entries'
+    );
+    if (!toolBlock || !Array.isArray(toolBlock.input && toolBlock.input.suggestions)) {
+      throw new Error('Unexpected response from Claude API.');
+    }
+
+    return { suggestions: toolBlock.input.suggestions };
+  });
+
   // PUI2 popout wiring.
   //  • popout:open spawns a new BrowserWindow for a single entry.
   //  • popout:changed is a one-way fan-out: whoever just mutated an entry

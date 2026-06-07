@@ -5977,57 +5977,65 @@ function renderImportPage(section) {
 
     // PImp2: Type filter for the preview list. Filtering is display-only;
     // Stage always stages all currentEntries regardless of what's visible.
-    const distinctTypes = [...new Set(
-      currentEntries.map((e) => e.entry_type).filter(Boolean)
-    )].sort();
+    // P45: rebuildFilterChips() is called after Claude suggestions are accepted
+    // so chip counts stay accurate.
     let previewTypeFilter = '';
+
+    // P45 — allowed canon entry types (mirrored from main.js CLASSIFY_TOOL).
+    const IMPORT_TYPES = [
+      'character', 'location', 'event', 'rule', 'theme', 'symbol',
+      'relationship', 'faction', 'timeline_event', 'subplot', 'motif',
+      'artifact', 'institution', 'dialogue_sample', 'world_rule',
+      'belief_system', 'technology', 'misc',
+    ];
 
     const previewFilterRow = document.createElement('div');
     previewFilterRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;';
-    if (distinctTypes.length > 0) {
+
+    function rebuildFilterChips() {
+      previewFilterRow.innerHTML = '';
+      const types = [...new Set(currentEntries.map((e) => e.entry_type).filter(Boolean))].sort();
+      if (types.length === 0) return;
       const fLabel = document.createElement('span');
       fLabel.style.cssText = 'font-size:0.85em;opacity:0.7;';
       fLabel.textContent = 'Show:';
       previewFilterRow.appendChild(fLabel);
-
       const allChip = document.createElement('button');
       allChip.type = 'button';
-      allChip.className = 'status-badge cr-type-chip cr-type-chip-active';
+      allChip.className = 'status-badge cr-type-chip' + (previewTypeFilter === '' ? ' cr-type-chip-active' : '');
       allChip.textContent = `All (${currentEntries.length})`;
       allChip.dataset.type = '';
       previewFilterRow.appendChild(allChip);
-
-      for (const t of distinctTypes) {
+      for (const t of types) {
         const count = currentEntries.filter((e) => e.entry_type === t).length;
         const chip = document.createElement('button');
         chip.type = 'button';
-        chip.className = 'status-badge cr-type-chip';
+        chip.className = 'status-badge cr-type-chip' + (previewTypeFilter === t ? ' cr-type-chip-active' : '');
         chip.textContent = `${t.replace(/_/g, ' ')} (${count})`;
         chip.dataset.type = t;
         previewFilterRow.appendChild(chip);
       }
-
-      // Untyped chip if any entries lack a detected type
       const untypedCount = currentEntries.filter((e) => !e.entry_type).length;
       if (untypedCount > 0) {
         const chip = document.createElement('button');
         chip.type = 'button';
-        chip.className = 'status-badge cr-type-chip';
+        chip.className = 'status-badge cr-type-chip' + (previewTypeFilter === '__untyped__' ? ' cr-type-chip-active' : '');
         chip.textContent = `untyped (${untypedCount})`;
         chip.dataset.type = '__untyped__';
         previewFilterRow.appendChild(chip);
       }
-
-      previewFilterRow.addEventListener('click', (e) => {
-        const chip = e.target.closest('.cr-type-chip');
-        if (!chip) return;
-        previewTypeFilter = chip.dataset.type;
-        for (const c of previewFilterRow.querySelectorAll('.cr-type-chip')) {
-          c.classList.toggle('cr-type-chip-active', c.dataset.type === previewTypeFilter);
-        }
-        renderCards();
-      });
     }
+    rebuildFilterChips();
+
+    previewFilterRow.addEventListener('click', (e) => {
+      const chip = e.target.closest('.cr-type-chip');
+      if (!chip) return;
+      previewTypeFilter = chip.dataset.type;
+      for (const c of previewFilterRow.querySelectorAll('.cr-type-chip')) {
+        c.classList.toggle('cr-type-chip-active', c.dataset.type === previewTypeFilter);
+      }
+      renderCards();
+    });
     div.appendChild(previewFilterRow);
 
     const list = document.createElement('div');
@@ -6035,7 +6043,7 @@ function renderImportPage(section) {
       'border:1px solid var(--border,#444);border-radius:6px;max-height:420px;' +
       'overflow-y:auto;margin-bottom:10px;';
 
-    function buildCard(entry) {
+    function buildCard(entry, entryIndex) {
       const card = document.createElement('div');
       card.style.cssText = 'padding:10px 12px;border-bottom:1px solid var(--border,#333);';
 
@@ -6074,26 +6082,112 @@ function renderImportPage(section) {
         preview.textContent = entry.body.length > 200 ? entry.body.slice(0, 200) + '…' : entry.body;
         card.appendChild(preview);
       }
+
+      // P45 — AI suggestion banner: shown while suggestion is pending (not yet accepted/skipped).
+      if (entry.aiSuggestion && entry.aiSuggestion.state === 'pending') {
+        const sugg = entry.aiSuggestion;
+        const suggBanner = document.createElement('div');
+        suggBanner.style.cssText =
+          'margin-top:6px;padding:6px 8px;' +
+          'background:rgba(74,158,255,0.08);border:1px solid var(--accent,#4a9eff);' +
+          'border-radius:4px;font-size:0.85em;';
+
+        const typeRow = document.createElement('div');
+        typeRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap;';
+
+        const suggLabel = document.createElement('span');
+        suggLabel.style.cssText = 'opacity:0.7;white-space:nowrap;';
+        suggLabel.textContent = 'Claude suggests:';
+
+        const typeSelect = document.createElement('select');
+        typeSelect.style.cssText =
+          'font-size:0.85em;padding:2px 4px;border-radius:3px;' +
+          'background:var(--bg,#1a1a1a);color:var(--text,#ddd);border:1px solid var(--border,#444);';
+        for (const t of IMPORT_TYPES) {
+          const opt = document.createElement('option');
+          opt.value = t;
+          opt.textContent = t.replace(/_/g, ' ');
+          if (t === sugg.suggested_type) opt.selected = true;
+          typeSelect.appendChild(opt);
+        }
+
+        const acceptBtn = document.createElement('button');
+        acceptBtn.type = 'button';
+        acceptBtn.className = 'btn-primary';
+        acceptBtn.style.cssText = 'padding:2px 8px;font-size:0.8em;';
+        acceptBtn.textContent = 'Accept';
+
+        const skipBtn = document.createElement('button');
+        skipBtn.type = 'button';
+        skipBtn.className = 'btn-secondary';
+        skipBtn.style.cssText = 'padding:2px 8px;font-size:0.8em;';
+        skipBtn.textContent = 'Skip';
+
+        typeRow.append(suggLabel, typeSelect, acceptBtn, skipBtn);
+        suggBanner.appendChild(typeRow);
+
+        if (sugg.reason) {
+          const reasonEl = document.createElement('div');
+          reasonEl.style.cssText = 'opacity:0.65;font-style:italic;';
+          reasonEl.textContent = sugg.reason;
+          suggBanner.appendChild(reasonEl);
+        }
+
+        if (sugg.is_duplicate && sugg.duplicate_of_title) {
+          const dupEl = document.createElement('div');
+          dupEl.style.cssText = 'margin-top:4px;color:var(--warn,#e8a043);';
+          dupEl.textContent = `⚠ Possible duplicate of existing proposal: "${sugg.duplicate_of_title}"`;
+          suggBanner.appendChild(dupEl);
+        }
+
+        acceptBtn.addEventListener('click', () => {
+          currentEntries[entryIndex].entry_type = typeSelect.value;
+          currentEntries[entryIndex].aiSuggestion.state = 'accepted';
+          rebuildFilterChips();
+          renderCards();
+        });
+        skipBtn.addEventListener('click', () => {
+          currentEntries[entryIndex].aiSuggestion.state = 'skipped';
+          renderCards();
+        });
+
+        card.appendChild(suggBanner);
+      } else if (
+        entry.aiSuggestion &&
+        entry.aiSuggestion.is_duplicate &&
+        entry.aiSuggestion.duplicate_of_title
+      ) {
+        // Keep showing the duplicate warning even after accept/skip.
+        const dupEl = document.createElement('div');
+        dupEl.style.cssText = 'margin-top:4px;color:var(--warn,#e8a043);font-size:0.85em;';
+        dupEl.textContent = `⚠ Possible duplicate of existing proposal: "${entry.aiSuggestion.duplicate_of_title}"`;
+        card.appendChild(dupEl);
+      }
+
       return card;
     }
 
     function renderCards() {
       list.innerHTML = '';
-      const filtered = previewTypeFilter === ''
-        ? currentEntries
-        : previewTypeFilter === '__untyped__'
-          ? currentEntries.filter((e) => !e.entry_type)
-          : currentEntries.filter((e) => e.entry_type === previewTypeFilter);
-      if (filtered.length === 0) {
+      // P45: track original index so buildCard can write back to currentEntries.
+      const filteredWithIdx = currentEntries
+        .map((e, i) => ({ e, i }))
+        .filter(({ e }) =>
+          previewTypeFilter === '' ? true :
+          previewTypeFilter === '__untyped__' ? !e.entry_type :
+          e.entry_type === previewTypeFilter
+        );
+      if (filteredWithIdx.length === 0) {
         const empty = document.createElement('div');
         empty.className = 'placeholder';
         empty.style.cssText = 'padding:20px;text-align:center;';
         empty.textContent = 'No entries match this filter.';
         list.appendChild(empty);
       } else {
-        for (let i = 0; i < filtered.length; i++) {
-          const card = buildCard(filtered[i]);
-          if (i === filtered.length - 1) card.style.borderBottom = 'none';
+        for (let j = 0; j < filteredWithIdx.length; j++) {
+          const { e, i } = filteredWithIdx[j];
+          const card = buildCard(e, i);
+          if (j === filteredWithIdx.length - 1) card.style.borderBottom = 'none';
           list.appendChild(card);
         }
       }
@@ -6145,7 +6239,51 @@ function renderImportPage(section) {
       }
     });
 
-    btnRow.append(backBtn, stageBtn, status);
+    // P45 — Ask Claude to suggest types for all entries and flag duplicates.
+    const claudeBtn = document.createElement('button');
+    claudeBtn.type = 'button';
+    claudeBtn.className = 'btn-secondary';
+    claudeBtn.textContent = 'Ask Claude for type suggestions';
+
+    claudeBtn.addEventListener('click', async () => {
+      claudeBtn.disabled = true;
+      claudeBtn.textContent = 'Asking Claude…';
+      setStatus(status, '');
+      try {
+        const model = (typeof chatModelSelect !== 'undefined' && chatModelSelect.value)
+          ? chatModelSelect.value : 'claude-sonnet-4-6';
+        const payload = currentEntries.map((e) => ({
+          title: e.title,
+          body: e.body || '',
+          entry_type: e.entry_type || null,
+        }));
+        const result = await window.revival.claude.importAssist(payload, model);
+        for (const sugg of result.suggestions || []) {
+          const idx = sugg.index;
+          if (typeof idx === 'number' && idx >= 0 && idx < currentEntries.length) {
+            currentEntries[idx].aiSuggestion = {
+              state: 'pending',
+              suggested_type: sugg.suggested_type || null,
+              reason: sugg.reason || '',
+              is_duplicate: !!sugg.is_duplicate,
+              duplicate_of_title: sugg.duplicate_of_title || null,
+            };
+          }
+        }
+        rebuildFilterChips();
+        renderCards();
+        claudeBtn.textContent = 'Re-run Claude suggestions';
+      } catch (err) {
+        const raw = err.message || 'Request failed';
+        const clean = raw.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+        setStatus(status, `Claude: ${clean}`);
+        claudeBtn.textContent = 'Ask Claude for type suggestions';
+      } finally {
+        claudeBtn.disabled = false;
+      }
+    });
+
+    btnRow.append(backBtn, claudeBtn, stageBtn, status);
     div.appendChild(btnRow);
     return div;
   }
