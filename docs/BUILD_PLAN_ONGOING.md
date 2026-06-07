@@ -261,15 +261,16 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Cross-workspace wiring
 
-### P36 — Cross-workspace attachments: picker + linked view
+### P36 — Cross-workspace attachments: picker + linked view ✅
 - "Attached" section on Characters and Episodes entries
 - Picker attaches resolved items from Decisions, Open Questions, Conflicts, Brainstorm, Research
 - Link-don't-copy: references with click-through to original
 - Bi-directional visibility
 - **Smoke:** Attach a Decision to a Character, see it on the Character page, click through, see back-reference; unlink, confirm original untouched
 
-### P37 — Characters: relational view
+### P37 — Characters: relational view ✅
 - Visual showing how characters connect (relationships, factions, arcs, conflicts)
+- SVG relationship graph rendered from character_relationships table
 - **Smoke:** Define a relationship between two characters, see it in relational view
 
 ### P38 — Characters/Episodes → Canon Review ✅
@@ -290,7 +291,7 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## UI Polish (pre-import)
 
-### PPOL1 — UI Polish: pre-import
+### PPOL1 — UI Polish: pre-import ✅
 - Work through all items logged in `POLISH_NOTES_ONGOING.md` up to this point
 - No new features. Fixes, consistency, rough edges only.
 - **Smoke:** Every item in POLISH_NOTES_ONGOING.md marked resolved
@@ -299,11 +300,11 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Safety + Export
 
-### P20v2 — Panic Export v2
+### P20v2 — Panic Export v2 ✅
 - Extend existing Panic Export to include canon tables, tags, proposals
 - **Smoke:** Run export, confirm output includes canon entries, tags, proposals
 
-### PEXPORT — Canon Bible export
+### PEXPORT — Canon Bible export ✅
 - Clean readable export of approved canon by entry type / character / season
 - Output formats: markdown and PDF
 - **Smoke:** Export by character, confirm output contains only that character's canon entries in readable format
@@ -312,14 +313,14 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Import
 
-### PImp1 — Worldbuilding file import
+### PImp1 — Worldbuilding file import ✅
 - File picker points at worldbuilding files folder
 - Parser reads and stages entries as pending proposals in Canon Review
 - Conflict flagging before staging: entries that appear to contradict existing canon are flagged
 - Source attribution on every proposal (which file it came from)
 - **Smoke:** Point at one worldbuilding file, confirm proposals appear in Canon Review with source attribution; confirm a known contradiction is flagged
 
-### PImp2 — Import review tools
+### PImp2 — Import review tools ✅
 - Filter Canon Review by entry type during import
 - Keyboard navigation through queue (tab, approve, defer without mouse)
 - Bulk defer by category
@@ -330,7 +331,7 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## UI Polish (pre-AI)
 
-### PPOL2 — UI Polish: pre-AI
+### PPOL2 — UI Polish: pre-AI ✅
 - Work through all items logged in `POLISH_NOTES_ONGOING.md` since PPOL1
 - No new features. Fixes, consistency, rough edges only.
 - **Smoke:** Every item in POLISH_NOTES_ONGOING.md marked resolved
@@ -339,14 +340,23 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## AI integration (Claude only)
 
-### P39 — Claude API config + request preview
+### P39 — Claude API config + request preview ✅
 - API key field in Settings (Claude only — no provider picker, no OpenAI scaffolding)
-- Request preview UI shows exact payload that would be sent
+- Project Rules editor in Settings: always-on system prompt visible to the user at all times
+- Request preview panel in chat composer: collapsible, shows exact API payload (model, system, messages) that would be sent — no API call made
+- API key stored in SQLite settings row; never leaves the main process except in outgoing API calls
 - **Smoke:** Enter key, draft a message, preview shows expected payload (user msg + Project Rules + active sources, nothing else)
 
-### P40 — Chat AI send/receive
-- Send a message, receive Claude's response, display in chat
-- **Smoke:** Send a message, get a response back, conversation history persists
+### P40 — Chat AI send/receive ✅
+- Migration `039_chat_messages`: persisted conversation turns (user/assistant) per chat
+- `claude:send` IPC handler in main process calls Anthropic API with stored key — key never touches renderer
+- User message shown immediately (optimistic); thinking indicator while waiting; response displayed on arrival
+- Both turns saved to DB; full history included in every API call for multi-turn context
+- Sources and Project Rules go in the `system` prompt; messages array stays clean alternating user/assistant
+- Enter to send; Shift+Enter for newline (standard chat convention)
+- **Model selector** in composer bar: Sonnet 4.6 (default) or Opus 4.7; selection persists to localStorage; reflected in Preview payload; validated server-side against an allowlist
+- Error messages strip the Electron IPC wrapper for readability
+- **Smoke:** Send a message, get a response back, conversation history persists; switch model, confirm new model used on next send
 
 ### P41 — AI suggestion → Canon Review pipeline
 - Claude-proposed structured canon changes land in Canon Review (never directly in Canon Bible)
