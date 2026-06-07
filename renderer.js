@@ -294,14 +294,19 @@ function mountLinkedIndicator(host, entityKind, id) {
     });
 }
 
-// P36 — cross-workspace attachment section (interactive, Characters/Episodes only).
-const CWA_HOST_KINDS = new Set(['characters', 'episodes']);
+// P36 + global expand — cross-workspace attachment section (all entry workspaces).
+const CWA_HOST_KINDS = new Set([
+  'characters', 'episodes', 'open_questions', 'conflicts', 'decisions',
+  'brainstorm', 'research', 'writing_lab', 'source_material', 'documents', 'unsorted',
+]);
 const CWA_SOURCE_KINDS = [
   { kind: 'decisions',      label: 'Decisions' },
   { kind: 'open_questions', label: 'Open Questions' },
   { kind: 'conflicts',      label: 'Conflicts' },
   { kind: 'brainstorm',     label: 'Brainstorm' },
   { kind: 'research',       label: 'Research' },
+  { kind: 'source_material', label: 'Source Material' },
+  { kind: 'documents',      label: 'Documents' },
 ];
 const CWA_KIND_TO_WORKSPACE = {
   characters:      'Characters',
@@ -312,6 +317,24 @@ const CWA_KIND_TO_WORKSPACE = {
   brainstorm:      'Brainstorm',
   research:        'Research',
   source_material: 'Source Material',
+  documents:       'Documents',
+  writing_lab:     'Writing Lab',
+  unsorted:        'Unsorted',
+};
+
+// Maps entity kind → window.revival API namespace for global archive/delete.
+const KIND_TO_API_NAME = {
+  characters:      'characters',
+  episodes:        'episodes',
+  decisions:       'decisions',
+  open_questions:  'openQuestions',
+  conflicts:       'conflicts',
+  brainstorm:      'brainstorm',
+  research:        'research',
+  source_material: 'sourceMaterial',
+  documents:       'documents',
+  writing_lab:     'writingLab',
+  unsorted:        'unsorted',
 };
 
 function buildAttachmentPicker(hostKind, hostId, onAttached, onClose) {
@@ -497,6 +520,64 @@ function mountAttachmentsSection(host, entityKind, id) {
         }
       });
       right.appendChild(unlinkBtn);
+
+      // Global archive — calls the entry's own workspace API directly.
+      const attApiName = KIND_TO_API_NAME[att.kind];
+      const attApi = attApiName && window.revival[attApiName];
+
+      if (attApi && attApi.archive) {
+        const archiveBtn = document.createElement('button');
+        archiveBtn.type = 'button';
+        archiveBtn.className = 'cwa-unlink';
+        archiveBtn.textContent = 'Archive';
+        archiveBtn.title = `Archive this ${att.workspace} entry`;
+        archiveBtn.addEventListener('click', async () => {
+          archiveBtn.disabled = true;
+          try {
+            await attApi.archive(att.id);
+            await refresh();
+          } catch {
+            archiveBtn.disabled = false;
+          }
+        });
+        right.appendChild(archiveBtn);
+      }
+
+      // Global delete — inline confirm before committing.
+      if (attApi && attApi.delete) {
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'cwa-unlink cwa-delete';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.title = `Permanently delete this ${att.workspace} entry`;
+        deleteBtn.addEventListener('click', () => {
+          // Swap to inline confirm so user can't accidentally delete.
+          right.innerHTML = '';
+          const confirmLabel = document.createElement('span');
+          confirmLabel.className = 'cwa-row-src';
+          confirmLabel.textContent = 'Delete permanently?';
+          const yesBtn = document.createElement('button');
+          yesBtn.type = 'button';
+          yesBtn.className = 'cwa-unlink cwa-delete';
+          yesBtn.textContent = 'Yes, delete';
+          yesBtn.addEventListener('click', async () => {
+            yesBtn.disabled = true;
+            try {
+              await attApi.delete(att.id);
+              await refresh();
+            } catch {
+              yesBtn.disabled = false;
+            }
+          });
+          const noBtn = document.createElement('button');
+          noBtn.type = 'button';
+          noBtn.className = 'cwa-unlink';
+          noBtn.textContent = 'Cancel';
+          noBtn.addEventListener('click', () => refresh());
+          right.append(confirmLabel, yesBtn, noBtn);
+        });
+        right.appendChild(deleteBtn);
+      }
 
       row.appendChild(right);
       attachList.appendChild(row);
@@ -1303,6 +1384,13 @@ function makeEntryWorkspace(config) {
     });
 
     rightCol.append(titleEdit, bodyEdit, status, err, actions);
+
+    // Global reference links: full attachment picker available in edit mode
+    // so the user can manage links without saving and switching back to detail.
+    if (entityKind && CWA_HOST_KINDS.has(entityKind) && window.revival.crossWorkspace) {
+      mountAttachmentsSection(rightCol, entityKind, item.id);
+    }
+
     titleEdit.focus();
   }
 
@@ -7183,7 +7271,7 @@ function renderWritingLabPage(section) {
     // PPOL2b-03 — status bar (workspace · type · created · edited · status).
     // Both are gated on item existing — new unsaved drafts have no DB row yet.
     if (item) {
-      mountLinkedIndicator(rightCol, 'writing_lab', item.id);
+      mountAttachmentsSection(rightCol, 'writing_lab', item.id);
       rightCol.appendChild(buildStatusBar('Writing Lab', item, archivedAtStart));
     }
 
@@ -7701,6 +7789,517 @@ function mountProposeCanonSection(container, item, sourceKind) {
 
 // --- End P37+P38 helpers ---------------------------------------------------
 
+// ── P46-A — Flanagan Filter ────────────────────────────────────────────────
+// Session-scoped defaults — survive one app session, reset on restart.
+let _ffDefaultMode = 'editorial_filter';
+// openFilter() for the currently-visible entry; called by the global shortcut.
+let _ffOpenFilter = null;
+
+const FF_MODES = [
+  { value: 'editorial_filter', label: 'Editorial Filter (Tier 1 — Five Questions)' },
+  { value: 'six_tensions',     label: 'The Six Tensions (Appendix A)' },
+  { value: 'wwfd',             label: 'WWFD — What Would Flanagan Do?' },
+  { value: 'full_diagnostic',  label: 'Full Diagnostic (all three)' },
+];
+
+const FF_CANON_NAMES = ['megan', 'jordan', 'diane', 'caroline', 'ray', 'marcus', 'renee'];
+
+// mountFlanaganFilter(rightCol, item, callbacks)
+// — Adds a "Flanagan Filter" button to the existing actions row so it's
+//   always visible at the top of the detail panel without scrolling.
+// — Appends a collapsible panel AFTER the actions row. The panel is hidden
+//   until the button (or keyboard shortcut) opens it.
+// — callbacks.refreshHistory: called after a successful save so the history
+//   section updates without a full page reload.
+// — Exposes callbacks.openWithMode(mode) for P46-B history "Reopen" action.
+function mountFlanaganFilter(rightCol, item, callbacks) {
+  const textLower = ((item.title || '') + ' ' + (item.body || '')).toLowerCase();
+  const mentionsCanon = FF_CANON_NAMES.some((n) => textLower.includes(n));
+
+  // ── 1. Add trigger button to the existing actions row ─────────────────
+  // detailExtra runs after the actions row is already appended to rightCol,
+  // so we can safely query it here.
+  const actionsRow = rightCol.querySelector('.tc-detail-actions');
+
+  const triggerBtn = document.createElement('button');
+  triggerBtn.type = 'button';
+  triggerBtn.className = 'btn-secondary ff-trigger-btn';
+  triggerBtn.textContent = 'Flanagan Filter';
+  triggerBtn.title = 'Run Flanagan craft analysis on this question (⌘⇧A)';
+  if (actionsRow) actionsRow.appendChild(triggerBtn);
+
+  // ── 2. Build the collapsible panel ────────────────────────────────────
+  const panel = document.createElement('div');
+  panel.className = 'ff-panel';
+  panel.hidden = true; // starts collapsed; trigger button opens it
+
+  // Panel header row (label + shortcut hint + close chevron)
+  const header = document.createElement('div');
+  header.className = 'ff-header';
+  const ffLabel = document.createElement('span');
+  ffLabel.className = 'ff-label';
+  ffLabel.textContent = 'The Flanagan Filter';
+  const shortcutHint = document.createElement('span');
+  shortcutHint.className = 'ff-shortcut-hint';
+  shortcutHint.textContent = '⌘⇧A';
+  shortcutHint.title = 'Cmd+Shift+A';
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'ff-close-btn';
+  closeBtn.textContent = '✕';
+  closeBtn.title = 'Close';
+  closeBtn.addEventListener('click', () => { panel.hidden = true; });
+  header.append(ffLabel, shortcutHint, closeBtn);
+  panel.appendChild(header);
+
+  // Mode select + run button
+  const controls = document.createElement('div');
+  controls.className = 'ff-controls';
+
+  const modeSelect = document.createElement('select');
+  modeSelect.className = 'ff-mode-select';
+  for (const m of FF_MODES) {
+    const opt = document.createElement('option');
+    opt.value = m.value;
+    opt.textContent = m.label;
+    modeSelect.appendChild(opt);
+  }
+  modeSelect.value = _ffDefaultMode;
+
+  const runBtn = document.createElement('button');
+  runBtn.type = 'button';
+  runBtn.className = 'btn-primary ff-run-btn';
+  runBtn.textContent = 'Run Analysis';
+
+  controls.append(modeSelect, runBtn);
+  panel.appendChild(controls);
+
+  // WWFD "not ready" soft gate
+  const wwfdWarning = document.createElement('div');
+  wwfdWarning.className = 'ff-context-note';
+  wwfdWarning.textContent =
+    'WWFD works best with scene-level context: a specific moment, scene, ' +
+    'dialogue situation, or character decision. This entry appears to describe ' +
+    'a higher-level story question — results may be less precise. You can still run.';
+  wwfdWarning.hidden = true;
+  panel.appendChild(wwfdWarning);
+
+  function hasSceneLevelContext() {
+    return ['scene', 'act ', 'episode', 'moment', 'shot ', 'dialogue', 'visual',
+            'camera', 'sequence', 'int.', 'ext.', ' page', 'cut to', ' beat ',
+            'says:', 'says "'].some((k) => textLower.includes(k));
+  }
+
+  function updateWwfdWarning() {
+    wwfdWarning.hidden = !(modeSelect.value === 'wwfd' && !hasSceneLevelContext());
+  }
+
+  modeSelect.addEventListener('change', () => {
+    _ffDefaultMode = modeSelect.value;
+    updateWwfdWarning();
+  });
+  updateWwfdWarning();
+
+  // Passive canon conflict flag
+  if (mentionsCanon) {
+    const canonFlag = document.createElement('div');
+    canonFlag.className = 'ff-canon-flag';
+    canonFlag.textContent =
+      'This question mentions canon characters or entities. Canon context is ' +
+      'available in the Canon Bible but is not auto-pulled into this analysis.';
+    panel.appendChild(canonFlag);
+  }
+
+  // Tier badge
+  if (item.tier) {
+    const tierBadge = document.createElement('div');
+    tierBadge.className = 'ff-tier-badge';
+    tierBadge.textContent = `Tier ${item.tier} question`;
+    panel.appendChild(tierBadge);
+  }
+
+  // Editable option labels — pre-populate from "Option A: ..." in body
+  const bodyText = item.body || '';
+  const optAMatch = bodyText.match(/option\s+a[:\s]+([^\n]+)/i);
+  const optBMatch = bodyText.match(/option\s+b[:\s]+([^\n]+)/i);
+  const defaultOptions = [
+    { key: 'A', value: optAMatch ? optAMatch[1].trim() : 'Option A' },
+    { key: 'B', value: optBMatch ? optBMatch[1].trim() : 'Option B' },
+  ];
+
+  const optionsSection = document.createElement('div');
+  optionsSection.className = 'ff-options';
+  const optionsHeading = document.createElement('div');
+  optionsHeading.className = 'ff-options-heading';
+  optionsHeading.textContent = 'Options under consideration (edit to clarify before running):';
+  optionsSection.appendChild(optionsHeading);
+
+  const optionInputs = [];
+  for (const opt of defaultOptions) {
+    const row = document.createElement('div');
+    row.className = 'ff-option-row';
+    const keyLabel = document.createElement('span');
+    keyLabel.className = 'ff-option-key';
+    keyLabel.textContent = `Option ${opt.key}`;
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'ff-option-input';
+    inp.value = opt.value;
+    inp.placeholder = `Describe option ${opt.key}…`;
+    optionInputs.push({ key: opt.key, input: inp });
+    row.append(keyLabel, inp);
+    optionsSection.appendChild(row);
+  }
+  panel.appendChild(optionsSection);
+
+  // Result area — hidden until a run completes
+  const resultArea = document.createElement('div');
+  resultArea.className = 'ff-result-area';
+  resultArea.hidden = true;
+  panel.appendChild(resultArea);
+
+  function buildRerunBar(currentMode) {
+    const rerunBar = document.createElement('div');
+    rerunBar.className = 'ff-rerun-bar';
+    const rerunLabel = document.createElement('span');
+    rerunLabel.className = 'ff-rerun-label';
+    rerunLabel.textContent = 'Run again with:';
+    const rerunSelect = document.createElement('select');
+    rerunSelect.className = 'ff-mode-select';
+    for (const m of FF_MODES) {
+      const opt = document.createElement('option');
+      opt.value = m.value;
+      opt.textContent = m.label;
+      rerunSelect.appendChild(opt);
+    }
+    rerunSelect.value = currentMode;
+    rerunSelect.addEventListener('change', () => {
+      _ffDefaultMode = rerunSelect.value;
+      modeSelect.value = rerunSelect.value;
+      updateWwfdWarning();
+    });
+    const rerunBtn = document.createElement('button');
+    rerunBtn.type = 'button';
+    rerunBtn.className = 'btn-secondary ff-rerun-btn';
+    rerunBtn.textContent = 'Re-run';
+    rerunBtn.addEventListener('click', () => {
+      _ffDefaultMode = rerunSelect.value;
+      modeSelect.value = rerunSelect.value;
+      updateWwfdWarning();
+      runAnalysis(rerunSelect.value);
+    });
+    rerunBar.append(rerunLabel, rerunSelect, rerunBtn);
+    return rerunBar;
+  }
+
+  async function runAnalysis(mode) {
+    const options = optionInputs.map((o) => ({
+      key: o.key,
+      label: o.input.value.trim() || `Option ${o.key}`,
+    }));
+
+    runBtn.disabled = true;
+    runBtn.textContent = 'Running…';
+    resultArea.hidden = false;
+    resultArea.innerHTML = '';
+
+    const thinkingEl = document.createElement('p');
+    thinkingEl.className = 'ff-thinking';
+    thinkingEl.textContent = 'Analyzing against the Flanagan criteria…';
+    resultArea.appendChild(thinkingEl);
+
+    try {
+      const model = (chatModelSelect && chatModelSelect.value) || 'claude-sonnet-4-6';
+      const res = await window.revival.claude.flanaganFilter({
+        questionTitle: item.title || '',
+        questionBody: item.body || '',
+        tier: item.tier || null,
+        options,
+        mode,
+      }, model);
+
+      resultArea.innerHTML = '';
+
+      // Summary line with confidence badge
+      const summaryEl = document.createElement('div');
+      summaryEl.className = 'ff-summary';
+      const confidenceBadge = document.createElement('span');
+      confidenceBadge.className =
+        `ff-confidence ff-confidence-${res.confidence === 'clear' ? 'clear' : 'tension'}`;
+      confidenceBadge.textContent =
+        res.confidence === 'clear' ? 'Clear verdict' : 'Genuine tension';
+      const summaryText = document.createTextNode(' ' + res.summary);
+      summaryEl.append(confidenceBadge, summaryText);
+      resultArea.appendChild(summaryEl);
+
+      // Full breakdown
+      const breakdownEl = document.createElement('div');
+      breakdownEl.className = 'ff-breakdown';
+      breakdownEl.textContent = res.breakdown;
+      resultArea.appendChild(breakdownEl);
+
+      // North Star check
+      const northStarEl = document.createElement('div');
+      northStarEl.className = 'ff-north-star';
+      const nsLabel = document.createElement('div');
+      nsLabel.className = 'ff-north-star-label';
+      nsLabel.textContent = 'North Star Check';
+      const nsText = document.createElement('div');
+      nsText.className = 'ff-north-star-text';
+      nsText.textContent = res.northStar;
+      northStarEl.append(nsLabel, nsText);
+      resultArea.appendChild(northStarEl);
+
+      resultArea.appendChild(buildRerunBar(mode));
+
+      // P46-B — save bar: one-click to attach this analysis to the entry.
+      const saveBar = document.createElement('div');
+      saveBar.className = 'ff-save-bar';
+      const saveBtn = document.createElement('button');
+      saveBtn.type = 'button';
+      saveBtn.className = 'btn-secondary';
+      saveBtn.textContent = 'Save analysis';
+      const saveConfirm = document.createElement('span');
+      saveConfirm.className = 'ff-save-confirm';
+      saveConfirm.hidden = true;
+      saveConfirm.textContent = 'Saved to history.';
+      saveBtn.addEventListener('click', async () => {
+        saveBtn.disabled = true;
+        try {
+          await window.revival.flanaganAnalyses.create(item.id, {
+            scanMode: mode,
+            flanaganVersion: res.flanaganVersion || 'unknown',
+            summary: res.summary,
+            breakdown: res.breakdown,
+            northStar: res.northStar,
+            confidence: res.confidence,
+          });
+          saveBtn.textContent = 'Saved';
+          saveConfirm.hidden = false;
+          if (callbacks && callbacks.refreshHistory) callbacks.refreshHistory();
+        } catch {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save failed — try again';
+        }
+      });
+      const dismissBtn = document.createElement('button');
+      dismissBtn.type = 'button';
+      dismissBtn.className = 'btn-secondary';
+      dismissBtn.textContent = 'Dismiss';
+      dismissBtn.title = 'Clear this result without saving';
+      dismissBtn.addEventListener('click', () => {
+        resultArea.hidden = true;
+        resultArea.innerHTML = '';
+      });
+      saveBar.append(saveBtn, saveConfirm, dismissBtn);
+      resultArea.appendChild(saveBar);
+    } catch (err) {
+      resultArea.innerHTML = '';
+      const errEl = document.createElement('p');
+      errEl.className = 'ff-error';
+      errEl.textContent = `Error: ${err.message || 'Analysis failed. Check your API key in Settings.'}`;
+      resultArea.appendChild(errEl);
+    } finally {
+      runBtn.disabled = false;
+      runBtn.textContent = 'Run Analysis';
+    }
+  }
+
+  runBtn.addEventListener('click', () => {
+    _ffDefaultMode = modeSelect.value;
+    runAnalysis(modeSelect.value);
+  });
+
+  // openFilter: show panel, scroll it into view, focus mode select.
+  // Called by the trigger button and by the keyboard shortcut.
+  function openFilter(mode) {
+    if (mode) {
+      modeSelect.value = mode;
+      _ffDefaultMode = mode;
+      updateWwfdWarning();
+    }
+    panel.hidden = false;
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    modeSelect.focus();
+  }
+
+  triggerBtn.addEventListener('click', () => openFilter());
+
+  // Register for the global shortcut; cleared when this entry is replaced.
+  _ffOpenFilter = () => openFilter();
+
+  // P46-B: expose openFilter via callbacks so history section can preselect mode.
+  if (callbacks) callbacks.openWithMode = openFilter;
+
+  // Insert the panel immediately after the actions row so it appears close
+  // to the top of the detail view (not buried below body content).
+  if (actionsRow && actionsRow.nextSibling) {
+    rightCol.insertBefore(panel, actionsRow.nextSibling);
+  } else {
+    rightCol.appendChild(panel);
+  }
+}
+// ── End P46-A ──────────────────────────────────────────────────────────────
+
+// ── P46-B — Flanagan Analysis History ──────────────────────────────────────
+// mountFlanaganHistory(rightCol, item, archivedFlag, callbacks)
+// — Appends a collapsed <details> section listing all saved Flanagan Filter
+//   analyses for this Open Questions entry.
+// — When archivedFlag is true all analyses are read-only (question is resolved).
+// — callbacks.openWithMode(mode): opens the filter panel with mode preselected;
+//   called by the "Reopen with new context" action.
+// — Returns { refresh } so the save bar in mountFlanaganFilter can refresh the
+//   list after a new analysis is saved.
+
+const FF_MODE_LABELS = {
+  editorial_filter: 'Editorial Filter',
+  six_tensions: 'Six Tensions',
+  wwfd: 'WWFD',
+  full_diagnostic: 'Full Diagnostic',
+};
+
+function mountFlanaganHistory(rightCol, item, archivedFlag, callbacks) {
+  const section = document.createElement('details');
+  section.className = 'ff-history-section';
+
+  const summary = document.createElement('summary');
+  section.appendChild(summary);
+
+  const cardsContainer = document.createElement('div');
+  cardsContainer.className = 'ff-history-cards';
+  section.appendChild(cardsContainer);
+
+  function buildCard(analysis) {
+    const card = document.createElement('div');
+    card.className = 'ff-history-card';
+
+    // Header: mode badge + date + version + stale badge
+    const header = document.createElement('div');
+    header.className = 'ff-history-card-header';
+
+    const modeBadge = document.createElement('span');
+    modeBadge.className = 'ff-history-mode-badge';
+    modeBadge.textContent = FF_MODE_LABELS[analysis.scan_mode] || analysis.scan_mode || '—';
+
+    const confBadge = document.createElement('span');
+    confBadge.className =
+      `ff-confidence ff-confidence-${analysis.confidence === 'clear' ? 'clear' : 'tension'}`;
+    confBadge.textContent = analysis.confidence === 'clear' ? 'Clear verdict' : 'Genuine tension';
+
+    const dateSpan = document.createElement('span');
+    dateSpan.className = 'ff-history-date';
+    dateSpan.textContent = new Date(analysis.created_at).toLocaleString();
+
+    header.append(modeBadge, confBadge, dateSpan);
+
+    if (analysis.flanagan_version && analysis.flanagan_version !== 'unknown') {
+      const verSpan = document.createElement('span');
+      verSpan.className = 'ff-history-version';
+      verSpan.textContent = `doc: ${analysis.flanagan_version}`;
+      header.appendChild(verSpan);
+    }
+
+    if (analysis.is_stale) {
+      const staleBadge = document.createElement('span');
+      staleBadge.className = 'ff-stale-badge';
+      staleBadge.textContent = 'Stale — reopen with new context';
+      header.appendChild(staleBadge);
+    }
+
+    card.appendChild(header);
+
+    // Summary line
+    if (analysis.summary) {
+      const summaryEl = document.createElement('div');
+      summaryEl.className = 'ff-history-card-summary';
+      summaryEl.textContent = analysis.summary;
+      card.appendChild(summaryEl);
+    }
+
+    // Actions
+    const cardActions = document.createElement('div');
+    cardActions.className = 'ff-history-card-actions';
+
+    if (!archivedFlag && !analysis.is_stale) {
+      const reopenBtn = document.createElement('button');
+      reopenBtn.type = 'button';
+      reopenBtn.className = 'btn-secondary';
+      reopenBtn.textContent = 'Reopen with new context';
+      reopenBtn.title =
+        'Mark this analysis as stale and open the filter to run a fresh analysis';
+      reopenBtn.addEventListener('click', async () => {
+        reopenBtn.disabled = true;
+        try {
+          await window.revival.flanaganAnalyses.markStale(analysis.id);
+          if (callbacks && callbacks.openWithMode) {
+            callbacks.openWithMode(analysis.scan_mode);
+          }
+          refresh();
+        } catch {
+          reopenBtn.disabled = false;
+        }
+      });
+      cardActions.appendChild(reopenBtn);
+    } else if (archivedFlag) {
+      const lockedNote = document.createElement('div');
+      lockedNote.className = 'ff-history-locked-note';
+      lockedNote.textContent = 'Analysis locked — question is resolved.';
+      card.appendChild(lockedNote);
+    }
+
+    // Delete always available (even on stale / archived question)
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn-danger';
+    deleteBtn.style.cssText = 'font-size:11px;padding:3px 8px;';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.title = 'Permanently delete this saved analysis';
+    deleteBtn.addEventListener('click', async () => {
+      deleteBtn.disabled = true;
+      try {
+        await window.revival.flanaganAnalyses.delete(analysis.id);
+        refresh();
+      } catch {
+        deleteBtn.disabled = false;
+      }
+    });
+    cardActions.appendChild(deleteBtn);
+    card.appendChild(cardActions);
+
+    return card;
+  }
+
+  async function refresh() {
+    let analyses = [];
+    try {
+      analyses = await window.revival.flanaganAnalyses.list(item.id);
+    } catch {
+      analyses = [];
+    }
+
+    summary.textContent = '';
+    summary.textContent = `Analysis History (${analyses.length})`;
+
+    cardsContainer.innerHTML = '';
+    if (analyses.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'font-size:12px;color:var(--muted);padding:4px 0;';
+      empty.textContent = 'No analyses saved yet.';
+      cardsContainer.appendChild(empty);
+    } else {
+      for (const a of analyses) {
+        cardsContainer.appendChild(buildCard(a));
+      }
+    }
+  }
+
+  refresh();
+  rightCol.appendChild(section);
+
+  return { refresh };
+}
+// ── End P46-B ──────────────────────────────────────────────────────────────
+
 const CONTENT_RENDERERS = {
   'Home': renderHomePage,
   'Writing Lab': renderWritingLabPage,
@@ -7738,6 +8337,15 @@ const CONTENT_RENDERERS = {
     entityKind: 'open_questions',
     draftPrefix: 'open_questions',
     addLabel: 'Add Question',
+    // P46-A/B — Flanagan Filter panel + saved analysis history.
+    detailExtra(rightCol, item, archivedFlag) {
+      // Shared callbacks wired between the filter panel and history section so
+      // saves refresh history and "Reopen" preselects the filter's mode.
+      const callbacks = {};
+      if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks);
+      const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks);
+      callbacks.refreshHistory = refresh;
+    },
   }),
   // Conflicts shares the lifecycle but is styled distinctly (red contradiction
   // accent + tailored labels) so it never reads like Open Questions.
@@ -8068,14 +8676,41 @@ function renderChatBody() {
     return;
   }
   for (const msg of chatMessageHistory) {
-    chatMessages.appendChild(_buildMsgEl(msg.role, msg.content));
+    chatMessages.appendChild(_buildMsgEl(msg.role, msg.content, msg));
   }
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 // Build a single message element (user or assistant).
-function _buildMsgEl(role, content) {
+// `dbMsg` is optional — when provided (from history), adds archive/unarchive button.
+function _buildMsgEl(role, content, dbMsg) {
   const wrap = document.createElement('div');
+
+  if (dbMsg && dbMsg.is_archived) {
+    wrap.className = 'chat-msg chat-msg-archived';
+    const note = document.createElement('span');
+    note.className = 'chat-msg-archived-note';
+    note.textContent = 'Message archived';
+    const unarchiveBtn = document.createElement('button');
+    unarchiveBtn.type = 'button';
+    unarchiveBtn.className = 'btn-tool chat-msg-unarchive';
+    unarchiveBtn.textContent = 'Unarchive';
+    unarchiveBtn.addEventListener('click', async () => {
+      unarchiveBtn.disabled = true;
+      try {
+        await window.revival.chatMessages.unarchive(dbMsg.id);
+        dbMsg.is_archived = 0;
+        const fresh = _buildMsgEl(role, content, dbMsg);
+        wrap.replaceWith(fresh);
+      } catch {
+        unarchiveBtn.disabled = false;
+      }
+    });
+    wrap.appendChild(note);
+    wrap.appendChild(unarchiveBtn);
+    return wrap;
+  }
+
   wrap.className = `chat-msg chat-msg-${role}`;
   const label = document.createElement('span');
   label.className = 'chat-msg-label';
@@ -8085,6 +8720,27 @@ function _buildMsgEl(role, content) {
   body.textContent = content;
   wrap.appendChild(label);
   wrap.appendChild(body);
+
+  if (dbMsg) {
+    const archiveBtn = document.createElement('button');
+    archiveBtn.type = 'button';
+    archiveBtn.className = 'btn-tool chat-msg-archive';
+    archiveBtn.textContent = 'Archive';
+    archiveBtn.title = 'Archive this message (removes from Claude context)';
+    archiveBtn.addEventListener('click', async () => {
+      archiveBtn.disabled = true;
+      try {
+        await window.revival.chatMessages.archive(dbMsg.id);
+        dbMsg.is_archived = 1;
+        const fresh = _buildMsgEl(role, content, dbMsg);
+        wrap.replaceWith(fresh);
+      } catch {
+        archiveBtn.disabled = false;
+      }
+    });
+    wrap.appendChild(archiveBtn);
+  }
+
   return wrap;
 }
 
@@ -8565,8 +9221,8 @@ chatComposer.addEventListener('submit', async (e) => {
   // Show the user's message immediately (optimistic).
   _appendMsgEl('user', text);
 
-  // Build API messages from history + current turn.
-  const history = chatMessageHistory.map((m) => ({ role: m.role, content: m.content }));
+  // Build API messages from history + current turn (archived messages excluded from context).
+  const history = chatMessageHistory.filter((m) => !m.is_archived).map((m) => ({ role: m.role, content: m.content }));
   history.push({ role: 'user', content: text });
 
   // Persist the user turn.
@@ -9425,5 +10081,20 @@ window.addEventListener('keydown', (e) => {
 // stale whenever another window writes. Reuse the popout signal as a cheap
 // refresh trigger — listAll is small.
 window.revival.popout.onChanged(() => loadSearchTagFilter());
+
+// P46-A — Cmd+Shift+A opens the Flanagan Filter panel for the currently-open
+// Open Questions entry. _ffOpenFilter is set by mountFlanaganFilter each time
+// an entry is selected, so it always refers to the active entry's panel.
+window.addEventListener('keydown', (e) => {
+  if (
+    (e.metaKey || e.ctrlKey) &&
+    e.shiftKey &&
+    (e.key === 'a' || e.key === 'A') &&
+    _ffOpenFilter
+  ) {
+    e.preventDefault();
+    _ffOpenFilter();
+  }
+});
 
 route('Home');

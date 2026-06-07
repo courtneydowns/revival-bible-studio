@@ -133,6 +133,8 @@ contextBridge.exposeInMainWorld('revival', {
     list: (chatId) => ipcRenderer.invoke('chatMessages:list', chatId),
     add: (chatId, role, content) =>
       ipcRenderer.invoke('chatMessages:add', chatId, role, content),
+    archive: (id) => ipcRenderer.invoke('chatMessages:archive', id),
+    unarchive: (id) => ipcRenderer.invoke('chatMessages:unarchive', id),
   },
   // P40 — Claude API (call lives in main so the key never touches the renderer)
   claude: {
@@ -150,6 +152,17 @@ contextBridge.exposeInMainWorld('revival', {
     // P45 — AI import assistant: type suggestions + duplicate flags.
     importAssist: (entries, model) =>
       ipcRenderer.invoke('claude:importAssist', entries, model),
+    // P46-A — Flanagan Filter: craft analysis for Open Questions entries.
+    flanaganFilter: (payload, model) =>
+      ipcRenderer.invoke('claude:flanaganFilter', payload, model),
+  },
+  // P46-B — save Flanagan Filter analyses to Open Questions entries.
+  flanaganAnalyses: {
+    create: (questionId, data) =>
+      ipcRenderer.invoke('flanaganAnalyses:create', questionId, data),
+    list: (questionId) => ipcRenderer.invoke('flanaganAnalyses:list', questionId),
+    markStale: (id) => ipcRenderer.invoke('flanaganAnalyses:markStale', id),
+    delete: (id) => ipcRenderer.invoke('flanaganAnalyses:delete', id),
   },
   dashboard: {
     summary: (limit) => ipcRenderer.invoke('dashboard:summary', limit),

@@ -417,6 +417,8 @@ function registerIpc() {
   ipcMain.handle('chatMessages:add', (_e, chatId, role, content) =>
     db.chatMessages.add(chatId, role, content)
   );
+  ipcMain.handle('chatMessages:archive', (_e, id) => db.chatMessages.archive(id));
+  ipcMain.handle('chatMessages:unarchive', (_e, id) => db.chatMessages.unarchive(id));
 
   // P40/P41 — Claude API call. Runs in main so the API key never touches the
   // renderer process. Returns { text, proposalsCreated } on success; throws a
@@ -905,6 +907,179 @@ function registerIpc() {
 
     return { suggestions: toolBlock.input.suggestions };
   });
+
+  // P46-A — Flanagan Filter: on-demand craft analysis for Open Questions entries.
+  // Reads the Flanagan Master document once per handler call and applies the
+  // requested scan mode (editorial_filter / six_tensions / wwfd / full_diagnostic).
+  // Returns { summary, confidence, breakdown, northStar } via a tool call so
+  // the response is always valid JSON, never a parsing gamble.
+  ipcMain.handle('claude:flanaganFilter', async (_e, payload, model) => {
+    const apiKey = db.settings.getClaudeApiKey();
+    if (!apiKey) throw new Error('No Claude API key configured. Add one in Settings.');
+
+    const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
+
+    const { questionTitle, questionBody, tier, options, mode } = payload;
+
+    // Read the Flanagan Master document — lazy, cached per process lifetime.
+    if (!ipcMain._flanaganDoc) {
+      const docPath = path.join(__dirname, 'docs', 'THE_FLANAGAN_MASTER.txt');
+      if (fs.existsSync(docPath)) {
+        ipcMain._flanaganDoc = fs.readFileSync(docPath, 'utf8');
+        ipcMain._flanaganVersion = new Date(fs.statSync(docPath).mtime)
+          .toISOString().slice(0, 10);
+      } else {
+        ipcMain._flanaganDoc = '(Flanagan Master document not found)';
+        ipcMain._flanaganVersion = 'unknown';
+      }
+    }
+    const flanaganDoc = ipcMain._flanaganDoc;
+
+    const tierLabel = tier ? `Tier ${tier}` : 'untiered';
+    const optionLines = (options || [])
+      .map((o) => `  Option ${o.key}: ${o.label}`)
+      .join('\n');
+
+    const questionBlock =
+      `## Open Question (${tierLabel})\n\n` +
+      `Question: ${questionTitle || '(untitled)'}\n\n` +
+      (questionBody ? `Context / options as written:\n${questionBody}\n\n` : '') +
+      (optionLines ? `Options under consideration:\n${optionLines}\n` : '');
+
+    const tierInstruction = tier === 1
+      ? 'This is a Tier 1 question — the highest-stakes creative decisions. Weight your analysis accordingly: be direct, decisive where possible, and flag genuine tensions rather than hedging.'
+      : tier === 2
+        ? 'This is a Tier 2 question — important but secondary to Tier 1 concerns. Apply the filter with appropriate weight.'
+        : 'Tier is unspecified — apply the filter at standard weight.';
+
+    // Build mode-specific content section from the full document.
+    // We include the full document so Claude has complete context, then
+    // explicitly instruct which section to focus on for the breakdown.
+    let modeInstruction;
+    if (mode === 'editorial_filter') {
+      modeInstruction =
+        'Apply TIER 1 — THE EDITORIAL FILTER (the five questions). ' +
+        'For each of the five questions, evaluate how Option A and Option B perform, citing the question by name ' +
+        '(e.g. "Question 1," "Question 3"). Give a verdict per question, then an overall verdict. ' +
+        'If Option B fails Question 5, flag it explicitly.';
+    } else if (mode === 'six_tensions') {
+      modeInstruction =
+        'Apply APPENDIX A — THE SIX FLANAGAN TENSIONS. ' +
+        'For each tension, apply the diagnostic check and evaluate how the two options perform, ' +
+        'citing each by name (e.g. "Tension 1: The Horror Is Already True," "Tension 4"). ' +
+        'Give a verdict per tension, then an overall verdict.';
+    } else if (mode === 'wwfd') {
+      modeInstruction =
+        'Apply the WWFD FORMAT from Tier 2 ("When You\'re Stuck"). ' +
+        'Frame the analysis as: THE STRUCTURAL MOVE, THE DIALOGUE MOVE, THE VISUAL MOVE, ' +
+        'THE REVIVAL ANCHOR — in that order, for each option where relevant. ' +
+        'If the question is more conceptual than scene-level, focus the Structural and Revival Anchor ' +
+        'sections and note where the Dialogue/Visual sections require scene-level decisions still to be made.';
+    } else if (mode === 'full_diagnostic') {
+      modeInstruction =
+        'Run all three scans in sequence: ' +
+        '(1) TIER 1 — THE EDITORIAL FILTER (five questions, citing each by number), ' +
+        '(2) APPENDIX A — THE SIX TENSIONS (citing each by number and name), ' +
+        '(3) WWFD FORMAT (Structural / Dialogue / Visual / Revival Anchor). ' +
+        'Label each section clearly. Conclude with a single synthesized verdict that weighs all three.';
+    }
+
+    const systemPrompt =
+      'You are The Flanagan Filter — a craft analysis assistant embedded in a TV writers\' room tool for REVIVAL. ' +
+      'Your job is to evaluate creative decisions against the criteria in THE FLANAGAN MASTER document below.\n\n' +
+      'Analysis rules:\n' +
+      '- Use named citations (e.g. "Question 1," "Question 5," "Tension 3: The Monster Is Never Wrong," ' +
+      '"Non-Negotiable Two," "Camera Rule One") so the writer can trace every point to the source document.\n' +
+      '- Distinguish clearly between a CLEAR VERDICT (one option is demonstrably stronger) ' +
+      'and GENUINE TENSION (both options have legitimate craft arguments — a real writers\'-room decision).\n' +
+      '- The North Star check is always: does this choice serve or obscure the show\'s commitment to seeing ' +
+      'people in recovery as full human beings?\n' +
+      '- Never manufacture agreement. If both options fail the filter, say so.\n' +
+      '- Never explain the show\'s premise — the writer knows it.\n\n' +
+      '## THE FLANAGAN MASTER DOCUMENT\n\n' +
+      flanaganDoc;
+
+    const userMsg =
+      questionBlock +
+      '\n---\n\n' +
+      `Scan mode: ${mode.replace(/_/g, ' ').toUpperCase()}\n\n` +
+      tierInstruction + '\n\n' +
+      modeInstruction;
+
+    const FILTER_TOOL = {
+      name: 'flanagan_filter_result',
+      description: 'Return the structured Flanagan Filter analysis result.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          summary: {
+            type: 'string',
+            description:
+              'One sentence: verdict (which option is stronger, or that genuine tension exists) ' +
+              'plus the primary craft reason. Example: "Option A is stronger — it roots the horror ' +
+              'in Megan\'s pre-existing guilt rather than importing a new external threat (Question 5)."',
+          },
+          confidence: {
+            type: 'string',
+            enum: ['clear', 'tension'],
+            description:
+              '"clear" when one option is demonstrably stronger by the filter criteria; ' +
+              '"tension" when both options have legitimate craft arguments and the decision ' +
+              'is a genuine writers\'-room call.',
+          },
+          breakdown: {
+            type: 'string',
+            description:
+              'Full analysis with named citations. Use plain text with section headers ' +
+              'and line breaks for readability. Include a synthesized verdict at the end.',
+          },
+          northStar: {
+            type: 'string',
+            description:
+              'One to three sentences: does this creative decision serve or obscure the show\'s ' +
+              'commitment to seeing people in recovery as full human beings? Cite the North Star ' +
+              'or Recovery Authenticity Mandate if relevant.',
+          },
+        },
+        required: ['summary', 'confidence', 'breakdown', 'northStar'],
+      },
+    };
+
+    const data = await callClaudeAPI(apiKey, {
+      model: safeModel,
+      max_tokens: 8192,
+      system: systemPrompt,
+      tools: [FILTER_TOOL],
+      tool_choice: { type: 'tool', name: 'flanagan_filter_result' },
+      messages: [{ role: 'user', content: userMsg }],
+    });
+
+    const toolBlock = (data.content || []).find(
+      (b) => b.type === 'tool_use' && b.name === 'flanagan_filter_result'
+    );
+    if (!toolBlock || !toolBlock.input) {
+      throw new Error('Unexpected response from Claude API.');
+    }
+
+    return {
+      summary: toolBlock.input.summary || '',
+      confidence: toolBlock.input.confidence || 'tension',
+      breakdown: toolBlock.input.breakdown || '',
+      northStar: toolBlock.input.northStar || '',
+      flanaganVersion: ipcMain._flanaganVersion || 'unknown',
+    };
+  });
+
+  // P46-B — Flanagan Filter: save + history. Analyses are attached to Open
+  // Questions entries; markStale flags a saved analysis for re-run.
+  ipcMain.handle('flanaganAnalyses:create', (_e, questionId, data) =>
+    db.flanaganAnalyses.create(questionId, data));
+  ipcMain.handle('flanaganAnalyses:list', (_e, questionId) =>
+    db.flanaganAnalyses.listFor(questionId));
+  ipcMain.handle('flanaganAnalyses:markStale', (_e, id) =>
+    db.flanaganAnalyses.markStale(id));
+  ipcMain.handle('flanaganAnalyses:delete', (_e, id) =>
+    db.flanaganAnalyses.delete(id));
 
   // PUI2 popout wiring.
   //  • popout:open spawns a new BrowserWindow for a single entry.

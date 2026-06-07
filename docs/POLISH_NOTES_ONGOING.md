@@ -86,3 +86,6 @@ Running log of UI/UX observations from smoke tests. Addressed in PPOL1 (pre-impo
 - [ ] PPOL2b-S11 [PPOL2b] Writing Lab: no inline search/filter on left-column list — narrow drafts by title or body
 - [ ] PPOL2b-S12 [PPOL2b] Canon Bible: no inline text filter on entry list — AI search (P42) covers semantic queries but there is no quick local filter to narrow the visible list by title keyword
 - [ ] PPOL2b-S13 [PPOL2b] Canon Review: no inline search/filter on proposal list — narrow proposals by proposed title or body
+
+### Noticed during P46 smoke
+- [ ] P46-PPOL [P46-A] Flanagan Filter panel — "Run" button clipped on right edge; panel width needs to accommodate the full button row without overflow

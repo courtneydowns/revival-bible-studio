@@ -1483,6 +1483,8 @@
         border-radius: 3px; cursor: pointer; background: transparent; color: var(--muted);
       }
       .cwa-unlink:hover { color: #e05252; border-color: #e05252; }
+      .cwa-unlink.cwa-delete { color: #c0392b; border-color: rgba(192,57,43,0.35); }
+      .cwa-unlink.cwa-delete:hover { color: #e05252; border-color: #e05252; }
       .cwa-picker {
         margin-top: 8px; border: 1px solid var(--border); border-radius: 6px;
         padding: 10px; background: var(--panel);
@@ -2432,6 +2434,12 @@
       .chat-msg-proposal .chat-msg-label { color: var(--accent); }
       .chat-msg-proposal .chat-msg-body { font-style: italic; margin-bottom: 6px; }
       .chat-proposal-goto { margin-top: 2px; font-size: 12px; }
+      /* P46-C — individual message archive */
+      .chat-msg-archive { font-size: 11px; opacity: 0; margin-top: 4px; transition: opacity 0.15s; }
+      .chat-msg:hover .chat-msg-archive { opacity: 1; }
+      .chat-msg-archived { display: flex; align-items: center; gap: 10px; padding: 4px 0; margin-bottom: 18px; }
+      .chat-msg-archived-note { color: var(--muted); font-size: 12px; font-style: italic; }
+      .chat-msg-unarchive { font-size: 11px; }
 
       /* --- Active sources bar (P18) ----------------------------------- */
       .chat-sources {
@@ -3179,6 +3187,325 @@
       .tag-manage-confirm-text {
         font-size: 12px;
         color: var(--muted);
+      }
+
+      /* ── P46-A — Flanagan Filter panel ───────────────────────────────────── */
+      .ff-panel {
+        margin-top: 20px;
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-left: 3px solid #7b6ea6;
+        border-radius: 6px;
+        background: rgba(123, 110, 166, 0.04);
+      }
+      /* Trigger button lives in the actions row — no extra margin needed. */
+      .ff-trigger-btn { /* inherits .btn-secondary sizing */ }
+      .ff-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+      .ff-close-btn {
+        background: none;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 13px;
+        padding: 0 2px;
+        line-height: 1;
+      }
+      .ff-close-btn:hover { color: var(--text); }
+      .ff-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #7b6ea6;
+        letter-spacing: 0.02em;
+      }
+      .ff-shortcut-hint {
+        font-size: 11px;
+        color: var(--muted);
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 1px 6px;
+        cursor: default;
+      }
+      .ff-controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .ff-mode-select {
+        flex: 1;
+        font: inherit;
+        font-size: 12px;
+        padding: 5px 8px;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .ff-mode-select:focus {
+        outline: none;
+        border-color: #7b6ea6;
+      }
+      .ff-run-btn { white-space: nowrap; flex-shrink: 0; }
+      .ff-context-note {
+        font-size: 12px;
+        color: #b08c4a;
+        background: rgba(176, 140, 74, 0.08);
+        border: 1px solid rgba(176, 140, 74, 0.25);
+        border-radius: 5px;
+        padding: 8px 10px;
+        margin-bottom: 8px;
+        line-height: 1.5;
+      }
+      .ff-canon-flag {
+        font-size: 12px;
+        color: var(--muted);
+        border-left: 2px solid var(--border);
+        padding-left: 8px;
+        margin-bottom: 8px;
+        line-height: 1.4;
+      }
+      .ff-tier-badge {
+        display: inline-block;
+        font-size: 11px;
+        color: #7b6ea6;
+        background: rgba(123, 110, 166, 0.1);
+        border: 1px solid rgba(123, 110, 166, 0.25);
+        border-radius: 10px;
+        padding: 2px 8px;
+        margin-bottom: 8px;
+      }
+      .ff-options { margin-bottom: 10px; }
+      .ff-options-heading {
+        font-size: 11px;
+        color: var(--muted);
+        margin-bottom: 6px;
+        font-weight: 500;
+      }
+      .ff-option-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+      .ff-option-key {
+        font-size: 12px;
+        color: var(--muted);
+        min-width: 56px;
+        flex-shrink: 0;
+      }
+      .ff-option-input {
+        flex: 1;
+        font: inherit;
+        font-size: 12px;
+        padding: 4px 8px;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+      }
+      .ff-option-input:focus {
+        outline: none;
+        border-color: #7b6ea6;
+      }
+      .ff-result-area { margin-top: 12px; }
+      .ff-thinking {
+        font-size: 13px;
+        color: var(--muted);
+        font-style: italic;
+      }
+      .ff-summary {
+        font-size: 13px;
+        font-weight: 500;
+        line-height: 1.5;
+        margin-bottom: 10px;
+        padding: 10px 12px;
+        border-radius: 5px;
+        background: var(--card);
+        border: 1px solid var(--border);
+      }
+      .ff-confidence {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 600;
+        border-radius: 10px;
+        padding: 1px 8px;
+        margin-right: 6px;
+        vertical-align: middle;
+      }
+      .ff-confidence-clear {
+        background: rgba(46, 160, 87, 0.15);
+        color: #2ea057;
+        border: 1px solid rgba(46, 160, 87, 0.3);
+      }
+      .ff-confidence-tension {
+        background: rgba(176, 140, 74, 0.15);
+        color: #b08c4a;
+        border: 1px solid rgba(176, 140, 74, 0.3);
+      }
+      .ff-breakdown {
+        font-size: 13px;
+        line-height: 1.65;
+        white-space: pre-wrap;
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        background: var(--card);
+        margin-bottom: 10px;
+      }
+      .ff-north-star {
+        padding: 10px 12px;
+        border: 1px solid rgba(123, 110, 166, 0.25);
+        border-left: 3px solid #7b6ea6;
+        border-radius: 5px;
+        background: rgba(123, 110, 166, 0.04);
+        margin-bottom: 12px;
+      }
+      .ff-north-star-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: #7b6ea6;
+        margin-bottom: 4px;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+      .ff-north-star-text {
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--text);
+      }
+      .ff-rerun-bar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding-top: 10px;
+        border-top: 1px solid var(--border);
+      }
+      .ff-rerun-label {
+        font-size: 12px;
+        color: var(--muted);
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .ff-rerun-btn { flex-shrink: 0; }
+      .ff-error {
+        font-size: 13px;
+        color: #c0392b;
+        padding: 8px 10px;
+        border: 1px solid rgba(192, 57, 43, 0.3);
+        border-radius: 5px;
+      }
+      /* P46-B — save bar + analysis history */
+      .ff-save-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding-top: 10px;
+        margin-top: 4px;
+        border-top: 1px solid var(--border);
+      }
+      .ff-save-confirm {
+        font-size: 12px;
+        color: #2ea057;
+      }
+      .ff-history-section {
+        margin-top: 20px;
+        padding: 12px 16px;
+        border: 1px solid var(--border);
+        border-left: 3px solid #7b6ea6;
+        border-radius: 6px;
+        background: rgba(123, 110, 166, 0.03);
+      }
+      .ff-history-section > summary {
+        font-size: 12px;
+        font-weight: 600;
+        color: #7b6ea6;
+        cursor: pointer;
+        user-select: none;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        letter-spacing: 0.02em;
+      }
+      .ff-history-section > summary::-webkit-details-marker { display: none; }
+      .ff-history-section > summary::before {
+        content: '▶';
+        font-size: 9px;
+        color: #7b6ea6;
+        transition: transform 0.15s;
+      }
+      .ff-history-section[open] > summary::before {
+        transform: rotate(90deg);
+      }
+      .ff-history-section > summary:hover { opacity: 0.8; }
+      .ff-history-cards {
+        padding-top: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .ff-history-card {
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        background: var(--bg);
+      }
+      .ff-history-card-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+        flex-wrap: wrap;
+      }
+      .ff-history-mode-badge {
+        font-size: 11px;
+        font-weight: 600;
+        color: #7b6ea6;
+        background: rgba(123, 110, 166, 0.1);
+        border: 1px solid rgba(123, 110, 166, 0.25);
+        border-radius: 10px;
+        padding: 2px 8px;
+      }
+      .ff-history-date {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .ff-history-version {
+        font-size: 11px;
+        color: var(--muted);
+        font-style: italic;
+      }
+      .ff-stale-badge {
+        font-size: 11px;
+        font-weight: 600;
+        color: #b08c4a;
+        background: rgba(176, 140, 74, 0.12);
+        border: 1px solid rgba(176, 140, 74, 0.3);
+        border-radius: 10px;
+        padding: 2px 8px;
+      }
+      .ff-history-card-summary {
+        font-size: 13px;
+        line-height: 1.45;
+        margin-bottom: 4px;
+      }
+      .ff-history-card-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 8px;
+      }
+      .ff-history-locked-note {
+        font-size: 11px;
+        color: var(--muted);
+        font-style: italic;
+        margin-top: 6px;
       }
     </style>
   </head>

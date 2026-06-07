@@ -1385,6 +1385,84 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '041_cwa_expand',
+    up(db) {
+      // Expand cross-workspace attachments to all remaining workspaces.
+      // The INSERT validity trigger (migration 025) uses CASE…WHEN and silently
+      // passes unknown kinds, so no trigger recreation needed. We only add the
+      // missing ON DELETE CASCADE triggers so orphan rows are cleaned up when
+      // any of the new host/source entries are deleted.
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS brainstorm_items_host_cwa_cascade
+        AFTER DELETE ON brainstorm_items BEGIN
+          DELETE FROM cross_workspace_attachments
+            WHERE host_kind = 'brainstorm' AND host_id = OLD.id;
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS research_items_host_cwa_cascade
+        AFTER DELETE ON research_items BEGIN
+          DELETE FROM cross_workspace_attachments
+            WHERE host_kind = 'research' AND host_id = OLD.id;
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS writing_lab_cwa_cascade
+        AFTER DELETE ON writing_lab_drafts BEGIN
+          DELETE FROM cross_workspace_attachments
+            WHERE (host_kind = 'writing_lab' AND host_id = OLD.id)
+               OR (source_kind = 'writing_lab' AND source_id = OLD.id);
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS documents_cwa_cascade
+        AFTER DELETE ON documents BEGIN
+          DELETE FROM cross_workspace_attachments
+            WHERE (host_kind = 'documents' AND host_id = OLD.id)
+               OR (source_kind = 'documents' AND source_id = OLD.id);
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS source_material_host_cwa_cascade
+        AFTER DELETE ON source_material BEGIN
+          DELETE FROM cross_workspace_attachments
+            WHERE host_kind = 'source_material' AND host_id = OLD.id;
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS unsorted_items_host_cwa_cascade
+        AFTER DELETE ON unsorted_items BEGIN
+          DELETE FROM cross_workspace_attachments
+            WHERE host_kind = 'unsorted' AND host_id = OLD.id;
+        END;
+      `);
+    },
+  },
+  {
+    name: '040_flanagan_analyses',
+    up(db) {
+      // P46-B — saved Flanagan Filter analyses attached to Open Questions entries.
+      // ON DELETE CASCADE keeps cleanup automatic when a question is deleted.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS flanagan_analyses (
+          id               INTEGER PRIMARY KEY AUTOINCREMENT,
+          question_id      INTEGER NOT NULL REFERENCES open_questions(id) ON DELETE CASCADE,
+          scan_mode        TEXT    NOT NULL DEFAULT '',
+          flanagan_version TEXT    NOT NULL DEFAULT '',
+          summary          TEXT    NOT NULL DEFAULT '',
+          breakdown        TEXT    NOT NULL DEFAULT '',
+          north_star       TEXT    NOT NULL DEFAULT '',
+          confidence       TEXT    NOT NULL DEFAULT '',
+          is_stale         INTEGER NOT NULL DEFAULT 0,
+          created_at       TEXT    NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_flanagan_analyses_question
+          ON flanagan_analyses(question_id, id);
+      `);
+    },
+  },
+  {
+    name: '042_chat_message_archive',
+    up(db) {
+      db.exec(`ALTER TABLE chat_messages ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0;`);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -1864,6 +1942,53 @@ const chatMessages = {
     return getDb()
       .prepare('SELECT * FROM chat_messages WHERE id = ?')
       .get(info.lastInsertRowid);
+  },
+  archive: (id) =>
+    getDb().prepare('UPDATE chat_messages SET is_archived = 1 WHERE id = ?').run(id),
+  unarchive: (id) =>
+    getDb().prepare('UPDATE chat_messages SET is_archived = 0 WHERE id = ?').run(id),
+};
+
+// --- Flanagan analyses repository (P46-B) ----------------------------------
+// Saved Flanagan Filter analysis records attached to Open Questions entries.
+const flanaganAnalyses = {
+  create(questionId, { scanMode, flanaganVersion, summary, breakdown, northStar, confidence }) {
+    const now = new Date().toISOString();
+    const info = getDb()
+      .prepare(`
+        INSERT INTO flanagan_analyses
+          (question_id, scan_mode, flanagan_version, summary, breakdown, north_star, confidence, is_stale, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
+      `)
+      .run(
+        questionId,
+        scanMode || '',
+        flanaganVersion || '',
+        summary || '',
+        breakdown || '',
+        northStar || '',
+        confidence || '',
+        now
+      );
+    return getDb()
+      .prepare('SELECT * FROM flanagan_analyses WHERE id = ?')
+      .get(info.lastInsertRowid);
+  },
+  listFor(questionId) {
+    return getDb()
+      .prepare('SELECT * FROM flanagan_analyses WHERE question_id = ? ORDER BY id DESC')
+      .all(questionId);
+  },
+  markStale(id) {
+    getDb()
+      .prepare('UPDATE flanagan_analyses SET is_stale = 1 WHERE id = ?')
+      .run(id);
+    return getDb()
+      .prepare('SELECT * FROM flanagan_analyses WHERE id = ?')
+      .get(id);
+  },
+  delete(id) {
+    getDb().prepare('DELETE FROM flanagan_analyses WHERE id = ?').run(id);
   },
 };
 
@@ -3883,6 +4008,9 @@ const CWA_TABLE_BY_KIND = {
   brainstorm: 'brainstorm_items',
   research: 'research_items',
   source_material: 'source_material',
+  documents: 'documents',
+  writing_lab: 'writing_lab_drafts',
+  unsorted: 'unsorted_items',
 };
 
 // Renderer entityKind (logical name) → canon_entries.origin_kind enum value.
@@ -3909,6 +4037,9 @@ const WORKSPACE_LABEL_BY_KIND = {
   brainstorm: 'Brainstorm',
   research: 'Research',
   source_material: 'Source Material',
+  documents: 'Documents',
+  writing_lab: 'Writing Lab',
+  unsorted: 'Unsorted',
 };
 
 const links = {
@@ -4675,6 +4806,7 @@ module.exports = {
   chats,
   chatSources,
   chatMessages,
+  flanaganAnalyses,
   listUnsorted,
   listArchivedUnsorted,
   getUnsorted,
