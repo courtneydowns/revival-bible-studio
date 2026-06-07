@@ -144,6 +144,9 @@ contextBridge.exposeInMainWorld('revival', {
     // P43 — on-demand conflict check: proposal vs locked canon entries.
     conflictCheck: (proposalId, model) =>
       ipcRenderer.invoke('claude:conflictCheck', proposalId, model),
+    // P44 — Writing Lab draft assistant.
+    draftAssist: (draftTitle, draftBody, sources, messages, model) =>
+      ipcRenderer.invoke('claude:draftAssist', draftTitle, draftBody, sources, messages, model),
   },
   dashboard: {
     summary: (limit) => ipcRenderer.invoke('dashboard:summary', limit),

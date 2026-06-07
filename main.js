@@ -708,6 +708,94 @@ function registerIpc() {
     return { flags: enriched, checkedCount: locked.length };
   });
 
+  // P44 — Writing Lab draft assistant. Injects the current draft and any
+  // attached source materials into the system prompt. Multi-turn; caller
+  // maintains message history. propose_canon_entry tool is available.
+  ipcMain.handle('claude:draftAssist', async (_e, draftTitle, draftBody, sources, messages, model) => {
+    const apiKey = db.settings.getClaudeApiKey();
+    if (!apiKey) throw new Error('No Claude API key configured. Add one in Settings.');
+
+    const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
+
+    const draftSection =
+      `## Active Draft: ${draftTitle || 'Untitled'}\n\n${draftBody || '(empty)'}`;
+
+    const sourcesSection = (sources && sources.length > 0)
+      ? '\n\n## Attached Sources\n\n' +
+        sources.map((s) => `### ${s.title}\n${s.body || '(no content)'}`).join('\n\n---\n\n')
+      : '';
+
+    const systemPrompt =
+      'You are a writing assistant embedded in a TV writers\' room tool. ' +
+      'The writer has opened a draft and may have attached source material for context. ' +
+      'Help with scene drafting, dialogue, continuity checks, character voice, and analysis. ' +
+      'Reference the draft and sources in your answers — do not invent facts not present in ' +
+      'the material provided. Keep answers focused and practical for a working writer.\n\n' +
+      draftSection + sourcesSection +
+      PROPOSE_TOOL_INSTRUCTION;
+
+    const baseBody = {
+      model: safeModel,
+      max_tokens: 8192,
+      messages,
+      tools: [PROPOSE_TOOL],
+      system: systemPrompt,
+    };
+
+    const data = await callClaudeAPI(apiKey, baseBody);
+
+    const toolUseBlocks = (data.content || []).filter((b) => b.type === 'tool_use');
+    const textBlock = (data.content || []).find((b) => b.type === 'text');
+
+    if (toolUseBlocks.length === 0) {
+      if (!textBlock) throw new Error('Unexpected response shape from Claude API.');
+      return { text: textBlock.text, proposalsCreated: [] };
+    }
+
+    const proposalsCreated = [];
+    const toolResults = [];
+
+    for (const block of toolUseBlocks) {
+      if (block.name !== 'propose_canon_entry') continue;
+      const input = block.input || {};
+      let resultText;
+      try {
+        const proposal = db.canonProposals.createFromAI({
+          entry_type: input.entry_type || null,
+          title: input.title || '',
+          body: input.body || '',
+          proposer_note: input.proposer_note || null,
+          chat_id: null,
+        });
+        proposalsCreated.push({ id: proposal.id, title: input.title || '(untitled)' });
+        resultText = `Proposal staged in Canon Review with id ${proposal.id}.`;
+      } catch (err) {
+        resultText = `Failed to create proposal: ${err.message}`;
+      }
+      toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultText });
+    }
+
+    const followUpMessages = [
+      ...messages,
+      { role: 'assistant', content: data.content },
+      { role: 'user', content: toolResults },
+    ];
+    const followUpBody = {
+      model: safeModel,
+      max_tokens: 2048,
+      messages: followUpMessages,
+      tools: [PROPOSE_TOOL],
+      system: systemPrompt,
+    };
+    const followUpData = await callClaudeAPI(apiKey, followUpBody);
+    const followUpText = (followUpData.content || []).find((b) => b.type === 'text');
+
+    return {
+      text: followUpText ? followUpText.text : 'Proposal sent to Canon Review.',
+      proposalsCreated,
+    };
+  });
+
   // PUI2 popout wiring.
   //  • popout:open spawns a new BrowserWindow for a single entry.
   //  • popout:changed is a one-way fan-out: whoever just mutated an entry

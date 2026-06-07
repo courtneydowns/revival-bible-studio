@@ -6544,6 +6544,109 @@ function renderWritingLabPage(section) {
       bar.append(status, counter, spacer, proposeBtn, archiveBtn, deleteBtn);
     }
 
+    // P44 — source attachment row: always visible below the editor bar.
+    let draftSources = [];
+
+    const sourcesBar = document.createElement('div');
+    sourcesBar.className = 'wl-sources-bar';
+
+    const sourcesLabel = document.createElement('span');
+    sourcesLabel.className = 'wl-sources-label';
+    sourcesLabel.textContent = 'Sources:';
+    sourcesBar.appendChild(sourcesLabel);
+
+    const sourcesChipArea = document.createElement('span');
+    sourcesChipArea.className = 'wl-sources-chips';
+    sourcesBar.appendChild(sourcesChipArea);
+
+    const sourceAttachBtn = document.createElement('button');
+    sourceAttachBtn.type = 'button';
+    sourceAttachBtn.className = 'wl-source-attach-btn';
+    sourceAttachBtn.textContent = '+ Attach Source';
+    sourcesBar.appendChild(sourceAttachBtn);
+
+    const sourcePickerEl = document.createElement('div');
+    sourcePickerEl.className = 'wl-source-picker';
+    sourcePickerEl.hidden = true;
+    document.body.appendChild(sourcePickerEl);
+
+    function renderSourceChips() {
+      sourcesChipArea.innerHTML = '';
+      for (const src of draftSources) {
+        const chip = document.createElement('span');
+        chip.className = 'wl-source-chip';
+        chip.textContent = src.title;
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.title = 'Remove';
+        rm.textContent = '×';
+        rm.addEventListener('click', () => {
+          draftSources = draftSources.filter((s) => s.id !== src.id);
+          renderSourceChips();
+        });
+        chip.appendChild(rm);
+        sourcesChipArea.appendChild(chip);
+      }
+    }
+
+    function hideSourcePicker() {
+      sourcePickerEl.hidden = true;
+      sourcePickerEl.innerHTML = '';
+    }
+
+    async function showSourcePicker() {
+      sourcePickerEl.innerHTML = '';
+      let allSources;
+      try {
+        allSources = await window.revival.sourceMaterial.list();
+      } catch {
+        allSources = [];
+      }
+      const usedIds = new Set(draftSources.map((s) => s.id));
+      const available = allSources.filter((s) => !usedIds.has(s.id));
+      if (available.length === 0) {
+        const msg = document.createElement('div');
+        msg.className = 'wl-source-picker-empty';
+        msg.textContent = allSources.length
+          ? 'All sources already attached.'
+          : 'No Source Material yet. Add some in the Source Material workspace.';
+        sourcePickerEl.appendChild(msg);
+      } else {
+        for (const src of available) {
+          const row = document.createElement('div');
+          row.className = 'wl-source-picker-item';
+          row.textContent = src.title;
+          row.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            draftSources.push(src);
+            renderSourceChips();
+            hideSourcePicker();
+          });
+          sourcePickerEl.appendChild(row);
+        }
+      }
+      const rect = sourceAttachBtn.getBoundingClientRect();
+      sourcePickerEl.style.top = `${rect.bottom + 4}px`;
+      sourcePickerEl.style.left = `${rect.left}px`;
+      sourcePickerEl.hidden = false;
+    }
+
+    sourceAttachBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!sourcePickerEl.hidden) { hideSourcePicker(); return; }
+      showSourcePicker();
+    });
+    sourceAttachBtn.addEventListener('blur', () => {
+      setTimeout(() => { if (!sourcePickerEl.matches(':hover')) hideSourcePicker(); }, 150);
+    });
+
+    const _srcPickerClose = (e) => {
+      if (!sourcePickerEl.hidden && !sourcePickerEl.contains(e.target) && e.target !== sourceAttachBtn) {
+        hideSourcePicker();
+      }
+    };
+    document.addEventListener('click', _srcPickerClose);
+
     const titleInput = document.createElement('input');
     titleInput.type = 'text';
     titleInput.className = 'wl-title';
@@ -6559,9 +6662,10 @@ function renderWritingLabPage(section) {
     if (archivedAtStart) {
       titleInput.readOnly = true;
       bodyInput.readOnly = true;
+      sourceAttachBtn.disabled = true;
     }
 
-    rightCol.append(bar, titleInput, bodyInput);
+    rightCol.append(bar, sourcesBar, titleInput, bodyInput);
 
     // PTAG — tag bar for the open draft. A brand-new untitled draft has no
     // DB row yet, so the bar mounts after the first autosave creates one
@@ -6772,6 +6876,154 @@ function renderWritingLabPage(section) {
 
     if (item && !archivedAtStart) bodyInput.focus();
     else titleInput.focus();
+
+    // P44 — Draft Assistant panel (collapsible, session-scoped conversation).
+    // Sources are attached via sourcesBar above the title (always visible).
+    const assistant = document.createElement('div');
+    assistant.className = 'wl-assistant';
+
+    const aHeader = document.createElement('div');
+    aHeader.className = 'wl-assistant-header';
+    const aLabel = document.createElement('span');
+    aLabel.className = 'wl-assistant-header-label';
+    aLabel.textContent = 'Draft Assistant';
+    const aToggle = document.createElement('span');
+    aToggle.className = 'wl-assistant-toggle';
+    aToggle.textContent = '▼ collapse';
+    aHeader.append(aLabel, aToggle);
+    assistant.appendChild(aHeader);
+
+    const aBody = document.createElement('div');
+    aBody.className = 'wl-assistant-body';
+    assistant.appendChild(aBody);
+
+    // Conversation thread.
+    const aThread = document.createElement('div');
+    aThread.className = 'wl-assistant-thread';
+    aThread.hidden = true;
+    aBody.appendChild(aThread);
+
+    // Input row.
+    const aInputRow = document.createElement('div');
+    aInputRow.className = 'wl-assistant-input-row';
+    const aInput = document.createElement('textarea');
+    aInput.className = 'wl-assistant-input';
+    aInput.placeholder = 'Ask about continuity, dialogue, scene structure… (Enter to send, Shift+Enter for newline)';
+    const aSend = document.createElement('button');
+    aSend.type = 'button';
+    aSend.className = 'btn-primary wl-assistant-send';
+    aSend.textContent = 'Send';
+    aInputRow.append(aInput, aSend);
+    aBody.appendChild(aInputRow);
+
+    // Multi-turn message history for this editor session.
+    let draftThread = [];
+
+    function appendMsg(role, text) {
+      const msg = document.createElement('div');
+      msg.className = `wl-assistant-msg role-${role}`;
+      const lbl = document.createElement('div');
+      lbl.className = 'wl-assistant-msg-label';
+      lbl.textContent = role === 'user' ? 'You' : role === 'assistant' ? 'Assistant' : role;
+      const body = document.createElement('div');
+      body.className = 'wl-assistant-msg-body';
+      body.textContent = text;
+      msg.append(lbl, body);
+      aThread.appendChild(msg);
+      aThread.hidden = false;
+      aThread.scrollTop = aThread.scrollHeight;
+      return msg;
+    }
+
+    async function sendMessage() {
+      const text = aInput.value.trim();
+      if (!text) return;
+      aInput.value = '';
+      aSend.disabled = true;
+
+      appendMsg('user', text);
+      draftThread.push({ role: 'user', content: text });
+
+      const thinking = appendMsg('thinking', 'Thinking…');
+      thinking.querySelector('.wl-assistant-msg-label').textContent = '';
+
+      try {
+        const model = (typeof chatModelSelect !== 'undefined' && chatModelSelect.value)
+          ? chatModelSelect.value
+          : 'claude-sonnet-4-6';
+        const sourcesPayload = draftSources.map((s) => ({ title: s.title, body: s.body || '' }));
+        const messagesPayload = draftThread.map((m) => ({ role: m.role, content: m.content }));
+
+        const result = await window.revival.claude.draftAssist(
+          titleInput.value,
+          bodyInput.value,
+          sourcesPayload,
+          messagesPayload,
+          model
+        );
+
+        thinking.remove();
+        appendMsg('assistant', result.text);
+        draftThread.push({ role: 'assistant', content: result.text });
+
+        if (result.proposalsCreated && result.proposalsCreated.length > 0) {
+          const notice = document.createElement('div');
+          notice.className = 'wl-assistant-proposal-notice';
+          notice.textContent =
+            'Sent to Canon Review: ' + result.proposalsCreated.map((p) => p.title).join(', ');
+          aThread.appendChild(notice);
+        }
+      } catch (err) {
+        thinking.remove();
+        const raw = err.message || 'Request failed';
+        const clean = raw.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+        appendMsg('error', clean);
+      } finally {
+        aSend.disabled = false;
+        aInput.focus();
+      }
+    }
+
+    aSend.addEventListener('click', sendMessage);
+    aInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    });
+
+    // Clear conversation.
+    const aClearRow = document.createElement('div');
+    aClearRow.style.cssText = 'margin-top:8px; text-align:right;';
+    const aClearBtn = document.createElement('button');
+    aClearBtn.type = 'button';
+    aClearBtn.className = 'wl-assistant-clear-btn';
+    aClearBtn.textContent = 'Clear conversation';
+    aClearBtn.addEventListener('click', () => {
+      draftThread = [];
+      aThread.innerHTML = '';
+      aThread.hidden = true;
+    });
+    aClearRow.appendChild(aClearBtn);
+    aBody.appendChild(aClearRow);
+
+    // Toggle collapse/expand — starts expanded.
+    let aOpen = true;
+    aHeader.addEventListener('click', () => {
+      aOpen = !aOpen;
+      aBody.hidden = !aOpen;
+      aToggle.textContent = aOpen ? '▼ collapse' : '▶ expand';
+    });
+
+    rightCol.appendChild(assistant);
+
+    // Cleanup: remove the fixed-position source picker and document listener
+    // when this editor instance is replaced (openEditor clears rightCol).
+    const _editorObserver = new MutationObserver(() => {
+      if (!rightCol.contains(assistant)) {
+        sourcePickerEl.remove();
+        document.removeEventListener('click', _srcPickerClose);
+        _editorObserver.disconnect();
+      }
+    });
+    _editorObserver.observe(rightCol, { childList: true });
   }
 
   function renderDetail() {
