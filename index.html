@@ -2024,6 +2024,103 @@
       .wl-assistant-clear-btn:hover { color: var(--text); }
 
       /* --- Home dashboard (P27) --------------------------------------- */
+      /* PHOME-NEEDS: Needs Attention panel */
+      .needs-attention {
+        margin-bottom: 4px;
+      }
+      .needs-attention-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin: 4px 0 10px;
+      }
+      .needs-attention-head .home-section-label { margin: 0; }
+      .needs-attention-empty {
+        font-size: 13px;
+        color: var(--muted);
+        padding: 8px 0;
+      }
+      .na-category {
+        margin-bottom: 8px;
+      }
+      .na-category-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
+      }
+      .na-category-label {
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .na-count-badge {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--accent);
+        background: color-mix(in srgb, var(--accent) 12%, transparent);
+        border-radius: 10px;
+        padding: 0 6px;
+        line-height: 1.6;
+      }
+      .na-items {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 6px;
+      }
+      .na-item {
+        position: relative;
+        text-align: left;
+        font: inherit;
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--accent);
+        border-radius: 6px;
+        padding: 7px 10px;
+        cursor: pointer;
+      }
+      .na-item:hover { border-color: var(--accent); background: var(--hover); }
+      .na-item-title {
+        font-size: 13px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .na-item-age {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+
+      /* PHOME-NEEDS: collapsed sections (Recently Viewed + Recent Activity) */
+      .home-collapsed {
+        margin-top: 20px;
+      }
+      .home-collapsed > summary {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+        list-style: none;
+        user-select: none;
+        padding: 4px 0;
+      }
+      .home-collapsed > summary::-webkit-details-marker { display: none; }
+      .home-collapsed > summary::before {
+        content: '▶';
+        font-size: 9px;
+        transition: transform 0.15s;
+      }
+      .home-collapsed[open] > summary::before { transform: rotate(90deg); }
+      .home-collapsed-body { margin-top: 10px; }
+
       .home-section-label {
         font-size: 12px;
         letter-spacing: 0.04em;

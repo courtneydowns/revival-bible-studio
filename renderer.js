@@ -4915,6 +4915,27 @@ const DISMISSED_SUGGESTIONS_KEY = 'revival.home.dismissedSuggestions';
 const SUGGESTION_CAP = 6;
 const RECENT_CAP = 6;
 
+// PHOME-NEEDS: staleness thresholds (days). Persisted in localStorage so
+// Settings changes survive restarts. Defaults match the spec.
+const NEEDS_THRESHOLDS_KEY = 'revival.home.needs.thresholds';
+const NEEDS_THRESHOLDS_DEFAULTS = {
+  tier1QuestionDays: 14,
+  conflictDays: 30,
+  canonReviewDays: 7,
+};
+function getNeedsThresholds() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(NEEDS_THRESHOLDS_KEY));
+    return { ...NEEDS_THRESHOLDS_DEFAULTS, ...(saved || {}) };
+  } catch {
+    return { ...NEEDS_THRESHOLDS_DEFAULTS };
+  }
+}
+function setNeedsThresholds(updates) {
+  const current = getNeedsThresholds();
+  localStorage.setItem(NEEDS_THRESHOLDS_KEY, JSON.stringify({ ...current, ...updates }));
+}
+
 function getDismissedSuggestions() {
   try {
     const arr = JSON.parse(localStorage.getItem(DISMISSED_SUGGESTIONS_KEY));
@@ -5006,6 +5027,141 @@ function buildSuggestions(countsByKey) {
   return list;
 }
 
+// PHOME-NEEDS: build the Needs Attention panel and append it to `container`.
+// Returns a refreshNeedsAttention() function the caller can invoke to re-render.
+function buildNeedsAttentionPanel(container) {
+  const wrap = document.createElement('div');
+  wrap.className = 'needs-attention';
+  container.appendChild(wrap);
+
+  function daysSince(isoStr) {
+    return Math.floor((Date.now() - new Date(isoStr).getTime()) / 864e5);
+  }
+
+  function renderNeedsAttention(data) {
+    wrap.innerHTML = '';
+
+    const head = document.createElement('div');
+    head.className = 'needs-attention-head';
+
+    const label = document.createElement('span');
+    label.className = 'home-section-label';
+    label.textContent = 'Needs Attention';
+    head.appendChild(label);
+
+    const refreshBtn = document.createElement('button');
+    refreshBtn.type = 'button';
+    refreshBtn.className = 'suggestions-refresh';
+    refreshBtn.textContent = '↻ Refresh';
+    refreshBtn.title = 'Re-check for stale items';
+    refreshBtn.addEventListener('click', () => refreshNeedsAttention(refreshBtn));
+    head.appendChild(refreshBtn);
+    wrap.appendChild(head);
+
+    const { tier1Questions, stalledConflicts, pendingProposals } = data;
+    const total = tier1Questions.length + stalledConflicts.length + pendingProposals.length;
+
+    if (total === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'needs-attention-empty';
+      empty.textContent = 'All clear — nothing needs attention right now.';
+      wrap.appendChild(empty);
+      return;
+    }
+
+    const thresholds = getNeedsThresholds();
+
+    function addCategory(labelText, items, routeName, ageField, thresholdDays) {
+      if (items.length === 0) return;
+      const cat = document.createElement('div');
+      cat.className = 'na-category';
+
+      const catHead = document.createElement('div');
+      catHead.className = 'na-category-head';
+
+      const catLabel = document.createElement('span');
+      catLabel.className = 'na-category-label';
+      catLabel.textContent = labelText;
+
+      const badge = document.createElement('span');
+      badge.className = 'na-count-badge';
+      badge.textContent = String(items.length);
+
+      catHead.append(catLabel, badge);
+      cat.appendChild(catHead);
+
+      const grid = document.createElement('div');
+      grid.className = 'na-items';
+
+      for (const item of items) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'na-item';
+        btn.title = `Go to ${routeName}`;
+        btn.addEventListener('click', () => route(routeName));
+
+        const titleEl = document.createElement('div');
+        titleEl.className = 'na-item-title';
+        titleEl.textContent = item.title || item.proposal_intent || '(untitled)';
+
+        const age = daysSince(item[ageField]);
+        const ageEl = document.createElement('div');
+        ageEl.className = 'na-item-age';
+        ageEl.textContent = `${age}d — threshold ${thresholdDays}d`;
+
+        btn.append(titleEl, ageEl);
+        grid.appendChild(btn);
+      }
+
+      cat.appendChild(grid);
+      wrap.appendChild(cat);
+    }
+
+    addCategory(
+      `Tier-1 Open Questions (no update in ${thresholds.tier1QuestionDays}+ days)`,
+      tier1Questions, 'Open Questions', 'updated_at', thresholds.tier1QuestionDays
+    );
+    addCategory(
+      `Conflicts open ${thresholds.conflictDays}+ days`,
+      stalledConflicts, 'Conflicts', 'created_at', thresholds.conflictDays
+    );
+    addCategory(
+      `Canon Review proposals pending ${thresholds.canonReviewDays}+ days`,
+      pendingProposals, 'Canon Review', 'created_at', thresholds.canonReviewDays
+    );
+  }
+
+  let refreshing = false;
+  async function refreshNeedsAttention(btn) {
+    if (refreshing) return;
+    refreshing = true;
+    if (btn) btn.disabled = true;
+    try {
+      const data = await window.revival.dashboard.needsAttention(getNeedsThresholds());
+      renderNeedsAttention(data);
+    } catch (err) {
+      /* keep stale display on failure */
+    }
+    refreshing = false;
+    if (btn) btn.disabled = false;
+  }
+
+  // Initial load
+  (async () => {
+    try {
+      const data = await window.revival.dashboard.needsAttention(getNeedsThresholds());
+      renderNeedsAttention(data);
+    } catch (err) {
+      const errEl = document.createElement('p');
+      errEl.className = 'placeholder';
+      errEl.textContent = `Could not load: ${err.message || err}`;
+      wrap.appendChild(errEl);
+    }
+  })();
+
+  return refreshNeedsAttention;
+}
+
 function renderHomePage(section) {
   const loading = document.createElement('p');
   loading.className = 'placeholder';
@@ -5023,6 +5179,9 @@ function renderHomePage(section) {
       return;
     }
     loading.remove();
+
+    // PHOME-NEEDS: Needs Attention panel — primary actionable section.
+    buildNeedsAttentionPanel(section);
 
     let countsByKey = {};
     for (const c of summary.counts) countsByKey[c.key] = c;
@@ -5217,7 +5376,46 @@ function renderHomePage(section) {
     }
     section.appendChild(grid);
 
-    // --- Recent activity ---
+    // --- Recently Viewed (session-based, collapsed) ---
+    const rvItems = getRecentlyViewed();
+    if (rvItems.length > 0) {
+      const rvDetails = document.createElement('details');
+      rvDetails.className = 'home-collapsed';
+
+      const rvSummary = document.createElement('summary');
+      rvSummary.textContent = `Recently Viewed (${rvItems.length})`;
+      rvDetails.appendChild(rvSummary);
+
+      const rvBody = document.createElement('div');
+      rvBody.className = 'home-collapsed-body';
+
+      const rvGrid = document.createElement('div');
+      rvGrid.className = 'home-recent-viewed';
+      for (const item of rvItems) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'rv-card';
+        btn.title = `Go to ${item.workspace} — ${item.title}`;
+        btn.addEventListener('click', () => route(item.workspace, item.id));
+
+        const titleEl = document.createElement('div');
+        titleEl.className = 'rv-title';
+        titleEl.textContent = item.title;
+
+        const wsEl = document.createElement('div');
+        wsEl.className = 'rv-ws';
+        wsEl.textContent = item.workspace;
+
+        btn.append(titleEl, wsEl);
+        rvGrid.appendChild(btn);
+      }
+
+      rvBody.appendChild(rvGrid);
+      rvDetails.appendChild(rvBody);
+      section.appendChild(rvDetails);
+    }
+
+    // --- Recent activity (collapsed) ---
     // Cards are clearable (the ✕ hides a card from view — it does NOT delete the
     // underlying entry) and Refresh re-pulls everything from the DB, bringing
     // cleared cards back. Clearing is view-only and in-memory, so leaving and
@@ -5226,16 +5424,23 @@ function renderHomePage(section) {
     const clearedRecentIds = new Set();
     const recentKey = (it) => `${it.route}:${it.id}`;
 
-    // Header carries the label + Refresh; recentLabel points at it so the trim
-    // logic shows/hides the whole header alongside the feed.
+    // Wrap in a collapsed <details> so it's below Needs Attention.
+    const recentDetails = document.createElement('details');
+    recentDetails.className = 'home-collapsed';
+    section.appendChild(recentDetails);
+
+    const recentDetailsSummary = document.createElement('summary');
+    recentDetailsSummary.textContent = 'Recent Activity';
+    recentDetails.appendChild(recentDetailsSummary);
+
+    const recentDetailsBody = document.createElement('div');
+    recentDetailsBody.className = 'home-collapsed-body';
+    recentDetails.appendChild(recentDetailsBody);
+
+    // Header carries the Refresh button; recentLabel tracks it for show/hide.
     const recentHead = document.createElement('div');
     recentHead.className = 'home-recent-head';
     recentLabel = recentHead;
-
-    const recentTitle = document.createElement('span');
-    recentTitle.className = 'home-section-label';
-    recentTitle.textContent = 'Recent activity';
-    recentHead.appendChild(recentTitle);
 
     const recentRefresh = document.createElement('button');
     recentRefresh.type = 'button';
@@ -5244,12 +5449,12 @@ function renderHomePage(section) {
     recentRefresh.title = 'Re-pull recent activity (restores cleared cards)';
     recentRefresh.addEventListener('click', () => refreshRecent(recentRefresh));
     recentHead.appendChild(recentRefresh);
-    section.appendChild(recentHead);
+    recentDetailsBody.appendChild(recentHead);
 
     const feed = document.createElement('div');
     feed.className = 'home-recent';
     recentFeed = feed;
-    section.appendChild(feed);
+    recentDetailsBody.appendChild(feed);
 
     function buildRecentCard(item) {
       const card = document.createElement('div');
@@ -5516,8 +5721,88 @@ function renderSettingsPage(section) {
   renderApiKeyBlock(section);
 
   renderManageTags(section);
+  renderNeedsAttentionSettings(section);
   renderPanicExport(section);
   renderCanonExport(section);
+}
+
+// --- Settings: Needs Attention thresholds (PHOME-NEEDS) --------------------
+// Three number inputs, persisted in localStorage. Defaults match the spec.
+function renderNeedsAttentionSettings(section) {
+  const block = document.createElement('div');
+  block.className = 'entry-form settings-block';
+
+  const heading = document.createElement('h2');
+  heading.className = 'settings-heading';
+  heading.textContent = 'Needs Attention Thresholds';
+
+  const desc = document.createElement('p');
+  desc.className = 'settings-desc';
+  desc.textContent =
+    'Days before an item appears in the Needs Attention panel on Home. Changes apply immediately on next Home visit.';
+
+  const fields = [
+    { key: 'tier1QuestionDays', label: 'Tier-1 Open Questions (days without update)' },
+    { key: 'conflictDays',      label: 'Conflicts (days open)' },
+    { key: 'canonReviewDays',   label: 'Canon Review proposals (days pending)' },
+  ];
+
+  const thresholds = getNeedsThresholds();
+  const inputs = {};
+  const fieldWrap = document.createElement('div');
+  fieldWrap.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-top:8px;';
+
+  for (const f of fields) {
+    const row = document.createElement('label');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;font-size:13px;';
+
+    const labelText = document.createElement('span');
+    labelText.style.flex = '1';
+    labelText.textContent = f.label;
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '1';
+    input.max = '365';
+    input.value = String(thresholds[f.key]);
+    input.style.cssText = 'width:60px;padding:3px 6px;font:inherit;';
+    inputs[f.key] = input;
+
+    const unit = document.createElement('span');
+    unit.textContent = 'd';
+    unit.style.color = 'var(--muted)';
+
+    row.append(labelText, input, unit);
+    fieldWrap.appendChild(row);
+  }
+
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.textContent = 'Save Thresholds';
+  saveBtn.style.marginTop = '10px';
+
+  const statusEl = document.createElement('p');
+  statusEl.className = 'draft-status';
+
+  saveBtn.addEventListener('click', () => {
+    const updates = {};
+    let valid = true;
+    for (const f of fields) {
+      const v = parseInt(inputs[f.key].value, 10);
+      if (!Number.isFinite(v) || v < 1) {
+        setStatus(statusEl, `"${f.label}" must be a number ≥ 1.`);
+        valid = false;
+        break;
+      }
+      updates[f.key] = v;
+    }
+    if (!valid) return;
+    setNeedsThresholds(updates);
+    setStatus(statusEl, 'Saved. Takes effect on next Home visit.');
+  });
+
+  block.append(heading, desc, fieldWrap, saveBtn, statusEl);
+  section.appendChild(block);
 }
 
 // --- Settings: Manage Tags (PTAGDEL) ---------------------------------------

@@ -201,6 +201,7 @@ contextBridge.exposeInMainWorld('revival', {
   dashboard: {
     summary: (limit) => ipcRenderer.invoke('dashboard:summary', limit),
     navBadges: () => ipcRenderer.invoke('dashboard:navBadges'),
+    needsAttention: (thresholds) => ipcRenderer.invoke('dashboard:needsAttention', thresholds),
   },
   canon: {
     list: () => ipcRenderer.invoke('canon:list'),

@@ -2588,6 +2588,40 @@ const dashboard = {
     counts: dashboard.counts(),
     recent: dashboard.recent(limit),
   }),
+  // PHOME-NEEDS: items that need attention based on staleness + tier.
+  // thresholds: { tier1QuestionDays, conflictDays, canonReviewDays }
+  // Dates stored as ISO strings — JS cutoff strings compare correctly via
+  // SQLite lexicographic order.
+  needsAttention: ({ tier1QuestionDays = 14, conflictDays = 30, canonReviewDays = 7 } = {}) => {
+    const db = getDb();
+    const cutoff = (days) => new Date(Date.now() - days * 864e5).toISOString();
+
+    const tier1Questions = db
+      .prepare(
+        `SELECT id, title, updated_at FROM open_questions
+          WHERE archived_at IS NULL AND tier = 1 AND updated_at < ?
+          ORDER BY updated_at ASC`
+      )
+      .all(cutoff(tier1QuestionDays));
+
+    const stalledConflicts = db
+      .prepare(
+        `SELECT id, title, created_at FROM conflicts
+          WHERE archived_at IS NULL AND created_at < ?
+          ORDER BY created_at ASC`
+      )
+      .all(cutoff(conflictDays));
+
+    const pendingProposals = db
+      .prepare(
+        `SELECT id, proposal_intent, proposer_note, created_at FROM canon_proposals
+          WHERE status = 'pending' AND created_at < ?
+          ORDER BY created_at ASC`
+      )
+      .all(cutoff(canonReviewDays));
+
+    return { tier1Questions, stalledConflicts, pendingProposals };
+  },
   // PHOME: the three nav badge counts. Unsorted = total active items; Canon
   // Review = proposals still awaiting a decision (pending); Open Questions =
   // active tier-1 questions (the highest-importance tier). Read-only.

@@ -502,7 +502,7 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Home upgrade
 
-### PHOME-NEEDS — Home: Needs Attention panel
+### PHOME-NEEDS — Home: Needs Attention panel ✅
 - Replace passive Home with actionable session-start surface
 - **Needs Attention panel** surfaces priorities based on staleness + tier + blocking status:
   - Tier-1 Open Questions unresolved 14+ days
@@ -514,6 +514,20 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Staleness thresholds configurable in Settings
 - Recently Viewed moves to collapsed section below Needs Attention
 - **Smoke:** Create stale items matching each category; confirm they appear in Needs Attention panel; adjust a threshold in Settings, confirm panel updates
+
+---
+
+## Chat history page
+
+### PCHAT-HISTORY — Chat: dedicated history page
+- Chat nav item opens a full two-column page (same layout pattern as all other workspaces)
+- Left column: list of past chats sorted by most recent — title, date, last message preview line
+- Right column: full read-only transcript of selected chat
+- "Continue" button on right panel — opens that chat in the drawer as the active session
+- "New Chat" button at top of left column — opens a fresh session in the drawer
+- Drawer stays exactly as-is; this page is a history surface, not a replacement
+- Archived chats visible in a collapsed section at the bottom of the left column (same pattern as other workspaces)
+- **Smoke:** Open Chat page, confirm two-column layout; click a past chat, confirm full transcript renders read-only; click "Continue," confirm that chat opens in the drawer as the active session; click "New Chat," confirm a fresh session opens in the drawer; confirm archived chats appear in collapsed section
 
 ---
 

@@ -73,7 +73,8 @@
 | **PAI-WIRE Cross-AI routing** | **CLI** | Four cross-feature connections, multi-file |
 | **PDOC-WIRE Documents wiring** | **CLI** | First-class workspace wiring, multi-file |
 | **PCHAT-ATTACH Chat attachment expansion** | **VS Code ext** | Add permitted types to existing attachment UI |
-| **PHOME-NEEDS Home: Needs Attention panel** | **CLI** | New panel component + staleness logic |
+| **PHOME-NEEDS Home: Needs Attention panel** | **CLI** ✅ | New panel component + staleness logic |
+| **PCHAT-HISTORY Chat: dedicated history page** | **CLI** | New two-column page, drawer wiring |
 | **PUNDO App-level undo** | **CLI** | Global action history, touches every workspace |
 | **PWLAB-VERSIONS Writing Lab draft versioning** | **CLI** | Version storage + diff view |
 | **PSESSION-LOG Session / work log** | **CLI** | New log module + Settings panel |

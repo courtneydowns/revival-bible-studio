@@ -90,7 +90,7 @@ Active attachments visible at all times. Same "what Claude is using" transparenc
 
 ---
 
-## PHOME-NEEDS — Home: Needs Attention panel
+## PHOME-NEEDS — Home: Needs Attention panel ✅
 
 Replace passive Home with an actionable session-start surface.
 

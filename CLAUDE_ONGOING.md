@@ -27,6 +27,18 @@ Local-first creative/editorial workspace for the **Revival project only**. Not a
 
 ---
 
+## Smoke test output rule
+
+**When Claude produces output that includes changes — code, phase specs, file updates, design decisions — it must append a numbered smoke test list at the end of the response.** Format:
+
+1. [Action to take]
+2. [What to confirm]
+3. ...
+
+The list should be tight and specific to what was just changed. No filler items.
+
+---
+
 ## UI principles — every screen must answer
 
 1. Where am I.
@@ -69,6 +81,7 @@ Do not invent new top-level workspaces.
 - **Planned (PCHAT-ATTACH):** Canon Bible entries, Characters entries, Episodes entries, Documents entries will also be attachable. Permitted list is fixed — no other workspaces.
 - Attach modes: (1) keep active in this chat, (2) use for next message only.
 - Active attachments must be visible at all times so the user knows what Claude is using.
+- **Chat history page (PCHAT-HISTORY):** Chat nav item opens a dedicated two-column page. Left = list of past chats (title, date, last message preview), sorted most recent first; archived chats in collapsed section at bottom. Right = full read-only transcript of selected chat. "Continue" button opens that chat in the drawer as the active session. "New Chat" button at top of left column opens a fresh drawer session. Drawer stays as-is — page is a history surface, not a replacement.
 
 ---
 
@@ -190,11 +203,12 @@ The Flanagan filter feature applies THE_FLANAGAN_MASTER document as an analytica
 
 These features are in `docs/FEATURE_BACKLOG_ONGOING.md` and `docs/BUILD_PLAN_ONGOING.md`. Do not implement any of these without an explicit build instruction. Listed here so Claude Code does not contradict them in design decisions.
 
+- **PCHAT-HISTORY:** Chat nav item opens a two-column history page. Left = chat list (title, date, last message preview); right = read-only transcript. "Continue" button opens chat in drawer. "New Chat" opens fresh drawer session. Drawer stays as-is.
 - **PFLAN-EXPAND:** Flanagan Filter expands to Brainstorm, Writing Lab, Characters, Episodes, Canon Review, Canon Bible (Edit Mode), Conflicts (lightweight), Decisions (lightweight). Fifth mode: Production Check (Tier 3 only).
 - **PAI-WIRE:** AI features wire to each other — P44→P41, P42→P43, P46→P41, P45→P43. All user-triggered, no automatic routing.
 - **PDOC-WIRE:** Documents becomes first-class — Chat-attachable, highlight-extract-route target, linkable to Characters/Episodes, Flanagan Filter, Canon proposal path.
 - **PCHAT-ATTACH:** Chat permits Canon Bible entries, Characters, Episodes, Documents in addition to Source Material.
-- **PHOME-NEEDS:** Home gets Needs Attention panel (staleness + tier + blocking). Recently Viewed moves to collapsed section.
+- **PHOME-NEEDS:** Home gets Needs Attention panel (staleness + tier + blocking). Recently Viewed moves to collapsed section. ✅ Complete.
 - **PUNDO:** Cmd+Z undo for archive/delete/resolve/approve/reject. Session-only, last 20 actions. Canon Bible chain actions excluded.
 - **PWLAB-VERSIONS:** Writing Lab draft versioning — manual save, named versions, side-by-side diff, restore.
 - **PSESSION-LOG:** Auto-generated session log at app close. Audit trail only, not editable.
@@ -214,7 +228,7 @@ These features are in `docs/FEATURE_BACKLOG_ONGOING.md` and `docs/BUILD_PLAN_ONG
 
 ---
 
-
+## Lifecycle
 
 - Every workspace supports editing.
 - Most workspaces support delete (for mistakes).
@@ -242,3 +256,4 @@ These features are in `docs/FEATURE_BACKLOG_ONGOING.md` and `docs/BUILD_PLAN_ONG
 - Ask before doing anything ambiguous.
 - If a request conflicts with the rules above, surface the conflict and stop. Do not silently comply.
 - Never assume; confirm.
+- **After any response that includes changes (phase specs, design decisions, file updates), append a numbered smoke test list.** Tight and specific to what changed.
