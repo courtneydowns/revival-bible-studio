@@ -158,11 +158,12 @@ contextBridge.exposeInMainWorld('revival', {
     flanaganTagSuggest: (analysisData, tags, model) =>
       ipcRenderer.invoke('claude:flanaganTagSuggest', analysisData, tags, model),
   },
-  // P46-B — save Flanagan Filter analyses to Open Questions entries.
+  // P46-B / PFLAN-EXPAND — Flanagan Filter analyses, keyed by entity kind + id.
   flanaganAnalyses: {
-    create: (questionId, data) =>
-      ipcRenderer.invoke('flanaganAnalyses:create', questionId, data),
-    list: (questionId) => ipcRenderer.invoke('flanaganAnalyses:list', questionId),
+    create: (entityKind, entityId, data) =>
+      ipcRenderer.invoke('flanaganAnalyses:create', entityKind, entityId, data),
+    list: (entityKind, entityId) =>
+      ipcRenderer.invoke('flanaganAnalyses:list', entityKind, entityId),
     markStale: (id) => ipcRenderer.invoke('flanaganAnalyses:markStale', id),
     delete: (id) => ipcRenderer.invoke('flanaganAnalyses:delete', id),
   },

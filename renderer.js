@@ -3356,16 +3356,27 @@ function renderCanonBiblePage(section) {
           list.appendChild(makeEditCard(e));
         } else {
           // PCBREF — Reference Mode: no action row, read-only tag bar.
-          list.appendChild(
-            buildCanonCard(
-              e,
-              typeConfig,
-              editMode ? onCanonTagChange : undefined,
-              editMode ? activeActions : null,
-              chainHelper,
-              !editMode
-            )
+          const card = buildCanonCard(
+            e,
+            typeConfig,
+            editMode ? onCanonTagChange : undefined,
+            editMode ? activeActions : null,
+            chainHelper,
+            !editMode
           );
+          // PFLAN-EXPAND — Flanagan Filter (full five modes) on canon entries in Edit Mode.
+          if (editMode) {
+            const cbFfCallbacks = {};
+            mountFlanaganFilter(card, e, cbFfCallbacks, {
+              entityKind: 'canon_entries',
+              workspaceName: 'Canon Bible',
+            });
+            const { refresh: cbFfRefresh } = mountFlanaganHistory(
+              card, e, false, cbFfCallbacks, 'canon_entries'
+            );
+            cbFfCallbacks.refreshHistory = cbFfRefresh;
+          }
+          list.appendChild(card);
         }
       }
     }
@@ -4516,6 +4527,22 @@ function renderCanonReviewPage(section, workspaceName) {
 
     // PPOL2b-02 — status bar (workspace · type · created · edited · status).
     rightCol.appendChild(buildStatusBar('Canon Review', p, false));
+
+    // PFLAN-EXPAND — Flanagan Filter (full five modes) on Canon Review proposals.
+    // Passed a synthetic item that exposes proposed title/body as item.title/body.
+    const crProposalItem = Object.assign({}, p, {
+      title: (p.proposed_fields && p.proposed_fields.title) || p.title || '',
+      body:  (p.proposed_fields && p.proposed_fields.body)  || p.body  || '',
+    });
+    const crFfCallbacks = {};
+    mountFlanaganFilter(rightCol, crProposalItem, crFfCallbacks, {
+      entityKind: 'canon_proposals',
+      workspaceName: 'Canon Review',
+    });
+    const { refresh: crFfRefresh } = mountFlanaganHistory(
+      rightCol, crProposalItem, false, crFfCallbacks, 'canon_proposals'
+    );
+    crFfCallbacks.refreshHistory = crFfRefresh;
 
     conflictCheckBtn.addEventListener('click', async () => {
       conflictCheckBtn.disabled = true;
@@ -7294,6 +7321,23 @@ function renderWritingLabPage(section) {
 
     rightCol.appendChild(assistant);
 
+    // PFLAN-EXPAND — Flanagan Filter (full five modes) on Writing Lab drafts.
+    // Gated on item existing (unsaved new drafts have no DB row yet).
+    if (item) {
+      const wlFfCallbacks = {};
+      if (!archivedAtStart) {
+        mountFlanaganFilter(rightCol, item, wlFfCallbacks, {
+          entityKind: 'writing_lab',
+          workspaceName: 'Writing Lab',
+          actionsRow: bar,
+        });
+      }
+      const { refresh: wlFfRefresh } = mountFlanaganHistory(
+        rightCol, item, archivedAtStart, wlFfCallbacks, 'writing_lab'
+      );
+      wlFfCallbacks.refreshHistory = wlFfRefresh;
+    }
+
     // PPOL2b-12 — linked-entries indicator (same passive pattern as other workspaces).
     // PPOL2b-03 — status bar (workspace · type · created · edited · status).
     // Both are gated on item existing — new unsaved drafts have no DB row yet.
@@ -7827,16 +7871,21 @@ const FF_MODES = [
   { value: 'six_tensions',     label: 'The Six Tensions (Appendix A)' },
   { value: 'wwfd',             label: 'WWFD — What Would Flanagan Do?' },
   { value: 'full_diagnostic',  label: 'Full Diagnostic (all three)' },
+  { value: 'production_check', label: 'Production Check (Tier 3)' },
 ];
+// Lightweight workspaces (Conflicts, Decisions) only show the Editorial Filter.
+const FF_LIGHT_MODES = [FF_MODES[0]];
 
 const FF_CANON_NAMES = ['megan', 'jordan', 'diane', 'caroline', 'ray', 'marcus', 'renee'];
 
 // P46-C helpers ───────────────────────────────────────────────────────────────
 
 // Build the body for a routed analysis entry (Brainstorm / Research).
-function _ffBuildRoutedBody(item, res, mode) {
+// sourceLabel is the workspace display name (e.g. 'Open Questions', 'Brainstorm').
+function _ffBuildRoutedBody(item, res, mode, sourceLabel) {
   const modeName = FF_MODE_LABELS[mode] || mode || 'Analysis';
   const conf = res.confidence === 'clear' ? 'Clear verdict' : 'Genuine tension';
+  const from = sourceLabel ? `${sourceLabel}: ` : '';
   const lines = [
     `[Flanagan Filter — ${modeName} | ${conf}]`,
     '',
@@ -7846,21 +7895,22 @@ function _ffBuildRoutedBody(item, res, mode) {
     '',
     res.northStar ? `North Star Check:\n${res.northStar}` : '',
     '',
-    `— Analysis from Open Question: "${item.title || '(untitled)'}"`,
+    `— Analysis from ${from}"${item.title || '(untitled)'}"`,
   ];
   return lines.filter((l, i, arr) => !(l === '' && arr[i - 1] === '')).join('\n').trim();
 }
 
 // Create a new entry in `apiName` workspace pre-filled with analysis content.
-async function _ffRouteAnalysis(item, res, mode, apiName) {
+async function _ffRouteAnalysis(item, res, mode, apiName, sourceLabel) {
   const modeName = FF_MODE_LABELS[mode] || mode || 'Analysis';
   const title = `${item.title ? `"${item.title.slice(0, 60)}"` : 'Untitled'} — Flanagan ${modeName}`;
-  const body = _ffBuildRoutedBody(item, res, mode);
+  const body = _ffBuildRoutedBody(item, res, mode, sourceLabel);
   return window.revival[apiName].create({ title, body });
 }
 
 // Fetch tag suggestions and render a confirmation panel inside `container`.
-async function _ffSuggestTags(container, item, res, mode) {
+// entityKind identifies which workspace table to attach confirmed tags to.
+async function _ffSuggestTags(container, item, res, mode, entityKind) {
   container.innerHTML = '';
   container.hidden = false;
   const loading = document.createElement('span');
@@ -7924,7 +7974,7 @@ async function _ffSuggestTags(container, item, res, mode) {
       try {
         for (const tag of suggested) {
           if (checked.has(tag.id)) {
-            await window.revival.tags.attach('open_questions', item.id, tag.id).catch(() => {});
+            await window.revival.tags.attach(entityKind || 'open_questions', item.id, tag.id).catch(() => {});
           }
         }
         container.innerHTML = '';
@@ -7953,36 +8003,42 @@ async function _ffSuggestTags(container, item, res, mode) {
   }
 }
 
-// mountFlanaganFilter(rightCol, item, callbacks)
-// — Adds a "Flanagan Filter" button to the existing actions row so it's
-//   always visible at the top of the detail panel without scrolling.
-// — Appends a collapsible panel AFTER the actions row. The panel is hidden
-//   until the button (or keyboard shortcut) opens it.
-// — callbacks.refreshHistory: called after a successful save so the history
-//   section updates without a full page reload.
+// mountFlanaganFilter(container, item, callbacks, ctx)
+// — PFLAN-EXPAND: generalised to all creative/narrative workspaces.
+// — ctx.entityKind     : string — workspace entity kind for storage + tag attachment
+// — ctx.workspaceName  : string — display name used in route attribution
+// — ctx.lightweight    : bool   — if true, show only Editorial Filter (Conflicts / Decisions)
+// — ctx.showOptions    : bool   — if true, show Option A/B inputs (Open Questions only)
+// — ctx.actionsRow     : DOM el — explicit actions row to attach trigger button to;
+//                                 falls back to container.querySelector('.tc-detail-actions')
+// — Adds a "Flanagan Filter" button to the actions row.
+// — Appends a collapsible panel AFTER the actions row; hidden until triggered.
+// — callbacks.refreshHistory: called after a successful save.
 // — Exposes callbacks.openWithMode(mode) for P46-B history "Reopen" action.
-function mountFlanaganFilter(rightCol, item, callbacks) {
+function mountFlanaganFilter(container, item, callbacks, ctx) {
+  const entityKind   = (ctx && ctx.entityKind)   || 'open_questions';
+  const workspaceName= (ctx && ctx.workspaceName) || 'Entry';
+  const lightweight  = !!(ctx && ctx.lightweight);
+  const showOptions  = !!(ctx && ctx.showOptions);
+  const activeModes  = lightweight ? FF_LIGHT_MODES : FF_MODES;
+
   const textLower = ((item.title || '') + ' ' + (item.body || '')).toLowerCase();
   const mentionsCanon = FF_CANON_NAMES.some((n) => textLower.includes(n));
 
-  // ── 1. Add trigger button to the existing actions row ─────────────────
-  // detailExtra runs after the actions row is already appended to rightCol,
-  // so we can safely query it here.
-  const actionsRow = rightCol.querySelector('.tc-detail-actions');
-
+  // ── 1. Add trigger button to the actions row ──────────────────────────
+  const actionsRow = (ctx && ctx.actionsRow) || container.querySelector('.tc-detail-actions');
   const triggerBtn = document.createElement('button');
   triggerBtn.type = 'button';
   triggerBtn.className = 'btn-secondary ff-trigger-btn';
   triggerBtn.textContent = 'Flanagan Filter';
-  triggerBtn.title = 'Run Flanagan craft analysis on this question (⌘⇧A)';
+  triggerBtn.title = 'Run Flanagan craft analysis (⌘⇧A)';
   if (actionsRow) actionsRow.appendChild(triggerBtn);
 
   // ── 2. Build the collapsible panel ────────────────────────────────────
   const panel = document.createElement('div');
   panel.className = 'ff-panel';
-  panel.hidden = true; // starts collapsed; trigger button opens it
+  panel.hidden = true;
 
-  // Panel header row (label + shortcut hint + close chevron)
   const header = document.createElement('div');
   header.className = 'ff-header';
   const ffLabel = document.createElement('span');
@@ -8007,13 +8063,16 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
 
   const modeSelect = document.createElement('select');
   modeSelect.className = 'ff-mode-select';
-  for (const m of FF_MODES) {
+  for (const m of activeModes) {
     const opt = document.createElement('option');
     opt.value = m.value;
     opt.textContent = m.label;
     modeSelect.appendChild(opt);
   }
-  modeSelect.value = _ffDefaultMode;
+  // Default to session preference if the mode is available in activeModes; else first.
+  modeSelect.value = activeModes.some((m) => m.value === _ffDefaultMode)
+    ? _ffDefaultMode
+    : activeModes[0].value;
 
   const runBtn = document.createElement('button');
   runBtn.type = 'button';
@@ -8023,15 +8082,11 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
   controls.append(modeSelect, runBtn);
   panel.appendChild(controls);
 
-  // WWFD "not ready" soft gate
-  const wwfdWarning = document.createElement('div');
-  wwfdWarning.className = 'ff-context-note';
-  wwfdWarning.textContent =
-    'WWFD works best with scene-level context: a specific moment, scene, ' +
-    'dialogue situation, or character decision. This entry appears to describe ' +
-    'a higher-level story question — results may be less precise. You can still run.';
-  wwfdWarning.hidden = true;
-  panel.appendChild(wwfdWarning);
+  // "Not ready" soft gates — WWFD and Production Check both need scene-level context.
+  const contextWarning = document.createElement('div');
+  contextWarning.className = 'ff-context-note';
+  contextWarning.hidden = true;
+  panel.appendChild(contextWarning);
 
   function hasSceneLevelContext() {
     return ['scene', 'act ', 'episode', 'moment', 'shot ', 'dialogue', 'visual',
@@ -8039,27 +8094,43 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
             'says:', 'says "'].some((k) => textLower.includes(k));
   }
 
-  function updateWwfdWarning() {
-    wwfdWarning.hidden = !(modeSelect.value === 'wwfd' && !hasSceneLevelContext());
+  function updateContextWarning() {
+    const v = modeSelect.value;
+    if (v === 'wwfd' && !hasSceneLevelContext()) {
+      contextWarning.textContent =
+        'WWFD works best with scene-level context: a specific moment, scene, ' +
+        'dialogue situation, or character decision. This entry appears to describe ' +
+        'a higher-level story question — results may be less precise. You can still run.';
+      contextWarning.hidden = false;
+    } else if (v === 'production_check' && !hasSceneLevelContext()) {
+      contextWarning.textContent =
+        'Production Check works best with scene or visual content (camera position, ' +
+        'location description, action lines). This entry lacks scene-level detail — ' +
+        'Claude will note which Tier 3 constraints apply when the scene is designed. ' +
+        'You can still run.';
+      contextWarning.hidden = false;
+    } else {
+      contextWarning.hidden = true;
+    }
   }
 
   modeSelect.addEventListener('change', () => {
     _ffDefaultMode = modeSelect.value;
-    updateWwfdWarning();
+    updateContextWarning();
   });
-  updateWwfdWarning();
+  updateContextWarning();
 
   // Passive canon conflict flag
   if (mentionsCanon) {
     const canonFlag = document.createElement('div');
     canonFlag.className = 'ff-canon-flag';
     canonFlag.textContent =
-      'This question mentions canon characters or entities. Canon context is ' +
+      'This entry mentions canon characters or entities. Canon context is ' +
       'available in the Canon Bible but is not auto-pulled into this analysis.';
     panel.appendChild(canonFlag);
   }
 
-  // Tier badge
+  // Tier badge (Open Questions only)
   if (item.tier) {
     const tierBadge = document.createElement('div');
     tierBadge.className = 'ff-tier-badge';
@@ -8067,39 +8138,39 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
     panel.appendChild(tierBadge);
   }
 
-  // Editable option labels — pre-populate from "Option A: ..." in body
-  const bodyText = item.body || '';
-  const optAMatch = bodyText.match(/option\s+a[:\s]+([^\n]+)/i);
-  const optBMatch = bodyText.match(/option\s+b[:\s]+([^\n]+)/i);
-  const defaultOptions = [
-    { key: 'A', value: optAMatch ? optAMatch[1].trim() : 'Option A' },
-    { key: 'B', value: optBMatch ? optBMatch[1].trim() : 'Option B' },
-  ];
-
-  const optionsSection = document.createElement('div');
-  optionsSection.className = 'ff-options';
-  const optionsHeading = document.createElement('div');
-  optionsHeading.className = 'ff-options-heading';
-  optionsHeading.textContent = 'Options under consideration (edit to clarify before running):';
-  optionsSection.appendChild(optionsHeading);
-
+  // Editable option labels — only shown for Open Questions (showOptions: true)
   const optionInputs = [];
-  for (const opt of defaultOptions) {
-    const row = document.createElement('div');
-    row.className = 'ff-option-row';
-    const keyLabel = document.createElement('span');
-    keyLabel.className = 'ff-option-key';
-    keyLabel.textContent = `Option ${opt.key}`;
-    const inp = document.createElement('input');
-    inp.type = 'text';
-    inp.className = 'ff-option-input';
-    inp.value = opt.value;
-    inp.placeholder = `Describe option ${opt.key}…`;
-    optionInputs.push({ key: opt.key, input: inp });
-    row.append(keyLabel, inp);
-    optionsSection.appendChild(row);
+  if (showOptions) {
+    const bodyText = item.body || '';
+    const optAMatch = bodyText.match(/option\s+a[:\s]+([^\n]+)/i);
+    const optBMatch = bodyText.match(/option\s+b[:\s]+([^\n]+)/i);
+    const defaultOptions = [
+      { key: 'A', value: optAMatch ? optAMatch[1].trim() : 'Option A' },
+      { key: 'B', value: optBMatch ? optBMatch[1].trim() : 'Option B' },
+    ];
+    const optionsSection = document.createElement('div');
+    optionsSection.className = 'ff-options';
+    const optionsHeading = document.createElement('div');
+    optionsHeading.className = 'ff-options-heading';
+    optionsHeading.textContent = 'Options under consideration (edit to clarify before running):';
+    optionsSection.appendChild(optionsHeading);
+    for (const opt of defaultOptions) {
+      const row = document.createElement('div');
+      row.className = 'ff-option-row';
+      const keyLabel = document.createElement('span');
+      keyLabel.className = 'ff-option-key';
+      keyLabel.textContent = `Option ${opt.key}`;
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'ff-option-input';
+      inp.value = opt.value;
+      inp.placeholder = `Describe option ${opt.key}…`;
+      optionInputs.push({ key: opt.key, input: inp });
+      row.append(keyLabel, inp);
+      optionsSection.appendChild(row);
+    }
+    panel.appendChild(optionsSection);
   }
-  panel.appendChild(optionsSection);
 
   // Result area — hidden until a run completes
   const resultArea = document.createElement('div');
@@ -8115,7 +8186,7 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
     rerunLabel.textContent = 'Run again with:';
     const rerunSelect = document.createElement('select');
     rerunSelect.className = 'ff-mode-select';
-    for (const m of FF_MODES) {
+    for (const m of activeModes) {
       const opt = document.createElement('option');
       opt.value = m.value;
       opt.textContent = m.label;
@@ -8125,7 +8196,7 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
     rerunSelect.addEventListener('change', () => {
       _ffDefaultMode = rerunSelect.value;
       modeSelect.value = rerunSelect.value;
-      updateWwfdWarning();
+      updateContextWarning();
     });
     const rerunBtn = document.createElement('button');
     rerunBtn.type = 'button';
@@ -8134,7 +8205,7 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
     rerunBtn.addEventListener('click', () => {
       _ffDefaultMode = rerunSelect.value;
       modeSelect.value = rerunSelect.value;
-      updateWwfdWarning();
+      updateContextWarning();
       runAnalysis(rerunSelect.value);
     });
     rerunBar.append(rerunLabel, rerunSelect, rerunBtn);
@@ -8158,10 +8229,11 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
     resultArea.appendChild(thinkingEl);
 
     try {
-      const model = (chatModelSelect && chatModelSelect.value) || 'claude-sonnet-4-6';
+      const model = (typeof chatModelSelect !== 'undefined' && chatModelSelect && chatModelSelect.value)
+        || 'claude-sonnet-4-6';
       const res = await window.revival.claude.flanaganFilter({
-        questionTitle: item.title || '',
-        questionBody: item.body || '',
+        entityTitle: item.title || '',
+        entityBody: item.body || '',
         tier: item.tier || null,
         options,
         mode,
@@ -8199,10 +8271,10 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
       northStarEl.append(nsLabel, nsText);
       resultArea.appendChild(northStarEl);
 
-      // P46-C: attach extract-and-route to output text
+      // Attach extract-and-route to output text
       if (window.RevivalExtract) {
         window.RevivalExtract.attach(resultArea, {
-          workspace: 'Open Questions',
+          workspace: workspaceName,
           id: item.id,
           title: item.title,
         });
@@ -8210,7 +8282,7 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
 
       resultArea.appendChild(buildRerunBar(mode));
 
-      // P46-B/C — save bar + route buttons + tag suggestions.
+      // Save bar + route buttons + tag suggestions
       const saveBar = document.createElement('div');
       saveBar.className = 'ff-save-bar';
       const saveBtn = document.createElement('button');
@@ -8222,7 +8294,6 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
       saveConfirm.hidden = true;
       saveConfirm.textContent = 'Saved to history.';
 
-      // P46-C: tag suggestion panel, shown after save
       const tagSuggestPanel = document.createElement('div');
       tagSuggestPanel.className = 'ff-tag-suggest-panel';
       tagSuggestPanel.hidden = true;
@@ -8230,7 +8301,7 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
       saveBtn.addEventListener('click', async () => {
         saveBtn.disabled = true;
         try {
-          await window.revival.flanaganAnalyses.create(item.id, {
+          await window.revival.flanaganAnalyses.create(entityKind, item.id, {
             scanMode: mode,
             flanaganVersion: res.flanaganVersion || 'unknown',
             summary: res.summary,
@@ -8241,8 +8312,7 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
           saveBtn.textContent = 'Saved';
           saveConfirm.hidden = false;
           if (callbacks && callbacks.refreshHistory) callbacks.refreshHistory();
-          // P46-C: request tag suggestions
-          _ffSuggestTags(tagSuggestPanel, item, res, mode);
+          _ffSuggestTags(tagSuggestPanel, item, res, mode, entityKind);
         } catch {
           saveBtn.disabled = false;
           saveBtn.textContent = 'Save failed — try again';
@@ -8260,7 +8330,7 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
       saveBar.append(saveBtn, saveConfirm, dismissBtn);
       resultArea.appendChild(saveBar);
 
-      // P46-C: route buttons — send full analysis to Brainstorm or Research
+      // Route buttons — send full analysis to Brainstorm or Research
       const routeBar = document.createElement('div');
       routeBar.className = 'ff-route-bar';
       const routeLabel = document.createElement('span');
@@ -8278,11 +8348,10 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
         routeBtn.addEventListener('click', async () => {
           routeBtn.disabled = true;
           try {
-            const created = await _ffRouteAnalysis(item, res, mode, dest.apiName);
+            const created = await _ffRouteAnalysis(item, res, mode, dest.apiName, workspaceName);
             if (created) {
-              // CWA: link new entry back to the Open Question
               await window.revival.crossWorkspace.attach(
-                dest.kind, created.id, 'open_questions', item.id
+                dest.kind, created.id, entityKind, item.id
               ).catch(() => {});
               routeBtn.textContent = `✓ Sent to ${dest.label}`;
               showRoutedToast(dest.label);
@@ -8312,13 +8381,11 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
     runAnalysis(modeSelect.value);
   });
 
-  // openFilter: show panel, scroll it into view, focus mode select.
-  // Called by the trigger button and by the keyboard shortcut.
   function openFilter(mode) {
-    if (mode) {
+    if (mode && activeModes.some((m) => m.value === mode)) {
       modeSelect.value = mode;
       _ffDefaultMode = mode;
-      updateWwfdWarning();
+      updateContextWarning();
     }
     panel.hidden = false;
     panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -8327,40 +8394,38 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
 
   triggerBtn.addEventListener('click', () => openFilter());
 
-  // Register for the global shortcut; cleared when this entry is replaced.
   _ffOpenFilter = () => openFilter();
 
-  // P46-B: expose openFilter via callbacks so history section can preselect mode.
   if (callbacks) callbacks.openWithMode = openFilter;
 
-  // Insert the panel immediately after the actions row so it appears close
-  // to the top of the detail view (not buried below body content).
+  // Insert the panel immediately after the actions row.
   if (actionsRow && actionsRow.nextSibling) {
-    rightCol.insertBefore(panel, actionsRow.nextSibling);
+    container.insertBefore(panel, actionsRow.nextSibling);
   } else {
-    rightCol.appendChild(panel);
+    container.appendChild(panel);
   }
 }
-// ── End P46-A ──────────────────────────────────────────────────────────────
+// ── End P46-A / PFLAN-EXPAND ────────────────────────────────────────────────
 
-// ── P46-B — Flanagan Analysis History ──────────────────────────────────────
-// mountFlanaganHistory(rightCol, item, archivedFlag, callbacks)
+// ── P46-B / PFLAN-EXPAND — Flanagan Analysis History ───────────────────────
+// mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, entityKind)
 // — Appends a collapsed <details> section listing all saved Flanagan Filter
-//   analyses for this Open Questions entry.
-// — When archivedFlag is true all analyses are read-only (question is resolved).
-// — callbacks.openWithMode(mode): opens the filter panel with mode preselected;
-//   called by the "Reopen with new context" action.
-// — Returns { refresh } so the save bar in mountFlanaganFilter can refresh the
-//   list after a new analysis is saved.
+//   analyses for the given entity.
+// — entityKind: workspace entity kind (e.g. 'open_questions', 'brainstorm').
+// — When archivedFlag is true all analyses are read-only.
+// — callbacks.openWithMode(mode): opens the filter panel with mode preselected.
+// — Returns { refresh } so the save bar in mountFlanaganFilter can refresh.
 
 const FF_MODE_LABELS = {
   editorial_filter: 'Editorial Filter',
   six_tensions: 'Six Tensions',
   wwfd: 'WWFD',
   full_diagnostic: 'Full Diagnostic',
+  production_check: 'Production Check',
 };
 
-function mountFlanaganHistory(rightCol, item, archivedFlag, callbacks) {
+function mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, entityKind) {
+  entityKind = entityKind || 'open_questions';
   const section = document.createElement('details');
   section.className = 'ff-history-section';
 
@@ -8445,7 +8510,7 @@ function mountFlanaganHistory(rightCol, item, archivedFlag, callbacks) {
     } else if (archivedFlag) {
       const lockedNote = document.createElement('div');
       lockedNote.className = 'ff-history-locked-note';
-      lockedNote.textContent = 'Analysis locked — question is resolved.';
+      lockedNote.textContent = 'Analysis locked — entry is archived.';
       card.appendChild(lockedNote);
     }
 
@@ -8465,7 +8530,7 @@ function mountFlanaganHistory(rightCol, item, archivedFlag, callbacks) {
           const created = await _ffRouteAnalysis(item, analysis, analysis.scan_mode, dest.apiName);
           if (created) {
             await window.revival.crossWorkspace.attach(
-              dest.kind, created.id, 'open_questions', item.id
+              dest.kind, created.id, entityKind, item.id
             ).catch(() => {});
             routeBtn.textContent = `✓ ${dest.label}`;
             showRoutedToast(dest.label);
@@ -8502,7 +8567,7 @@ function mountFlanaganHistory(rightCol, item, archivedFlag, callbacks) {
   async function refresh() {
     let analyses = [];
     try {
-      analyses = await window.revival.flanaganAnalyses.list(item.id);
+      analyses = await window.revival.flanaganAnalyses.list(entityKind, item.id);
     } catch {
       analyses = [];
     }
@@ -8567,18 +8632,18 @@ const CONTENT_RENDERERS = {
     entityKind: 'open_questions',
     draftPrefix: 'open_questions',
     addLabel: 'Add Question',
-    // P46-A/B — Flanagan Filter panel + saved analysis history.
     detailExtra(rightCol, item, archivedFlag) {
-      // Shared callbacks wired between the filter panel and history section so
-      // saves refresh history and "Reopen" preselects the filter's mode.
       const callbacks = {};
-      if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks);
-      const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks);
+      if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
+        entityKind: 'open_questions',
+        workspaceName: 'Open Questions',
+        showOptions: true,
+      });
+      const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'open_questions');
       callbacks.refreshHistory = refresh;
     },
   }),
-  // Conflicts shares the lifecycle but is styled distinctly (red contradiction
-  // accent + tailored labels) so it never reads like Open Questions.
+  // Conflicts: lightweight filter (Editorial Filter + North Star only).
   'Conflicts': makeEntryWorkspace({
     apiName: 'conflicts',
     entityKind: 'conflicts',
@@ -8587,7 +8652,18 @@ const CONTENT_RENDERERS = {
     sectionClass: 'ws-conflicts',
     titlePlaceholder: 'What contradicts what?',
     bodyPlaceholder: 'The two sides in tension, and where each comes from (optional)',
+    detailExtra(rightCol, item, archivedFlag) {
+      const callbacks = {};
+      if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
+        entityKind: 'conflicts',
+        workspaceName: 'Conflicts',
+        lightweight: true,
+      });
+      const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'conflicts');
+      callbacks.refreshHistory = refresh;
+    },
   }),
+  // Decisions: lightweight filter (Editorial Filter + North Star only).
   'Decisions': makeEntryWorkspace({
     apiName: 'decisions',
     entityKind: 'decisions',
@@ -8595,7 +8671,18 @@ const CONTENT_RENDERERS = {
     addLabel: 'Record Decision',
     titlePlaceholder: 'What was decided?',
     bodyPlaceholder: 'The decision, and why it was settled this way (optional)',
+    detailExtra(rightCol, item, archivedFlag) {
+      const callbacks = {};
+      if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
+        entityKind: 'decisions',
+        workspaceName: 'Decisions',
+        lightweight: true,
+      });
+      const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'decisions');
+      callbacks.refreshHistory = refresh;
+    },
   }),
+  // Brainstorm: full five-mode filter.
   'Brainstorm': makeEntryWorkspace({
     apiName: 'brainstorm',
     entityKind: 'brainstorm',
@@ -8603,6 +8690,15 @@ const CONTENT_RENDERERS = {
     addLabel: 'Add Idea',
     titlePlaceholder: 'What is the idea?',
     bodyPlaceholder: 'Where it might go, what sparked it (optional)',
+    detailExtra(rightCol, item, archivedFlag) {
+      const callbacks = {};
+      if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
+        entityKind: 'brainstorm',
+        workspaceName: 'Brainstorm',
+      });
+      const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'brainstorm');
+      callbacks.refreshHistory = refresh;
+    },
   }),
   // Research shares the lifecycle but is styled distinctly (blue source accent +
   // tailored labels) so it never reads like Brainstorm's open ideation.
@@ -8632,6 +8728,13 @@ const CONTENT_RENDERERS = {
         mountCharRelationships(rightCol, item.id);
         mountProposeCanonSection(rightCol, item, 'characters_workspace');
       }
+      const callbacks = {};
+      if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
+        entityKind: 'characters',
+        workspaceName: 'Characters',
+      });
+      const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'characters');
+      callbacks.refreshHistory = refresh;
     },
     leftColExtra(leftCol, rightCol, ctx) {
       setupCharRelationalView(leftCol, rightCol, ctx);
@@ -8649,6 +8752,13 @@ const CONTENT_RENDERERS = {
     bodyPlaceholder: 'Outline, scene list, beats, draft notes (optional)',
     detailExtra(rightCol, item, archivedFlag) {
       if (!archivedFlag) mountProposeCanonSection(rightCol, item, 'episodes_workspace');
+      const callbacks = {};
+      if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
+        entityKind: 'episodes',
+        workspaceName: 'Episodes',
+      });
+      const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'episodes');
+      callbacks.refreshHistory = refresh;
     },
   }),
 };
@@ -10373,9 +10483,9 @@ window.addEventListener('keydown', (e) => {
 // refresh trigger — listAll is small.
 window.revival.popout.onChanged(() => loadSearchTagFilter());
 
-// P46-A — Cmd+Shift+A opens the Flanagan Filter panel for the currently-open
-// Open Questions entry. _ffOpenFilter is set by mountFlanaganFilter each time
-// an entry is selected, so it always refers to the active entry's panel.
+// P46-A / PFLAN-EXPAND — Cmd+Shift+A opens the Flanagan Filter panel for the
+// currently-active entry in any workspace that supports it. _ffOpenFilter is
+// set by mountFlanaganFilter each time a filter panel is mounted.
 window.addEventListener('keydown', (e) => {
   if (
     (e.metaKey || e.ctrlKey) &&

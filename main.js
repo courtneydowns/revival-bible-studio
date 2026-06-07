@@ -919,7 +919,14 @@ function registerIpc() {
 
     const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
 
-    const { questionTitle, questionBody, tier, options, mode } = payload;
+    // PFLAN-EXPAND: accept entityTitle/entityBody for any workspace, with
+    // backward-compat fallback to the original questionTitle/questionBody fields.
+    const {
+      entityTitle, entityBody, tier, options, mode,
+      questionTitle, questionBody,
+    } = payload;
+    const title = entityTitle || questionTitle || '';
+    const body  = entityBody  || questionBody  || '';
 
     // Read the Flanagan Master document — lazy, cached per process lifetime.
     if (!ipcMain._flanaganDoc) {
@@ -941,9 +948,9 @@ function registerIpc() {
       .join('\n');
 
     const questionBlock =
-      `## Open Question (${tierLabel})\n\n` +
-      `Question: ${questionTitle || '(untitled)'}\n\n` +
-      (questionBody ? `Context / options as written:\n${questionBody}\n\n` : '') +
+      `## Entry Under Analysis (${tierLabel})\n\n` +
+      `Title: ${title || '(untitled)'}\n\n` +
+      (body ? `Content:\n${body}\n\n` : '') +
       (optionLines ? `Options under consideration:\n${optionLines}\n` : '');
 
     const tierInstruction = tier === 1
@@ -959,21 +966,21 @@ function registerIpc() {
     if (mode === 'editorial_filter') {
       modeInstruction =
         'Apply TIER 1 — THE EDITORIAL FILTER (the five questions). ' +
-        'For each of the five questions, evaluate how Option A and Option B perform, citing the question by name ' +
+        'Evaluate the entry against each of the five questions, citing each by name ' +
         '(e.g. "Question 1," "Question 3"). Give a verdict per question, then an overall verdict. ' +
-        'If Option B fails Question 5, flag it explicitly.';
+        'If the entry fails Question 5, flag it explicitly.';
     } else if (mode === 'six_tensions') {
       modeInstruction =
         'Apply APPENDIX A — THE SIX FLANAGAN TENSIONS. ' +
-        'For each tension, apply the diagnostic check and evaluate how the two options perform, ' +
+        'For each tension, apply the diagnostic check and evaluate how the entry holds up, ' +
         'citing each by name (e.g. "Tension 1: The Horror Is Already True," "Tension 4"). ' +
         'Give a verdict per tension, then an overall verdict.';
     } else if (mode === 'wwfd') {
       modeInstruction =
         'Apply the WWFD FORMAT from Tier 2 ("When You\'re Stuck"). ' +
         'Frame the analysis as: THE STRUCTURAL MOVE, THE DIALOGUE MOVE, THE VISUAL MOVE, ' +
-        'THE REVIVAL ANCHOR — in that order, for each option where relevant. ' +
-        'If the question is more conceptual than scene-level, focus the Structural and Revival Anchor ' +
+        'THE REVIVAL ANCHOR — in that order, for each option or direction where relevant. ' +
+        'If the entry is more conceptual than scene-level, focus the Structural and Revival Anchor ' +
         'sections and note where the Dialogue/Visual sections require scene-level decisions still to be made.';
     } else if (mode === 'full_diagnostic') {
       modeInstruction =
@@ -982,6 +989,19 @@ function registerIpc() {
         '(2) APPENDIX A — THE SIX TENSIONS (citing each by number and name), ' +
         '(3) WWFD FORMAT (Structural / Dialogue / Visual / Revival Anchor). ' +
         'Label each section clearly. Conclude with a single synthesized verdict that weighs all three.';
+    } else if (mode === 'production_check') {
+      modeInstruction =
+        'Apply TIER 3 — THE PRODUCTION TRANSLATION. ' +
+        'Evaluate the entry against the production-level criteria: ' +
+        'camera positions (cite each by name: "The Witness Position," "The Companion Position," ' +
+        '"The Surveillance Position"), color/light philosophy, sound and music principles ' +
+        '(cite as "Music Rule"), performance direction, location and production design, ' +
+        'and episodic structure. Cite rules by specific name: "Camera Rule One," "Camera Rule Two," ' +
+        '"Camera Rule Three," "Companion Position," "Principle 3-A (The Caroline Principle)." ' +
+        'If the entry contains scene or visual content, evaluate it directly against Tier 3. ' +
+        'If it is primarily conceptual (no scene description), note which Tier 3 considerations ' +
+        'will apply when the scene is designed, and flag any structural choices that constrain ' +
+        'the production approach.';
     }
 
     const systemPrompt =
@@ -1070,12 +1090,12 @@ function registerIpc() {
     };
   });
 
-  // P46-B — Flanagan Filter: save + history. Analyses are attached to Open
-  // Questions entries; markStale flags a saved analysis for re-run.
-  ipcMain.handle('flanaganAnalyses:create', (_e, questionId, data) =>
-    db.flanaganAnalyses.create(questionId, data));
-  ipcMain.handle('flanaganAnalyses:list', (_e, questionId) =>
-    db.flanaganAnalyses.listFor(questionId));
+  // P46-B / PFLAN-EXPAND — Flanagan Filter: save + history. entityKind + entityId
+  // identify which workspace row the analysis belongs to.
+  ipcMain.handle('flanaganAnalyses:create', (_e, entityKind, entityId, data) =>
+    db.flanaganAnalyses.create(entityKind, entityId, data));
+  ipcMain.handle('flanaganAnalyses:list', (_e, entityKind, entityId) =>
+    db.flanaganAnalyses.listFor(entityKind, entityId));
   ipcMain.handle('flanaganAnalyses:markStale', (_e, id) =>
     db.flanaganAnalyses.markStale(id));
   ipcMain.handle('flanaganAnalyses:delete', (_e, id) =>

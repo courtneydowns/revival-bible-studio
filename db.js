@@ -1463,6 +1463,47 @@ const MIGRATIONS = [
       db.exec(`ALTER TABLE chat_messages ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0;`);
     },
   },
+  {
+    name: '043_flanagan_analyses_expand',
+    up(db) {
+      // PFLAN-EXPAND — generalise flanagan_analyses from Open Questions-only to any
+      // workspace. Recreate the table to make question_id nullable (was NOT NULL
+      // with FK) and add entity_kind + entity_id as the primary lookup keys.
+      // Existing rows are backfilled: entity_kind = 'open_questions', entity_id = question_id.
+      db.exec(`
+        CREATE TABLE flanagan_analyses_new (
+          id               INTEGER PRIMARY KEY AUTOINCREMENT,
+          question_id      INTEGER REFERENCES open_questions(id) ON DELETE CASCADE,
+          entity_kind      TEXT    NOT NULL DEFAULT 'open_questions',
+          entity_id        INTEGER NOT NULL DEFAULT 0,
+          scan_mode        TEXT    NOT NULL DEFAULT '',
+          flanagan_version TEXT    NOT NULL DEFAULT '',
+          summary          TEXT    NOT NULL DEFAULT '',
+          breakdown        TEXT    NOT NULL DEFAULT '',
+          north_star       TEXT    NOT NULL DEFAULT '',
+          confidence       TEXT    NOT NULL DEFAULT '',
+          is_stale         INTEGER NOT NULL DEFAULT 0,
+          created_at       TEXT    NOT NULL
+        );
+
+        INSERT INTO flanagan_analyses_new
+          (id, question_id, entity_kind, entity_id, scan_mode, flanagan_version,
+           summary, breakdown, north_star, confidence, is_stale, created_at)
+        SELECT id, question_id, 'open_questions', question_id,
+               scan_mode, flanagan_version, summary, breakdown, north_star,
+               confidence, is_stale, created_at
+          FROM flanagan_analyses;
+
+        DROP TABLE flanagan_analyses;
+        ALTER TABLE flanagan_analyses_new RENAME TO flanagan_analyses;
+
+        CREATE INDEX idx_flanagan_analyses_question
+          ON flanagan_analyses(question_id, id);
+        CREATE INDEX idx_flanagan_analyses_entity
+          ON flanagan_analyses(entity_kind, entity_id, id);
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -1952,16 +1993,20 @@ const chatMessages = {
 // --- Flanagan analyses repository (P46-B) ----------------------------------
 // Saved Flanagan Filter analysis records attached to Open Questions entries.
 const flanaganAnalyses = {
-  create(questionId, { scanMode, flanaganVersion, summary, breakdown, northStar, confidence }) {
+  create(entityKind, entityId, { scanMode, flanaganVersion, summary, breakdown, northStar, confidence }) {
     const now = new Date().toISOString();
+    const qId = entityKind === 'open_questions' ? entityId : null;
     const info = getDb()
       .prepare(`
         INSERT INTO flanagan_analyses
-          (question_id, scan_mode, flanagan_version, summary, breakdown, north_star, confidence, is_stale, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
+          (question_id, entity_kind, entity_id, scan_mode, flanagan_version,
+           summary, breakdown, north_star, confidence, is_stale, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
       `)
       .run(
-        questionId,
+        qId,
+        entityKind || 'open_questions',
+        entityId,
         scanMode || '',
         flanaganVersion || '',
         summary || '',
@@ -1974,10 +2019,10 @@ const flanaganAnalyses = {
       .prepare('SELECT * FROM flanagan_analyses WHERE id = ?')
       .get(info.lastInsertRowid);
   },
-  listFor(questionId) {
+  listFor(entityKind, entityId) {
     return getDb()
-      .prepare('SELECT * FROM flanagan_analyses WHERE question_id = ? ORDER BY id DESC')
-      .all(questionId);
+      .prepare('SELECT * FROM flanagan_analyses WHERE entity_kind = ? AND entity_id = ? ORDER BY id DESC')
+      .all(entityKind || 'open_questions', entityId);
   },
   markStale(id) {
     getDb()
