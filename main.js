@@ -408,6 +408,53 @@ function registerIpc() {
     db.settings.setClaudeApiKey(key)
   );
 
+  // P40 — Chat message persistence.
+  ipcMain.handle('chatMessages:list', (_e, chatId) => db.chatMessages.list(chatId));
+  ipcMain.handle('chatMessages:add', (_e, chatId, role, content) =>
+    db.chatMessages.add(chatId, role, content)
+  );
+
+  // P40 — Claude API call. Runs in main so the API key never touches the
+  // renderer process. Returns the assistant's text content on success; throws
+  // a plain Error with a user-visible message on failure.
+  ipcMain.handle('claude:send', async (_e, messages, systemPrompt) => {
+    const apiKey = db.settings.getClaudeApiKey();
+    if (!apiKey) throw new Error('No Claude API key configured. Add one in Settings.');
+
+    const body = {
+      model: 'claude-opus-4-7',
+      max_tokens: 8192,
+      messages,
+      ...(systemPrompt ? { system: systemPrompt } : {}),
+    };
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!resp.ok) {
+      let errMsg = `Claude API error (${resp.status})`;
+      try {
+        const errBody = await resp.json();
+        if (errBody.error && errBody.error.message) errMsg = errBody.error.message;
+      } catch {
+        // ignore parse failures
+      }
+      throw new Error(errMsg);
+    }
+
+    const data = await resp.json();
+    const block = data.content && data.content[0];
+    if (!block || block.type !== 'text') throw new Error('Unexpected response shape from Claude API.');
+    return block.text;
+  });
+
   // PUI2 popout wiring.
   //  • popout:open spawns a new BrowserWindow for a single entry.
   //  • popout:changed is a one-way fan-out: whoever just mutated an entry

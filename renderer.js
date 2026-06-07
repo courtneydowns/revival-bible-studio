@@ -7443,6 +7443,9 @@ let activeSources = [];
 // only so they never survive a send or a restart. Keyed by chat id → array of
 // source objects, so switching chats keeps each chat's pending picks separate.
 const nextSourcesByChat = new Map();
+// P40 — in-memory message history for the active chat; loaded from DB on switch.
+let chatMessageHistory = [];
+let _sendInProgress = false;
 
 function setChatOpen(open) {
   chatDrawer.classList.toggle('open', open);
@@ -7462,22 +7465,119 @@ function setChatExpanded(expanded) {
   localStorage.setItem(CHAT_EXPANDED_KEY, expanded ? '1' : '0');
 }
 
-// The message area is a shell: no messages exist yet. It names the active chat
-// so switching via the dropdown visibly changes what's shown.
+// P40 — render all loaded messages (or an empty-state hint).
 function renderChatBody() {
   chatMessages.innerHTML = '';
-  const p = document.createElement('p');
-  p.className = 'chat-empty';
-  const active = chatList.find((c) => c.id === activeChatId);
-  if (!active) {
-    p.textContent =
-      'No chats yet. Click “+ New chat” to start one. Messaging Claude is added in a later phase; attachments will come from Source Material only. Nothing here is saved or sent without your confirmation.';
-  } else {
-    p.textContent =
-      `You’re in “${active.title}”. Messaging Claude here is added in a later phase. ` +
-      'Attachments will come from Source Material only. Nothing here is saved or sent without your confirmation.';
+  if (activeChatId == null) {
+    const p = document.createElement('p');
+    p.className = 'chat-empty';
+    p.textContent = 'No chats yet. Click “+ New chat” to start one.';
+    chatMessages.appendChild(p);
+    return;
   }
-  chatMessages.appendChild(p);
+  if (chatMessageHistory.length === 0) {
+    const p = document.createElement('p');
+    p.className = 'chat-empty';
+    p.textContent = 'No messages yet. Type below and press Send.';
+    chatMessages.appendChild(p);
+    return;
+  }
+  for (const msg of chatMessageHistory) {
+    chatMessages.appendChild(_buildMsgEl(msg.role, msg.content));
+  }
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Build a single message element (user or assistant).
+function _buildMsgEl(role, content) {
+  const wrap = document.createElement('div');
+  wrap.className = `chat-msg chat-msg-${role}`;
+  const label = document.createElement('span');
+  label.className = 'chat-msg-label';
+  label.textContent = role === 'user' ? 'You' : 'Claude';
+  const body = document.createElement('p');
+  body.className = 'chat-msg-body';
+  body.textContent = content;
+  wrap.appendChild(label);
+  wrap.appendChild(body);
+  return wrap;
+}
+
+// Append a message element to the DOM and scroll into view.
+function _appendMsgEl(role, content) {
+  const el = _buildMsgEl(role, content);
+  chatMessages.appendChild(el);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return el;
+}
+
+// Append an ephemeral “thinking” indicator (no DB backing).
+function _appendThinkingEl() {
+  const wrap = document.createElement('div');
+  wrap.className = 'chat-msg chat-msg-assistant chat-thinking';
+  const label = document.createElement('span');
+  label.className = 'chat-msg-label';
+  label.textContent = 'Claude';
+  const body = document.createElement('p');
+  body.className = 'chat-msg-body';
+  body.textContent = 'Thinking…';
+  wrap.appendChild(label);
+  wrap.appendChild(body);
+  chatMessages.appendChild(wrap);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return wrap;
+}
+
+// Append a transient error row (not saved to DB).
+function _appendErrorEl(message) {
+  const wrap = document.createElement('div');
+  wrap.className = 'chat-msg chat-msg-error';
+  const label = document.createElement('span');
+  label.className = 'chat-msg-label';
+  label.textContent = 'Error';
+  const body = document.createElement('p');
+  body.className = 'chat-msg-body';
+  body.textContent = message;
+  wrap.appendChild(label);
+  wrap.appendChild(body);
+  chatMessages.appendChild(wrap);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Load messages for the active chat from DB and re-render.
+async function loadChatMessages() {
+  if (activeChatId == null) return;
+  const id = activeChatId;
+  try {
+    const msgs = await window.revival.chatMessages.list(id);
+    if (activeChatId !== id) return; // stale — user switched chat
+    chatMessageHistory = msgs;
+    renderChatBody();
+  } catch (err) {
+    console.error('[chat] loadChatMessages error:', err);
+  }
+}
+
+// Build the system prompt: project rules + any attached sources.
+async function buildSystemPrompt() {
+  let rules = '';
+  try {
+    rules = (await window.revival.settings.getProjectRules()) || '';
+  } catch {
+    rules = '';
+  }
+  const keptSrcs = activeSources;
+  const nextSrcs = activeChatId != null ? nextSourcesFor(activeChatId) : [];
+  const allSrcs = [...keptSrcs, ...nextSrcs];
+  const parts = [];
+  if (rules) parts.push(rules);
+  if (allSrcs.length) {
+    const sections = allSrcs.map(
+      (s) => `### ${s.title}\n\n${s.body || '(no content)'}`
+    );
+    parts.push(`## Source Material\n\n${sections.join('\n\n---\n\n')}`);
+  }
+  return parts.join('\n\n');
 }
 
 function renderChatSelect() {
@@ -7743,6 +7843,7 @@ async function attachSource(src, mode, row) {
 
 function setActiveChat(id) {
   activeChatId = id;
+  chatMessageHistory = [];
   if (id == null) {
     localStorage.removeItem(ACTIVE_CHAT_KEY);
   } else {
@@ -7754,6 +7855,7 @@ function setActiveChat(id) {
   renderChatTools();
   renderChatBody();
   loadActiveSources();
+  if (id != null) loadChatMessages();
 }
 
 async function loadChats() {
@@ -7824,21 +7926,87 @@ chatAttachBtn.addEventListener('click', () => {
   }
 });
 
-// Draft send (P19/P40): clears the composer and drops "next message only"
-// sources. In P39 also collapses the preview panel so it doesn't show a stale
-// payload after the message is gone.
-chatComposer.addEventListener('submit', (e) => {
+// P40 — Send message + receive Claude's response.
+chatComposer.addEventListener('submit', async (e) => {
   e.preventDefault();
-  if (activeChatId == null) return;
+  if (activeChatId == null || _sendInProgress) return;
+
+  const text = chatInput.value.trim();
+  if (!text) return;
+
+  _sendInProgress = true;
+  chatSend.disabled = true;
+  chatInput.disabled = true;
+
+  // Clear composer and next-message-only sources.
   chatInput.value = '';
   if (nextSourcesFor(activeChatId).length) {
     nextSourcesByChat.set(activeChatId, []);
     renderActiveSources();
   }
-  // Collapse preview on send so the next draft starts clean.
+  // Collapse preview so it doesn't show a stale payload.
   _previewOpen = false;
   chatPreviewWrap.hidden = true;
   chatPreviewBtn.textContent = 'Preview';
+
+  // Clear cached project rules so the real send always uses the latest.
+  _cachedProjectRules = null;
+
+  // Show the user's message immediately (optimistic).
+  _appendMsgEl('user', text);
+
+  // Build API messages from history + current turn.
+  const history = chatMessageHistory.map((m) => ({ role: m.role, content: m.content }));
+  history.push({ role: 'user', content: text });
+
+  // Persist the user turn.
+  try {
+    const saved = await window.revival.chatMessages.add(activeChatId, 'user', text);
+    chatMessageHistory.push(saved);
+  } catch (err) {
+    _appendErrorEl(`Could not save message: ${err.message || err}`);
+    _sendInProgress = false;
+    chatSend.disabled = false;
+    chatInput.disabled = false;
+    chatInput.focus();
+    return;
+  }
+
+  // Show thinking indicator while waiting for Claude.
+  const thinkingEl = _appendThinkingEl();
+
+  let response;
+  try {
+    const systemPrompt = await buildSystemPrompt();
+    response = await window.revival.claude.send(history, systemPrompt);
+  } catch (apiErr) {
+    thinkingEl.remove();
+    // Strip the Electron IPC wrapper ("Error invoking remote method '...': ") for readability.
+    const rawMsg = apiErr.message || 'Claude API error';
+    const cleanMsg = rawMsg.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+    _appendErrorEl(cleanMsg);
+    _sendInProgress = false;
+    chatSend.disabled = false;
+    chatInput.disabled = false;
+    chatInput.focus();
+    return;
+  }
+
+  thinkingEl.remove();
+  _appendMsgEl('assistant', response);
+
+  // Persist the assistant turn.
+  try {
+    const saved = await window.revival.chatMessages.add(activeChatId, 'assistant', response);
+    chatMessageHistory.push(saved);
+  } catch (err) {
+    console.error('[chat] could not save assistant message:', err);
+  }
+
+  _sendInProgress = false;
+  chatSend.disabled = false;
+  chatInput.disabled = false;
+  chatInput.focus();
 });
 
 // P39 — Request preview: assembles the exact Claude API payload from the
@@ -7850,7 +8018,7 @@ let _cachedProjectRules = null;
 let _previewOpen = false;
 
 async function buildPreviewPayload() {
-  // Fetch project rules once per session.
+  // Fetch project rules once per session (cleared on actual send).
   if (_cachedProjectRules === null) {
     try {
       _cachedProjectRules = (await window.revival.settings.getProjectRules()) || '';
@@ -7864,17 +8032,21 @@ async function buildPreviewPayload() {
   const nextSrcs = activeChatId != null ? nextSourcesFor(activeChatId) : [];
   const allSrcs = [...keptSrcs, ...nextSrcs];
 
-  // Build messages array matching the shape that will be sent to Claude.
-  // Sources are included as separate user-turn blocks (one per source) so
-  // Claude sees them clearly separated from the actual message.
-  const messages = [];
-  for (const src of allSrcs) {
-    const label = nextSrcs.includes(src) ? ' (next message only)' : ' (keep active)';
-    messages.push({
-      role: 'user',
-      content: `[Source: ${src.title}${label}]\n\n${src.body || '(no content)'}`,
+  // Build the system prompt the same way the real send does: project rules +
+  // source material. This matches what will actually be sent to Claude.
+  const systemParts = [];
+  if (_cachedProjectRules) systemParts.push(_cachedProjectRules);
+  if (allSrcs.length) {
+    const sections = allSrcs.map((s) => {
+      const mode = nextSrcs.includes(s) ? ' (next message only)' : ' (keep active)';
+      return `### ${s.title}${mode}\n\n${s.body || '(no content)'}`;
     });
+    systemParts.push(`## Source Material\n\n${sections.join('\n\n---\n\n')}`);
   }
+  const systemPrompt = systemParts.join('\n\n');
+
+  // Messages: conversation history + current draft.
+  const messages = chatMessageHistory.map((m) => ({ role: m.role, content: m.content }));
   if (userText.trim()) {
     messages.push({ role: 'user', content: userText });
   }
@@ -7882,7 +8054,7 @@ async function buildPreviewPayload() {
   const payload = {
     model: 'claude-opus-4-7',
     max_tokens: 8192,
-    ...(  _cachedProjectRules ? { system: _cachedProjectRules } : {}),
+    ...(systemPrompt ? { system: systemPrompt } : {}),
     messages,
   };
 

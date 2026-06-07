@@ -128,6 +128,17 @@ contextBridge.exposeInMainWorld('revival', {
     detach: (chatId, sourceId) =>
       ipcRenderer.invoke('chatSources:detach', chatId, sourceId),
   },
+  // P40 — persisted chat message history
+  chatMessages: {
+    list: (chatId) => ipcRenderer.invoke('chatMessages:list', chatId),
+    add: (chatId, role, content) =>
+      ipcRenderer.invoke('chatMessages:add', chatId, role, content),
+  },
+  // P40 — Claude API (call lives in main so the key never touches the renderer)
+  claude: {
+    send: (messages, systemPrompt) =>
+      ipcRenderer.invoke('claude:send', messages, systemPrompt),
+  },
   dashboard: {
     summary: (limit) => ipcRenderer.invoke('dashboard:summary', limit),
     navBadges: () => ipcRenderer.invoke('dashboard:navBadges'),

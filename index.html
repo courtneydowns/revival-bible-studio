@@ -2206,6 +2206,29 @@
         margin: 0;
       }
 
+      /* P40 — message bubbles */
+      .chat-msg { margin-bottom: 18px; }
+      .chat-msg-label {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+      .chat-msg-user .chat-msg-label { color: var(--accent); }
+      .chat-msg-body {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.65;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .chat-msg-error .chat-msg-label { color: #e05c5c; }
+      .chat-msg-error .chat-msg-body { color: #e05c5c; font-style: italic; }
+      .chat-thinking .chat-msg-body { color: var(--muted); font-style: italic; }
+
       /* --- Active sources bar (P18) ----------------------------------- */
       .chat-sources {
         border-top: 1px solid var(--border);

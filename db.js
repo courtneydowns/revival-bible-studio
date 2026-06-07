@@ -1366,6 +1366,25 @@ const MIGRATIONS = [
       }
     },
   },
+  {
+    name: '039_chat_messages',
+    up(db) {
+      // P40 — persisted conversation history. Each row is one turn (user or
+      // assistant). ON DELETE CASCADE keeps cleanup automatic when a chat is
+      // deleted. The index makes loading a chat's history fast.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS chat_messages (
+          id         INTEGER PRIMARY KEY AUTOINCREMENT,
+          chat_id    INTEGER NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+          role       TEXT    NOT NULL CHECK(role IN ('user','assistant')),
+          content    TEXT    NOT NULL DEFAULT '',
+          created_at TEXT    NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_chat_messages_chat_id
+          ON chat_messages(chat_id, id);
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -1823,6 +1842,28 @@ const chatSources = {
       .prepare('DELETE FROM chat_source_attachments WHERE chat_id = ? AND source_id = ?')
       .run(chatId, sourceId);
     return chatSources.list(chatId);
+  },
+};
+
+// --- Chat messages repository (P40) ----------------------------------------
+// Persisted conversation turns for the global Chat drawer. Each row is one
+// user or assistant turn. History is loaded in insertion order and passed
+// verbatim to the Claude API as the messages array.
+const chatMessages = {
+  list: (chatId) =>
+    getDb()
+      .prepare('SELECT * FROM chat_messages WHERE chat_id = ? ORDER BY id ASC')
+      .all(chatId),
+  add: (chatId, role, content) => {
+    const now = new Date().toISOString();
+    const info = getDb()
+      .prepare(
+        'INSERT INTO chat_messages (chat_id, role, content, created_at) VALUES (?, ?, ?, ?)'
+      )
+      .run(chatId, role, content, now);
+    return getDb()
+      .prepare('SELECT * FROM chat_messages WHERE id = ?')
+      .get(info.lastInsertRowid);
   },
 };
 
@@ -4600,6 +4641,7 @@ module.exports = {
   writingLab,
   chats,
   chatSources,
+  chatMessages,
   listUnsorted,
   listArchivedUnsorted,
   getUnsorted,
