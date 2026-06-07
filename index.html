@@ -2363,8 +2363,21 @@
       }
       .chat-composer-bar .chat-preview-btn-row {
         display: flex;
-        justify-content: flex-end;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
       }
+      .chat-model-select {
+        font: inherit;
+        font-size: 12px;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 4px 8px;
+        cursor: pointer;
+      }
+      .chat-model-select:focus { outline: none; border-color: var(--accent); }
 
       /* P39 — request preview panel */
       .chat-preview-wrap {
@@ -3087,7 +3100,13 @@
       </div>
       <!-- P39: Preview button lives outside the form so it never triggers submit. -->
       <div class="chat-composer-bar">
-        <button id="chat-preview-btn" type="button" class="btn-secondary btn-sm">Preview</button>
+        <div class="chat-preview-btn-row">
+          <select id="chat-model" class="chat-model-select" aria-label="Claude model">
+            <option value="claude-sonnet-4-6">Sonnet 4.6</option>
+            <option value="claude-opus-4-7">Opus 4.7</option>
+          </select>
+          <button id="chat-preview-btn" type="button" class="btn-secondary btn-sm">Preview</button>
+        </div>
         <form class="chat-composer" id="chat-composer">
           <textarea
             id="chat-input"

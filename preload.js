@@ -136,8 +136,8 @@ contextBridge.exposeInMainWorld('revival', {
   },
   // P40 — Claude API (call lives in main so the key never touches the renderer)
   claude: {
-    send: (messages, systemPrompt) =>
-      ipcRenderer.invoke('claude:send', messages, systemPrompt),
+    send: (messages, systemPrompt, model) =>
+      ipcRenderer.invoke('claude:send', messages, systemPrompt, model),
   },
   dashboard: {
     summary: (limit) => ipcRenderer.invoke('dashboard:summary', limit),

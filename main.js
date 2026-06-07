@@ -417,12 +417,14 @@ function registerIpc() {
   // P40 — Claude API call. Runs in main so the API key never touches the
   // renderer process. Returns the assistant's text content on success; throws
   // a plain Error with a user-visible message on failure.
-  ipcMain.handle('claude:send', async (_e, messages, systemPrompt) => {
+  const ALLOWED_MODELS = new Set(['claude-sonnet-4-6', 'claude-opus-4-7']);
+  ipcMain.handle('claude:send', async (_e, messages, systemPrompt, model) => {
     const apiKey = db.settings.getClaudeApiKey();
     if (!apiKey) throw new Error('No Claude API key configured. Add one in Settings.');
 
+    const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
     const body = {
-      model: 'claude-opus-4-7',
+      model: safeModel,
       max_tokens: 8192,
       messages,
       ...(systemPrompt ? { system: systemPrompt } : {}),

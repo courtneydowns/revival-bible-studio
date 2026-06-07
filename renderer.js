@@ -7431,9 +7431,12 @@ const chatSend = document.getElementById('chat-send');
 const chatPreviewBtn = document.getElementById('chat-preview-btn');
 const chatPreviewWrap = document.getElementById('chat-preview-wrap');
 const chatPreviewBody = document.getElementById('chat-preview-body');
+// Model selector
+const chatModelSelect = document.getElementById('chat-model');
 
 const ACTIVE_CHAT_KEY = 'revival.chat.active';
 const CHAT_EXPANDED_KEY = 'revival.chat.expanded';
+const CHAT_MODEL_KEY = 'revival.chat.model';
 let chatList = [];
 let archivedChats = [];
 let activeChatId = null;
@@ -7978,7 +7981,7 @@ chatComposer.addEventListener('submit', async (e) => {
   let response;
   try {
     const systemPrompt = await buildSystemPrompt();
-    response = await window.revival.claude.send(history, systemPrompt);
+    response = await window.revival.claude.send(history, systemPrompt, chatModelSelect.value);
   } catch (apiErr) {
     thinkingEl.remove();
     // Strip the Electron IPC wrapper ("Error invoking remote method '...': ") for readability.
@@ -8052,7 +8055,7 @@ async function buildPreviewPayload() {
   }
 
   const payload = {
-    model: 'claude-opus-4-7',
+    model: chatModelSelect.value,
     max_tokens: 8192,
     ...(systemPrompt ? { system: systemPrompt } : {}),
     messages,
@@ -8131,6 +8134,17 @@ chatArchiveBtn.addEventListener('click', async () => {
 });
 
 setChatExpanded(localStorage.getItem(CHAT_EXPANDED_KEY) === '1');
+
+// Restore saved model (default Sonnet).
+const _savedModel = localStorage.getItem(CHAT_MODEL_KEY);
+if (_savedModel && chatModelSelect.querySelector(`option[value="${_savedModel}"]`)) {
+  chatModelSelect.value = _savedModel;
+}
+chatModelSelect.addEventListener('change', () => {
+  localStorage.setItem(CHAT_MODEL_KEY, chatModelSelect.value);
+  if (_previewOpen) refreshPreview();
+});
+
 loadChats();
 
 // Sticky Panic Export button (P21): same action as the Settings button. Gives
