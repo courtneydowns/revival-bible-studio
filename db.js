@@ -1647,6 +1647,20 @@ const MIGRATIONS = [
     },
   },
   {
+    name: '046_session_logs',
+    up(db) {
+      // PSESSION-LOG — audit trail of actions per session.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS session_logs (
+          id         INTEGER PRIMARY KEY AUTOINCREMENT,
+          started_at TEXT NOT NULL,
+          ended_at   TEXT NOT NULL,
+          events     TEXT NOT NULL
+        );
+      `);
+    },
+  },
+  {
     name: '045_chat_entity_attachments',
     up(db) {
       // PCHAT-ATTACH — Canon Bible entries, Characters, and Episodes now attachable to Chat.
@@ -5208,6 +5222,25 @@ const canonImport = {
   },
 };
 
+// PSESSION-LOG — session audit trail.
+const sessionLogs = {
+  save(startedAt, endedAt, events) {
+    getDb()
+      .prepare('INSERT INTO session_logs (started_at, ended_at, events) VALUES (?, ?, ?)')
+      .run(startedAt, endedAt, JSON.stringify(events));
+  },
+  list() {
+    return getDb()
+      .prepare('SELECT id, started_at, ended_at, events FROM session_logs ORDER BY id DESC')
+      .all()
+      .map((r) => ({ ...r, events: JSON.parse(r.events) }));
+  },
+  get(id) {
+    const r = getDb().prepare('SELECT * FROM session_logs WHERE id = ?').get(id);
+    return r ? { ...r, events: JSON.parse(r.events) } : null;
+  },
+};
+
 module.exports = {
   initDatabase,
   getDb,
@@ -5253,4 +5286,5 @@ module.exports = {
   archiveUnsorted,
   restoreUnsorted,
   canonImport,
+  sessionLogs,
 };

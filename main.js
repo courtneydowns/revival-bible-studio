@@ -3,6 +3,25 @@ const fs = require('fs');
 const path = require('path');
 const db = require('./db');
 
+// PSESSION-LOG — in-memory event accumulator. Flushed to DB on will-quit or on
+// the explicit "End Session" action from Settings. better-sqlite3 is sync so
+// finalizeSession() can run synchronously inside the will-quit handler.
+let sessionStart = null;
+const sessionEvents = [];
+
+function recordEvent(workspace, action) {
+  if (!sessionStart) return;
+  sessionEvents.push({ workspace, action, at: new Date().toISOString() });
+}
+
+function finalizeSession() {
+  if (!sessionStart || sessionEvents.length === 0) { sessionStart = null; return; }
+  const endedAt = new Date().toISOString();
+  try { db.sessionLogs.save(sessionStart, endedAt, [...sessionEvents]); } catch {}
+  sessionEvents.length = 0;
+  sessionStart = null;
+}
+
 // Filesystem-safe timestamp for the export folder name, e.g. 2026-06-04_14-30-05.
 function timestampSlug() {
   const d = new Date();
@@ -52,74 +71,74 @@ function createPopoutWindow(workspace, id) {
 function registerIpc() {
   ipcMain.handle('unsorted:list', () => db.listUnsorted());
   ipcMain.handle('unsorted:listArchived', () => db.listArchivedUnsorted());
-  ipcMain.handle('unsorted:create', (_event, entry) => db.createUnsorted(entry));
+  ipcMain.handle('unsorted:create', (_event, entry) => { const r = db.createUnsorted(entry); recordEvent('Unsorted', 'created'); return r; });
   ipcMain.handle('unsorted:update', (_event, id, entry) => db.updateUnsorted(id, entry));
-  ipcMain.handle('unsorted:delete', (_event, id) => db.deleteUnsorted(id));
-  ipcMain.handle('unsorted:archive', (_event, id) => db.archiveUnsorted(id));
+  ipcMain.handle('unsorted:delete', (_event, id) => { const r = db.deleteUnsorted(id); recordEvent('Unsorted', 'deleted'); return r; });
+  ipcMain.handle('unsorted:archive', (_event, id) => { const r = db.archiveUnsorted(id); recordEvent('Unsorted', 'archived'); return r; });
   ipcMain.handle('unsorted:restore', (_event, id) => db.restoreUnsorted(id));
 
   ipcMain.handle('sourceMaterial:list', () => db.sourceMaterial.list());
   ipcMain.handle('sourceMaterial:listArchived', () => db.sourceMaterial.listArchived());
-  ipcMain.handle('sourceMaterial:create', (_event, entry) => db.sourceMaterial.create(entry));
+  ipcMain.handle('sourceMaterial:create', (_event, entry) => { const r = db.sourceMaterial.create(entry); recordEvent('Source Material', 'created'); return r; });
   ipcMain.handle('sourceMaterial:update', (_event, id, entry) => db.sourceMaterial.update(id, entry));
-  ipcMain.handle('sourceMaterial:delete', (_event, id) => db.sourceMaterial.delete(id));
-  ipcMain.handle('sourceMaterial:archive', (_event, id) => db.sourceMaterial.archive(id));
+  ipcMain.handle('sourceMaterial:delete', (_event, id) => { const r = db.sourceMaterial.delete(id); recordEvent('Source Material', 'deleted'); return r; });
+  ipcMain.handle('sourceMaterial:archive', (_event, id) => { const r = db.sourceMaterial.archive(id); recordEvent('Source Material', 'archived'); return r; });
   ipcMain.handle('sourceMaterial:restore', (_event, id) => db.sourceMaterial.restore(id));
 
   ipcMain.handle('documents:list', () => db.documents.list());
   ipcMain.handle('documents:listArchived', () => db.documents.listArchived());
-  ipcMain.handle('documents:create', (_event, entry) => db.documents.create(entry));
+  ipcMain.handle('documents:create', (_event, entry) => { const r = db.documents.create(entry); recordEvent('Documents', 'created'); return r; });
   ipcMain.handle('documents:update', (_event, id, entry) => db.documents.update(id, entry));
-  ipcMain.handle('documents:delete', (_event, id) => db.documents.delete(id));
-  ipcMain.handle('documents:archive', (_event, id) => db.documents.archive(id));
+  ipcMain.handle('documents:delete', (_event, id) => { const r = db.documents.delete(id); recordEvent('Documents', 'deleted'); return r; });
+  ipcMain.handle('documents:archive', (_event, id) => { const r = db.documents.archive(id); recordEvent('Documents', 'archived'); return r; });
   ipcMain.handle('documents:restore', (_event, id) => db.documents.restore(id));
 
   ipcMain.handle('openQuestions:list', () => db.openQuestions.list());
   ipcMain.handle('openQuestions:listArchived', () => db.openQuestions.listArchived());
-  ipcMain.handle('openQuestions:create', (_event, entry) => db.openQuestions.create(entry));
+  ipcMain.handle('openQuestions:create', (_event, entry) => { const r = db.openQuestions.create(entry); recordEvent('Open Questions', 'created'); return r; });
   ipcMain.handle('openQuestions:update', (_event, id, entry) => db.openQuestions.update(id, entry));
-  ipcMain.handle('openQuestions:delete', (_event, id) => db.openQuestions.delete(id));
-  ipcMain.handle('openQuestions:archive', (_event, id) => db.openQuestions.archive(id));
+  ipcMain.handle('openQuestions:delete', (_event, id) => { const r = db.openQuestions.delete(id); recordEvent('Open Questions', 'deleted'); return r; });
+  ipcMain.handle('openQuestions:archive', (_event, id) => { const r = db.openQuestions.archive(id); recordEvent('Open Questions', 'archived'); return r; });
   ipcMain.handle('openQuestions:restore', (_event, id) => db.openQuestions.restore(id));
 
   ipcMain.handle('conflicts:list', () => db.conflicts.list());
   ipcMain.handle('conflicts:listArchived', () => db.conflicts.listArchived());
-  ipcMain.handle('conflicts:create', (_event, entry) => db.conflicts.create(entry));
+  ipcMain.handle('conflicts:create', (_event, entry) => { const r = db.conflicts.create(entry); recordEvent('Conflicts', 'created'); return r; });
   ipcMain.handle('conflicts:update', (_event, id, entry) => db.conflicts.update(id, entry));
-  ipcMain.handle('conflicts:delete', (_event, id) => db.conflicts.delete(id));
-  ipcMain.handle('conflicts:archive', (_event, id) => db.conflicts.archive(id));
+  ipcMain.handle('conflicts:delete', (_event, id) => { const r = db.conflicts.delete(id); recordEvent('Conflicts', 'deleted'); return r; });
+  ipcMain.handle('conflicts:archive', (_event, id) => { const r = db.conflicts.archive(id); recordEvent('Conflicts', 'archived'); return r; });
   ipcMain.handle('conflicts:restore', (_event, id) => db.conflicts.restore(id));
 
   ipcMain.handle('decisions:list', () => db.decisions.list());
   ipcMain.handle('decisions:listArchived', () => db.decisions.listArchived());
-  ipcMain.handle('decisions:create', (_event, entry) => db.decisions.create(entry));
+  ipcMain.handle('decisions:create', (_event, entry) => { const r = db.decisions.create(entry); recordEvent('Decisions', 'created'); return r; });
   ipcMain.handle('decisions:update', (_event, id, entry) => db.decisions.update(id, entry));
-  ipcMain.handle('decisions:delete', (_event, id) => db.decisions.delete(id));
-  ipcMain.handle('decisions:archive', (_event, id) => db.decisions.archive(id));
+  ipcMain.handle('decisions:delete', (_event, id) => { const r = db.decisions.delete(id); recordEvent('Decisions', 'deleted'); return r; });
+  ipcMain.handle('decisions:archive', (_event, id) => { const r = db.decisions.archive(id); recordEvent('Decisions', 'archived'); return r; });
   ipcMain.handle('decisions:restore', (_event, id) => db.decisions.restore(id));
 
   ipcMain.handle('brainstorm:list', () => db.brainstorm.list());
   ipcMain.handle('brainstorm:listArchived', () => db.brainstorm.listArchived());
-  ipcMain.handle('brainstorm:create', (_event, entry) => db.brainstorm.create(entry));
+  ipcMain.handle('brainstorm:create', (_event, entry) => { const r = db.brainstorm.create(entry); recordEvent('Brainstorm', 'created'); return r; });
   ipcMain.handle('brainstorm:update', (_event, id, entry) => db.brainstorm.update(id, entry));
-  ipcMain.handle('brainstorm:delete', (_event, id) => db.brainstorm.delete(id));
-  ipcMain.handle('brainstorm:archive', (_event, id) => db.brainstorm.archive(id));
+  ipcMain.handle('brainstorm:delete', (_event, id) => { const r = db.brainstorm.delete(id); recordEvent('Brainstorm', 'deleted'); return r; });
+  ipcMain.handle('brainstorm:archive', (_event, id) => { const r = db.brainstorm.archive(id); recordEvent('Brainstorm', 'archived'); return r; });
   ipcMain.handle('brainstorm:restore', (_event, id) => db.brainstorm.restore(id));
 
   ipcMain.handle('research:list', () => db.research.list());
   ipcMain.handle('research:listArchived', () => db.research.listArchived());
-  ipcMain.handle('research:create', (_event, entry) => db.research.create(entry));
+  ipcMain.handle('research:create', (_event, entry) => { const r = db.research.create(entry); recordEvent('Research', 'created'); return r; });
   ipcMain.handle('research:update', (_event, id, entry) => db.research.update(id, entry));
-  ipcMain.handle('research:delete', (_event, id) => db.research.delete(id));
-  ipcMain.handle('research:archive', (_event, id) => db.research.archive(id));
+  ipcMain.handle('research:delete', (_event, id) => { const r = db.research.delete(id); recordEvent('Research', 'deleted'); return r; });
+  ipcMain.handle('research:archive', (_event, id) => { const r = db.research.archive(id); recordEvent('Research', 'archived'); return r; });
   ipcMain.handle('research:restore', (_event, id) => db.research.restore(id));
 
   ipcMain.handle('characters:list', () => db.characters.list());
   ipcMain.handle('characters:listArchived', () => db.characters.listArchived());
-  ipcMain.handle('characters:create', (_event, entry) => db.characters.create(entry));
+  ipcMain.handle('characters:create', (_event, entry) => { const r = db.characters.create(entry); recordEvent('Characters', 'created'); return r; });
   ipcMain.handle('characters:update', (_event, id, entry) => db.characters.update(id, entry));
-  ipcMain.handle('characters:delete', (_event, id) => db.characters.delete(id));
-  ipcMain.handle('characters:archive', (_event, id) => db.characters.archive(id));
+  ipcMain.handle('characters:delete', (_event, id) => { const r = db.characters.delete(id); recordEvent('Characters', 'deleted'); return r; });
+  ipcMain.handle('characters:archive', (_event, id) => { const r = db.characters.archive(id); recordEvent('Characters', 'archived'); return r; });
   ipcMain.handle('characters:restore', (_event, id) => db.characters.restore(id));
 
   // P37 — character relationship edges (workspace-level, not canon)
@@ -141,18 +160,18 @@ function registerIpc() {
 
   ipcMain.handle('episodes:list', () => db.episodes.list());
   ipcMain.handle('episodes:listArchived', () => db.episodes.listArchived());
-  ipcMain.handle('episodes:create', (_event, entry) => db.episodes.create(entry));
+  ipcMain.handle('episodes:create', (_event, entry) => { const r = db.episodes.create(entry); recordEvent('Episodes', 'created'); return r; });
   ipcMain.handle('episodes:update', (_event, id, entry) => db.episodes.update(id, entry));
-  ipcMain.handle('episodes:delete', (_event, id) => db.episodes.delete(id));
-  ipcMain.handle('episodes:archive', (_event, id) => db.episodes.archive(id));
+  ipcMain.handle('episodes:delete', (_event, id) => { const r = db.episodes.delete(id); recordEvent('Episodes', 'deleted'); return r; });
+  ipcMain.handle('episodes:archive', (_event, id) => { const r = db.episodes.archive(id); recordEvent('Episodes', 'archived'); return r; });
   ipcMain.handle('episodes:restore', (_event, id) => db.episodes.restore(id));
 
   ipcMain.handle('writingLab:list', () => db.writingLab.list());
   ipcMain.handle('writingLab:listArchived', () => db.writingLab.listArchived());
-  ipcMain.handle('writingLab:create', (_event, entry) => db.writingLab.create(entry));
+  ipcMain.handle('writingLab:create', (_event, entry) => { const r = db.writingLab.create(entry); recordEvent('Writing Lab', 'created'); return r; });
   ipcMain.handle('writingLab:update', (_event, id, entry) => db.writingLab.update(id, entry));
-  ipcMain.handle('writingLab:delete', (_event, id) => db.writingLab.delete(id));
-  ipcMain.handle('writingLab:archive', (_event, id) => db.writingLab.archive(id));
+  ipcMain.handle('writingLab:delete', (_event, id) => { const r = db.writingLab.delete(id); recordEvent('Writing Lab', 'deleted'); return r; });
+  ipcMain.handle('writingLab:archive', (_event, id) => { const r = db.writingLab.archive(id); recordEvent('Writing Lab', 'archived'); return r; });
   ipcMain.handle('writingLab:restore', (_event, id) => db.writingLab.restore(id));
 
   ipcMain.handle('chats:list', () => db.chats.list());
@@ -250,12 +269,12 @@ function registerIpc() {
   // stay in lockstep with the DB-side detail tables.
   ipcMain.handle('canon:typeConfig', () => db.canon.typeConfig());
   ipcMain.handle('canon:getDetail', (_event, id) => db.canon.getDetail(id));
-  ipcMain.handle('canon:create', (_event, payload) => db.canon.create(payload));
+  ipcMain.handle('canon:create', (_event, payload) => { const r = db.canon.create(payload); recordEvent('Canon Bible', 'created'); return r; });
   ipcMain.handle('canon:update', (_event, id, payload) =>
     db.canon.update(id, payload)
   );
-  ipcMain.handle('canon:delete', (_event, id) => db.canon.delete(id));
-  ipcMain.handle('canon:archive', (_event, id) => db.canon.archive(id));
+  ipcMain.handle('canon:delete', (_event, id) => { const r = db.canon.delete(id); recordEvent('Canon Bible', 'deleted'); return r; });
+  ipcMain.handle('canon:archive', (_event, id) => { const r = db.canon.archive(id); recordEvent('Canon Bible', 'archived'); return r; });
   ipcMain.handle('canon:restore', (_event, id) => db.canon.restore(id));
   // P33 — lock/unlock toggle. Lock is "currently accepted, edits still
   // allowed but warned"; the renderer enforces the warning, this just flips
@@ -320,18 +339,26 @@ function registerIpc() {
   ipcMain.handle('canonProposals:updateFields', (_event, id, payload) =>
     db.canonProposals.updateFields(id, payload)
   );
-  ipcMain.handle('canonProposals:approve', (_event, id, payload) =>
-    db.canonProposals.approve(id, payload)
-  );
-  ipcMain.handle('canonProposals:sendBack', (_event, id, payload) =>
-    db.canonProposals.sendBack(id, payload)
-  );
-  ipcMain.handle('canonProposals:defer', (_event, id, payload) =>
-    db.canonProposals.defer(id, payload)
-  );
-  ipcMain.handle('canonProposals:reject', (_event, id, payload) =>
-    db.canonProposals.reject(id, payload)
-  );
+  ipcMain.handle('canonProposals:approve', (_event, id, payload) => {
+    const r = db.canonProposals.approve(id, payload);
+    recordEvent('Canon Review', 'approved');
+    return r;
+  });
+  ipcMain.handle('canonProposals:sendBack', (_event, id, payload) => {
+    const r = db.canonProposals.sendBack(id, payload);
+    recordEvent('Canon Review', 'sent back');
+    return r;
+  });
+  ipcMain.handle('canonProposals:defer', (_event, id, payload) => {
+    const r = db.canonProposals.defer(id, payload);
+    recordEvent('Canon Review', 'deferred');
+    return r;
+  });
+  ipcMain.handle('canonProposals:reject', (_event, id, payload) => {
+    const r = db.canonProposals.reject(id, payload);
+    recordEvent('Canon Review', 'rejected');
+    return r;
+  });
   ipcMain.handle('canonProposals:delete', (_event, id) =>
     db.canonProposals.delete(id)
   );
@@ -1194,19 +1221,24 @@ function registerIpc() {
       throw new Error('Unexpected response from Claude API.');
     }
 
-    return {
+    const flanaganResult = {
       summary: toolBlock.input.summary || '',
       confidence: toolBlock.input.confidence || 'tension',
       breakdown: toolBlock.input.breakdown || '',
       northStar: toolBlock.input.northStar || '',
       flanaganVersion: ipcMain._flanaganVersion || 'unknown',
     };
+    recordEvent('Flanagan Filter', 'analysis run');
+    return flanaganResult;
   });
 
   // P46-B / PFLAN-EXPAND — Flanagan Filter: save + history. entityKind + entityId
   // identify which workspace row the analysis belongs to.
-  ipcMain.handle('flanaganAnalyses:create', (_e, entityKind, entityId, data) =>
-    db.flanaganAnalyses.create(entityKind, entityId, data));
+  ipcMain.handle('flanaganAnalyses:create', (_e, entityKind, entityId, data) => {
+    const r = db.flanaganAnalyses.create(entityKind, entityId, data);
+    recordEvent('Flanagan Filter', 'analysis saved');
+    return r;
+  });
   ipcMain.handle('flanaganAnalyses:list', (_e, entityKind, entityId) =>
     db.flanaganAnalyses.listFor(entityKind, entityId));
   ipcMain.handle('flanaganAnalyses:markStale', (_e, id) =>
@@ -1292,6 +1324,65 @@ function registerIpc() {
       }
     }
   });
+
+  // PSESSION-LOG — finalize on demand (Settings "End Session" button), list
+  // all past logs, and export a specific log as a plain-text file.
+  ipcMain.handle('sessionLog:finalize', () => {
+    const hadEvents = sessionEvents.length > 0;
+    finalizeSession();
+    sessionStart = new Date().toISOString();
+    return { ok: true, saved: hadEvents };
+  });
+  ipcMain.handle('sessionLog:list', () => db.sessionLogs.list());
+  ipcMain.handle('sessionLog:export', (_e, id) => {
+    const log = db.sessionLogs.get(id);
+    if (!log) throw new Error('Session log not found.');
+    const start = new Date(log.started_at);
+    const end   = new Date(log.ended_at);
+    const durationMs = end - start;
+    const h = Math.floor(durationMs / 3600000);
+    const m = Math.floor((durationMs % 3600000) / 60000);
+    const durStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
+    const fmtDate = start.toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+    });
+    const fmtTime = (d) =>
+      d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+    const groups = {};
+    for (const e of log.events) {
+      if (!groups[e.workspace]) groups[e.workspace] = {};
+      groups[e.workspace][e.action] = (groups[e.workspace][e.action] || 0) + 1;
+    }
+
+    const lines = [
+      'Revival Studio — Session Log',
+      fmtDate,
+      `Started: ${fmtTime(start)}   Ended: ${fmtTime(end)}   Duration: ${durStr}`,
+      '',
+    ];
+    for (const [ws, actions] of Object.entries(groups)) {
+      lines.push(ws);
+      for (const [action, count] of Object.entries(actions)) {
+        const label = action.charAt(0).toUpperCase() + action.slice(1);
+        lines.push(`  ${label}: ${count}`);
+      }
+      lines.push('');
+    }
+    lines.push(`Total: ${log.events.length} action(s)`);
+
+    const folder = path.join(
+      app.getPath('documents'),
+      'revival-bible-studio',
+      'session_logs'
+    );
+    fs.mkdirSync(folder, { recursive: true });
+    const slug = log.started_at.slice(0, 19).replace(/[:.]/g, '-');
+    const filePath = path.join(folder, `session-${slug}.txt`);
+    fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
+    shell.openPath(folder);
+    return { filePath };
+  });
 }
 
 app.whenReady().then(() => {
@@ -1300,10 +1391,17 @@ app.whenReady().then(() => {
 
   registerIpc();
   createWindow();
+  sessionStart = new Date().toISOString();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+// PSESSION-LOG — save the session log before the process exits.
+// better-sqlite3 is synchronous so this runs cleanly in will-quit.
+app.on('will-quit', () => {
+  finalizeSession();
 });
 
 app.on('window-all-closed', () => {

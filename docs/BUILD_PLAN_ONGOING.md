@@ -557,7 +557,7 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Session log
 
-### PSESSION-LOG — Session / work log
+### PSESSION-LOG — Session / work log ✅
 - Auto-generated log at session end (app close or explicit "end session" action)
 - Records: entries created, entries approved/resolved/archived, canon changes made, analyses run — grouped by workspace
 - Viewable from Settings or a dedicated log panel on Home

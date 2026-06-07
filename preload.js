@@ -331,6 +331,14 @@ contextBridge.exposeInMainWorld('revival', {
   panic: {
     export: () => ipcRenderer.invoke('panic:export'),
   },
+  // PSESSION-LOG — audit trail. finalize() saves the current session and
+  // starts a fresh one; list() returns all past logs; export(id) writes a
+  // plain-text file and reveals the folder.
+  sessionLog: {
+    finalize: () => ipcRenderer.invoke('sessionLog:finalize'),
+    list:     () => ipcRenderer.invoke('sessionLog:list'),
+    export:   (id) => ipcRenderer.invoke('sessionLog:export', id),
+  },
   // PUI2: open a single-entry popout window, and a tiny pub-sub so popout
   // saves are reflected in the main window (and vice-versa). notifyChanged is
   // fire-and-forget; onChanged returns the unsubscribe handle so a workspace

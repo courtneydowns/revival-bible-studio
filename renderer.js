@@ -6095,6 +6095,143 @@ function renderSettingsPage(section) {
   renderNeedsAttentionSettings(section);
   renderPanicExport(section);
   renderCanonExport(section);
+  renderSessionLog(section);
+}
+
+// --- Settings: Session Log (PSESSION-LOG) ------------------------------------
+// Audit trail of actions per session. Auto-saved on app close; "End Session"
+// button saves immediately and starts a fresh one. Read-only — export as text.
+function renderSessionLog(section) {
+  const block = document.createElement('div');
+  block.className = 'entry-form settings-block';
+
+  const heading = document.createElement('h2');
+  heading.className = 'settings-heading';
+  heading.textContent = 'Session Log';
+
+  const desc = document.createElement('p');
+  desc.className = 'settings-desc';
+  desc.textContent =
+    'Audit trail of actions taken each session. Saved automatically when the app closes. ' +
+    'Use "End Session" to save the current session and start a fresh one without closing.';
+
+  const endBtn = document.createElement('button');
+  endBtn.type = 'button';
+  endBtn.className = 'btn-secondary';
+  endBtn.textContent = 'End Session & Save Log';
+
+  const endStatus = document.createElement('p');
+  endStatus.className = 'draft-status';
+
+  const logList = document.createElement('div');
+  logList.className = 'session-log-list';
+
+  async function renderLogs() {
+    logList.innerHTML = '';
+    let logs;
+    try {
+      logs = await window.revival.sessionLog.list();
+    } catch {
+      const errEl = document.createElement('p');
+      errEl.className = 'settings-desc';
+      errEl.textContent = 'Could not load session logs.';
+      logList.appendChild(errEl);
+      return;
+    }
+    if (!logs.length) {
+      const emptyEl = document.createElement('p');
+      emptyEl.className = 'settings-desc';
+      emptyEl.textContent = 'No sessions recorded yet. Logs appear here after the app is closed or "End Session" is used.';
+      logList.appendChild(emptyEl);
+      return;
+    }
+    for (const log of logs) logList.appendChild(buildLogCard(log));
+  }
+
+  function buildLogCard(log) {
+    const card = document.createElement('div');
+    card.className = 'session-log-card';
+
+    const start = new Date(log.started_at);
+    const end   = new Date(log.ended_at);
+    const ms    = end - start;
+    const h     = Math.floor(ms / 3600000);
+    const m     = Math.floor((ms % 3600000) / 60000);
+    const dur   = h > 0 ? `${h}h ${m}m` : `${m}m`;
+    const fmtDate = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const fmtTime = (d) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+    const header = document.createElement('div');
+    header.className = 'session-log-card-header';
+
+    const dateSpan = document.createElement('span');
+    dateSpan.className = 'session-log-date';
+    dateSpan.textContent = `${fmtDate}  ${fmtTime(start)} – ${fmtTime(end)}  (${dur})`;
+
+    const exportBtn = document.createElement('button');
+    exportBtn.type = 'button';
+    exportBtn.className = 'btn-secondary session-log-export-btn';
+    exportBtn.textContent = 'Export .txt';
+    exportBtn.addEventListener('click', async () => {
+      exportBtn.disabled = true;
+      try { await window.revival.sessionLog.export(log.id); }
+      finally { exportBtn.disabled = false; }
+    });
+
+    header.append(dateSpan, exportBtn);
+
+    // Group events by workspace → action → count
+    const groups = {};
+    for (const e of log.events) {
+      if (!groups[e.workspace]) groups[e.workspace] = {};
+      groups[e.workspace][e.action] = (groups[e.workspace][e.action] || 0) + 1;
+    }
+
+    const summary = document.createElement('div');
+    summary.className = 'session-log-summary';
+    for (const [ws, actions] of Object.entries(groups)) {
+      const row = document.createElement('div');
+      row.className = 'session-log-ws-row';
+      const label = document.createElement('span');
+      label.className = 'session-log-ws-label';
+      label.textContent = ws;
+      const acts = document.createElement('span');
+      acts.textContent = Object.entries(actions)
+        .map(([a, c]) => `${c} ${a}`)
+        .join(' · ');
+      row.append(label, acts);
+      summary.appendChild(row);
+    }
+
+    const total = document.createElement('div');
+    total.className = 'session-log-total';
+    total.textContent = `${log.events.length} action(s) total`;
+
+    card.append(header, summary, total);
+    return card;
+  }
+
+  endBtn.addEventListener('click', async () => {
+    endBtn.disabled = true;
+    try {
+      const { saved } = await window.revival.sessionLog.finalize();
+      if (saved) {
+        setStatus(endStatus, 'Session saved. Fresh session started.');
+        await renderLogs();
+      } else {
+        setStatus(endStatus, 'No actions recorded this session — nothing to save yet.');
+      }
+    } catch (err) {
+      setStatus(endStatus, `Could not save: ${err.message || err}`);
+    } finally {
+      endBtn.disabled = false;
+    }
+  });
+
+  block.append(heading, desc, endBtn, endStatus, logList);
+  section.appendChild(block);
+
+  renderLogs();
 }
 
 // --- Settings: Needs Attention thresholds (PHOME-NEEDS) --------------------
