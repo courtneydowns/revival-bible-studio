@@ -380,7 +380,7 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## UI Polish (deferred items from PPOL2)
 
-### PPOL2b — UI Polish: deferred PPOL2 items ✅
+### PPOL2b — UI Polish: deferred PPOL2 items
 - Six items deferred from PPOL2 as feature territory or substantial fixes — addressed here before P46-A
 - Status bar missing from Canon Review proposals (PPOL2-02)
 - Status bar missing from Writing Lab drafts (PPOL2-03)

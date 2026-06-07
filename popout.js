@@ -96,6 +96,15 @@ const WORKSPACE_CONFIGS = {
     bodyPlaceholder: 'Outline, scene list, beats, draft notes (optional)',
     typeLabel: 'Episode',
   },
+  // PPOL2b-11 — Writing Lab drafts can be popped out. The popout shows the
+  // standard title+body Reference/Edit view; the draft assistant is main-window-only.
+  'Writing Lab': {
+    apiName: 'writingLab',
+    entityKind: 'writing_lab',
+    titlePlaceholder: 'Untitled draft',
+    bodyPlaceholder: 'Draft text (optional)',
+    typeLabel: 'Draft',
+  },
 };
 
 // Same persisted theme key the main window uses, so the popout inherits

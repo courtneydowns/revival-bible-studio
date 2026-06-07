@@ -28,7 +28,7 @@
 |---|---|---|
 | P0–P31 | ✅ Complete | — |
 | PR1–PR6 | ✅ Complete | — |
-| **PUI1 | ✅ Complete | — |
+| **PUI1** | ✅ Complete | — |
 | **PUI2 Full-screen popout** | **CLI** ✅ | New window module |
 | **PUI3 Highlight + extract + route** | **CLI** ✅ | Cross-module wiring |
 | **PCAP Quick-capture** | **VS Code ext** ✅ | Small modal + Unsorted write |
@@ -45,26 +45,53 @@
 | **PCBREF Canon Bible reference mode** | **VS Code ext** ✅ | Mode toggle on existing page |
 | **PHIST Canon entry version history** | **CLI** ✅ | Chain traversal + side-by-side view |
 | **PCONFLICT Conflict detection UI** | **CLI** ✅ | Cross-entry analysis + routing |
-| **PCONFLICT-2 Auto-route + re-check nudges** | **CLI** ✅ | New IPCs (scanAndRoute, openFlagEntryIds) + multi-file (Canon Bible + Conflicts) |
-| **PCONFLICT-3 Contradiction scan + conflict lifecycle** | **CLI** ✅ | Scan + lifecycle wiring across Canon Bible + Conflicts, reuses PCONFLICT-2 helpers |
+| **PCONFLICT-2 Auto-route + re-check nudges** | **CLI** ✅ | New IPCs (scanAndRoute, openFlagEntryIds) + multi-file |
+| **PCONFLICT-3 Contradiction scan + conflict lifecycle** | **CLI** ✅ | Scan + lifecycle wiring, reuses PCONFLICT-2 helpers |
 | **P36 Cross-workspace attachments** | **CLI** ✅ | Cross-module wiring, join tables |
 | **P37 Characters relational view** | **CLI** ✅ | New visual component |
 | **P38 Characters/Episodes → Canon Review** | **CLI** ✅ | Cross-module flow |
 | **PWLAB Writing Lab → Canon Review** | **VS Code ext** ✅ | Action on existing Writing Lab page |
-| **PPOL1 UI Polish: pre-import** | **VS Code ext / CLI** | Per item in POLISH_NOTES_ONGOING.md |
-| **P20v2 Panic Export v2** | **VS Code ext** | Extend existing export module |
-| **PEXPORT Canon Bible export** | **CLI** | New export module, markdown + PDF |
-| **PImp1 Worldbuilding file import** | **CLI** | New module, file picker, parser |
-| **PImp2 Import review tools** | **CLI** | Bulk actions, keyboard nav in queue |
-| **PPOL2 UI Polish: pre-AI** | **VS Code ext / CLI** | Per item in POLISH_NOTES_ONGOING.md |
-| **P39 Claude API config** | **CLI** | New module + settings UI |
-| **P40 Chat AI send/receive** | **CLI** | API wiring |
-| **P41 AI → Canon Review pipeline** | **CLI** | Cross-module flow |
-| **P42 AI canon search assistant** | **CLI** | New query module |
-| **P43 AI conflict detector** | **CLI** | On-demand analysis in Canon Review |
-| **P44 AI draft assistant** | **VS Code ext** | Action on existing Writing Lab page |
-| **P45 AI import assistant** | **CLI** | Wired into PImp flow |
-| **P46 AI open questions analyst** | **VS Code ext** | Action on existing Open Questions entry |
+| **PPOL1 UI Polish: pre-import** | **VS Code ext / CLI** ✅ | Per item in POLISH_NOTES_ONGOING.md |
+| **P20v2 Panic Export v2** | **VS Code ext** ✅ | Extend existing export module |
+| **PEXPORT Canon Bible export** | **CLI** ✅ | New export module, markdown + PDF |
+| **PImp1 Worldbuilding file import** | **CLI** ✅ | New module, file picker, parser |
+| **PImp2 Import review tools** | **CLI** ✅ | Bulk actions, keyboard nav in queue |
+| **PPOL2 UI Polish: pre-AI** | **VS Code ext / CLI** ✅ | Per item in POLISH_NOTES_ONGOING.md |
+| **P39 Claude API config** | **CLI** ✅ | New module + settings UI |
+| **P40 Chat AI send/receive** | **CLI** ✅ | API wiring |
+| **P41 AI → Canon Review pipeline** | **CLI** ✅ | Cross-module flow |
+| **P42 AI canon search assistant** | **CLI** ✅ | New query module |
+| **P43 AI conflict detector** | **CLI** ✅ | On-demand analysis in Canon Review |
+| **P44 AI draft assistant** | **VS Code ext** ✅ | Action on existing Writing Lab page |
+| **P45 AI import assistant** | **CLI** ✅ | Wired into PImp flow |
+| **PPOL2b UI Polish: deferred PPOL2 items** | **VS Code ext / CLI** | Six deferred items — status bars, Writing Lab popout, Canon Review filter, search scroll |
+| **P46-A AI open questions analyst: foundation** | **CLI** | New analysis panel, API wiring, four scan modes |
+| **P46-B AI open questions analyst: save + history** | **VS Code ext** | Analysis history, lock, stale flag — additions to existing panel |
+| **P46-C AI open questions analyst: routing + tags** | **CLI** | Export to Brainstorm/Research, highlight-extract wiring, tag suggestions |
+| **PPOL3 UI Polish: post-P46** | **VS Code ext / CLI** | Print/PDF only — no polish log dependency |
+| **PFLAN-EXPAND Flanagan Filter expansion** | **CLI** | Multi-workspace wiring + Production Check mode |
+| **PAI-WIRE Cross-AI routing** | **CLI** | Four cross-feature connections, multi-file |
+| **PDOC-WIRE Documents wiring** | **CLI** | First-class workspace wiring, multi-file |
+| **PCHAT-ATTACH Chat attachment expansion** | **VS Code ext** | Add permitted types to existing attachment UI |
+| **PHOME-NEEDS Home: Needs Attention panel** | **CLI** | New panel component + staleness logic |
+| **PUNDO App-level undo** | **CLI** | Global action history, touches every workspace |
+| **PWLAB-VERSIONS Writing Lab draft versioning** | **CLI** | Version storage + diff view |
+| **PSESSION-LOG Session / work log** | **CLI** | New log module + Settings panel |
+| **PBLOCK Open Questions: blocking + escalation** | **VS Code ext** | Additions to existing Open Questions entry |
+| **PBRAIN-STRUCT Brainstorm internal structure** | **CLI** | Thread/cluster + status badges + developed-into links |
+| **PSTALE Stale item nudges** | **CLI** | Staleness logic + badge aging, touches nav + all workspaces |
+| **PDRAFT-LOCK Character/Episode draft lock** | **VS Code ext** | Lock state on existing entry components |
+| **PARC-A Character arc tracker: written** | **CLI** | New read-only view, cross-table queries |
+| **PARC-B Character arc tracker: visual** | **CLI** | New visual component, horizontal timeline |
+| **PEPISODE-STRUCT Episode structure checklist** | **VS Code ext / CLI** | Checklist panel + AI assist option |
+| **PQUIET Quiet devastation tracker** | **CLI** | New tracker + dashboard view + seeded data |
+| **PLOCKED-SPECIFICS Locked specifics panel** | **VS Code ext** | Reference panel on existing workspace pages |
+| **PEPISODE-CONT AI episode continuity checker** | **CLI** | New AI module, cross-entry reads |
+| **PRESEARCH-CITE Research source citation** | **VS Code ext** | Source field on existing Research entry |
+| **PEMPTY-STATE Empty state + onboarding** | **VS Code ext** | Empty state copy + first-session guide |
+| **PHEALTH App health indicator** | **VS Code ext** | Read-only panel in Settings |
+| **PCONFIG-BACKUP Config backup/restore** | **VS Code ext** | Export/import config in Settings |
+| **PPOL-ONGOING Ongoing polish** | **VS Code ext / CLI** | Open-ended; tool choice per item |
 
 ---
 
@@ -103,11 +130,11 @@ Opus burns the Max weekly limit much faster. Don't run brainstorm/chat sessions 
 ## Token-saving habits
 
 1. **One phase = one Claude Code session.** Start a fresh session per phase so context stays small.
-2. **Don't paste BUILD_PLAN_ONGOING.md into Claude Code.** It already has CLAUDE_ONGOING.md. Just say: "Do PUI1 per docs/BUILD_PLAN_ONGOING.md."
+2. **Don't paste BUILD_PLAN_ONGOING.md into Claude Code.** It already has CLAUDE_ONGOING.md. Just say: "Do P46-A per docs/BUILD_PLAN_ONGOING.md."
 3. **Don't write code in claude.ai that Claude Code will rewrite.** Either claude.ai produces a tight brief for Claude Code, or Claude Code does the work — not both.
 4. **Use the VS Code extension for fixes under ~15 lines.** Faster, no session overhead.
 5. **Review smoke test results in claude.ai (Sonnet)** before next phase — keeps Claude Code sessions short.
-6. **Log polish items during smoke tests.** Don't fix them inline — add to POLISH_NOTES_ONGOING.md and address in PPOL1/PPOL2.
+6. **Log polish items during smoke tests.** Don't fix them inline — add to POLISH_NOTES_ONGOING.md and address in PPOL-ONGOING.
 
 ---
 
@@ -129,6 +156,7 @@ Opus burns the Max weekly limit much faster. Don't run brainstorm/chat sessions 
 - [x] `CLAUDE_ONGOING.md` is also in this claude.ai Project's knowledge files
 - [x] `PROJECT_INSTRUCTIONS.md` contents pasted into claude.ai Project's custom instructions
 - [x] `docs/BUILD_PLAN_ONGOING.md` and `docs/TOOL_ROUTING_ONGOING.md` committed
+- [x] `docs/FEATURE_BACKLOG_ONGOING.md` committed (backlog — not passed to Claude Code)
 - [x] `POLISH_NOTES_ONGOING.md` lives at repo root and uploaded to this claude.ai Project
 - [x] Claude Code CLI logged into the right Anthropic account (Max plan)
 - [x] VS Code extension logged in

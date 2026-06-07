@@ -3605,6 +3605,14 @@ function renderCanonBiblePage(section) {
 
     renderFilterBar();
     renderLists();
+
+    // PPOL2b-26 — consume a pending deep-link from global search so the page
+    // scrolls to (and flashes) the matched canon entry.
+    if (pendingEntrySelection && pendingEntrySelection.workspace === 'Canon Bible') {
+      const targetId = pendingEntrySelection.id;
+      pendingEntrySelection = null;
+      chainHelper.goto(targetId);
+    }
   }
 
   refresh();
@@ -3972,12 +3980,15 @@ function renderCanonReviewPage(section, workspaceName) {
     list.innerHTML = '';
     deferredList.innerHTML = '';
 
-    const showDeferredSection = filter === 'active';
+    // PPOL2b-06 — when filter is 'deferred', show items in the deferred section
+    // (not the main list). showDeferredSection = true for both 'active' and
+    // 'deferred' so the collapsed section is always visible for those filters.
+    const showDeferredSection = filter === 'active' || filter === 'deferred';
     const statusFiltered = proposals.filter((p) => {
       if (filter === 'active')    return p.status === 'pending' || p.status === 'sent_back';
       if (filter === 'pending')   return p.status === 'pending';
       if (filter === 'sent_back') return p.status === 'sent_back';
-      if (filter === 'deferred')  return p.status === 'deferred';
+      if (filter === 'deferred')  return false; // deferred items go to the section, not main list
       return true;
     });
 
@@ -4002,6 +4013,8 @@ function renderCanonReviewPage(section, workspaceName) {
         empty.textContent =
           'No proposals in the queue yet. Highlight text anywhere and route ' +
           'it to Canon Review to stage one.';
+      } else if (filter === 'deferred') {
+        empty.textContent = 'Deferred proposals appear in the section below.';
       } else {
         empty.textContent = 'No proposals match this filter.';
       }
@@ -4385,6 +4398,9 @@ function renderCanonReviewPage(section, workspaceName) {
     const conflictArea = document.createElement('div');
     conflictArea.className = 'cr-conflict-area';
     rightCol.appendChild(conflictArea);
+
+    // PPOL2b-02 — status bar (workspace · type · created · edited · status).
+    rightCol.appendChild(buildStatusBar('Canon Review', p, false));
 
     conflictCheckBtn.addEventListener('click', async () => {
       conflictCheckBtn.disabled = true;
@@ -6676,10 +6692,21 @@ function renderWritingLabPage(section) {
     deleteBtn.className = 'btn-danger';
     deleteBtn.textContent = 'Delete';
 
+    // PPOL2b-11 — pop out button; only available for saved drafts (item != null).
+    const wlPopoutParts = item ? (() => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-secondary';
+      btn.textContent = 'Pop out ↗';
+      btn.title = 'Open this draft in its own window';
+      btn.addEventListener('click', () => window.revival.popout.open('Writing Lab', item.id));
+      return [btn];
+    })() : [];
+
     if (archivedAtStart) {
-      bar.append(status, counter, spacer, archiveBtn, deleteBtn);
+      bar.append(status, counter, spacer, ...wlPopoutParts, archiveBtn, deleteBtn);
     } else {
-      bar.append(status, counter, spacer, proposeBtn, archiveBtn, deleteBtn);
+      bar.append(status, counter, spacer, proposeBtn, ...wlPopoutParts, archiveBtn, deleteBtn);
     }
 
     // P44 — source attachment row: always visible below the editor bar.
@@ -7151,6 +7178,14 @@ function renderWritingLabPage(section) {
     });
 
     rightCol.appendChild(assistant);
+
+    // PPOL2b-12 — linked-entries indicator (same passive pattern as other workspaces).
+    // PPOL2b-03 — status bar (workspace · type · created · edited · status).
+    // Both are gated on item existing — new unsaved drafts have no DB row yet.
+    if (item) {
+      mountLinkedIndicator(rightCol, 'writing_lab', item.id);
+      rightCol.appendChild(buildStatusBar('Writing Lab', item, archivedAtStart));
+    }
 
     // Cleanup: remove the fixed-position source picker and document listener
     // when this editor instance is replaced (openEditor clears rightCol).
@@ -8985,10 +9020,11 @@ const SEARCH_KIND_TO_WORKSPACE = {
   chats: 'Chat',
 };
 // Workspaces wired into PUI2's popout. Other kinds route() instead.
+// PPOL2b-11 — writing_lab added now that popout.js supports Writing Lab.
 const SEARCH_POPOUT_KINDS = new Set([
   'unsorted', 'source_material', 'documents', 'open_questions',
   'conflicts', 'decisions', 'brainstorm', 'research',
-  'characters', 'episodes',
+  'characters', 'episodes', 'writing_lab',
 ]);
 
 const searchInput = document.getElementById('search-input');
@@ -9308,9 +9344,9 @@ function openSearchHit(group, hit) {
     window.revival.popout.open(workspace, hit.id);
     return;
   }
-  // Canon Bible / Writing Lab: route to the workspace; entry selection is a
-  // later phase (Canon Bible deep-link is on the P32+ track).
-  route(workspace);
+  // PPOL2b-26 — Canon Bible: route with the entry id so the page scrolls to
+  // the matched entry. Writing Lab: route to workspace (editor opens on demand).
+  route(workspace, group.kind === 'canon_entries' ? hit.id : undefined);
 }
 
 searchInput.addEventListener('input', () => {

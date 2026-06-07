@@ -65,9 +65,24 @@ Running log of UI/UX observations from smoke tests. Addressed in PPOL1 (pre-impo
 - [x] PPOL2-39 [PHOME] Home count cells show "0" in full weight with no visual distinction from populated workspaces ✅ PPOL2
 
 ### Logged but deferred (feature territory or substantial)
-- [ ] PPOL2-02 [PPASSIVE] Status bar missing from Canon Review proposals
-- [ ] PPOL2-03 [PPASSIVE] Status bar missing from Writing Lab drafts
-- [ ] PPOL2-06 [P35] Canon Review deferred section hidden when filter = "Deferred only" — items appear in main list (design debate)
-- [ ] PPOL2-11 [PUI2] Writing Lab missing "Pop out" button
-- [ ] PPOL2-12 [PUI2] Writing Lab missing linked-entries indicator
-- [ ] PPOL2-26 [PSEARCH] Search: Canon Bible hits route to the page top, not the matched entry (known gap)
+- [x] PPOL2-02 [PPASSIVE] Status bar missing from Canon Review proposals ✅ PPOL2b
+- [x] PPOL2-03 [PPASSIVE] Status bar missing from Writing Lab drafts ✅ PPOL2b
+- [x] PPOL2-06 [P35] Canon Review deferred section hidden when filter = "Deferred only" — items appear in main list ✅ PPOL2b
+- [x] PPOL2-11 [PUI2] Writing Lab missing "Pop out" button ✅ PPOL2b
+- [x] PPOL2-12 [PUI2] Writing Lab missing linked-entries indicator ✅ PPOL2b
+- [x] PPOL2-26 [PSEARCH] Search: Canon Bible hits route to the page top, not the matched entry ✅ PPOL2b
+
+### Noticed during PPOL2b smoke
+- [ ] PPOL2b-S01 [PPOL2b] Unsorted: no inline search/filter on left-column list — add text input above the list to narrow entries by title or body
+- [ ] PPOL2b-S02 [PPOL2b] Source Material: no inline search/filter on left-column list — narrow sources by title or body
+- [ ] PPOL2b-S03 [PPOL2b] Documents: no inline search/filter on left-column list — narrow documents by title or body
+- [ ] PPOL2b-S04 [PPOL2b] Open Questions: no inline search/filter on left-column list — narrow questions by title or body
+- [ ] PPOL2b-S05 [PPOL2b] Conflicts: no inline search/filter on left-column list — narrow conflicts by title or body
+- [ ] PPOL2b-S06 [PPOL2b] Decisions: no inline search/filter on left-column list — narrow decisions by title or body
+- [ ] PPOL2b-S07 [PPOL2b] Brainstorm: no inline search/filter on left-column list — narrow ideas by title or body
+- [ ] PPOL2b-S08 [PPOL2b] Research: no inline search/filter on left-column list — narrow research entries by title or body
+- [ ] PPOL2b-S09 [PPOL2b] Characters: no inline search/filter on left-column list — narrow characters by name or body
+- [ ] PPOL2b-S10 [PPOL2b] Episodes: no inline search/filter on left-column list — narrow episodes by title or body
+- [ ] PPOL2b-S11 [PPOL2b] Writing Lab: no inline search/filter on left-column list — narrow drafts by title or body
+- [ ] PPOL2b-S12 [PPOL2b] Canon Bible: no inline text filter on entry list — AI search (P42) covers semantic queries but there is no quick local filter to narrow the visible list by title keyword
+- [ ] PPOL2b-S13 [PPOL2b] Canon Review: no inline search/filter on proposal list — narrow proposals by proposed title or body
