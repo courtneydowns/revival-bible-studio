@@ -89,3 +89,8 @@ Running log of UI/UX observations from smoke tests. Addressed in PPOL1 (pre-impo
 
 ### Noticed during P46 smoke
 - [ ] P46-PPOL [P46-A] Flanagan Filter panel — "Run" button clipped on right edge; panel width needs to accommodate the full button row without overflow
+
+### Added post-P46-C (route toast + chat routing)
+- [x] P46-C route buttons now show a bottom-center "Sent to X — Open →" toast; stays on current workspace ✅
+- [x] PUI3 highlight-extract-route wired to chat message bodies ✅
+- [x] PCHAT-ROUTE: "Route →" button in chat toolbar routes full transcript to Brainstorm / Research / Writing Lab / Decisions / Unsorted ✅

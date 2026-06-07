@@ -420,11 +420,12 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - "Reopen with new context" action: flags a saved analysis as stale and queues re-run (user-triggered only, never automatic)
 - **Smoke:** Run an analysis, save it, confirm it appears in collapsed history with mode tag; resolve the question, confirm analysis locks; reopen question, use "reopen with new context," confirm stale flag appears
 
-### P46-C — Flanagan Filter: routing + tags
-- One-click "Send to Brainstorm" / "Send to Research" on full analysis output — creates new entry pre-filled with content and source attribution to the originating Open Question; link-don't-copy discipline
-- Highlight-extract-route available on all analysis output text (reuses PUI3 pattern — no new mechanism)
-- AI tag suggestions on save: Claude proposes tags from existing library; user confirms, discards, or adds manually — never auto-applied
-- **Smoke:** Run an analysis; send full output to Brainstorm, confirm new entry exists with attribution and back-reference to the Open Question; highlight a section, route to Research, confirm entry; save analysis, confirm tag suggestions appear and require manual confirmation before applying
+### P46-C — Flanagan Filter: routing + tags ✅
+- One-click `→ Brainstorm` / `→ Research` on full analysis output and on each saved history card — creates new entry pre-filled with content and source attribution to the originating Open Question; link-don't-copy discipline
+- Route stays on current workspace; "Sent to X — Open →" toast confirms and provides one-click jump to the target
+- Highlight-extract-route (PUI3) wired to all analysis output text and to all chat message bodies — any selection opens the extract-and-route menu
+- AI tag suggestions on save: Claude proposes up to 5 tags from existing library; user confirms or skips — never auto-applied
+- **Smoke:** Run an analysis; route full output to Brainstorm, confirm new entry exists with attribution and CWA back-link to the Open Question; confirm toast appears with working "Open →" link; highlight a section of analysis text, route to Research, confirm entry; save analysis, confirm tag suggestions appear and require confirmation before applying; open a chat, select text in a message, confirm extract-and-route menu appears
 
 ---
 
@@ -473,6 +474,18 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Documents attachable to Decisions, Open Questions, Conflicts as supporting reference
 - Bi-directional visibility on all links
 - **Smoke:** Attach a Document to Chat, confirm it's visible as active source; link a Document to a Character, confirm bi-directional visibility; highlight text in a Document, route to Brainstorm, confirm attribution; propose to Canon Review from a Document, confirm attribution
+
+---
+
+## Chat routing
+
+### PCHAT-ROUTE — Chat: route full chat to workspace ✅
+- "Route →" button in chat toolbar opens a destination picker: Brainstorm, Research, Writing Lab, Decisions, Unsorted
+- Creates a new entry in the target workspace with the full non-archived message transcript as the body, attributed to the source chat
+- Archived messages are excluded from the routed transcript (same as Claude context exclusion)
+- Route stays on current workspace; "Sent to X — Open →" toast confirms and provides one-click jump
+- Highlight-extract-route (PUI3) also wired to individual chat message bodies for selective routing
+- **Smoke:** Open a chat with messages, click "Route →", select Brainstorm, confirm new entry exists with full transcript and attribution; confirm toast appears; confirm archived messages are excluded from routed body; highlight text in a chat message, confirm extract-and-route menu appears
 
 ---
 
@@ -715,7 +728,7 @@ Held until core feature set is stable and in active use.
 
 - **Chat search** — search across all chat history by keyword
 - **Chat pop-out** — dedicated window for Chat independent of main app
-- **Chat export** — export a chat as plain text or markdown
+- **Chat plain-text export** — export a chat as a downloadable .txt or .md file (routing to workspaces covered by PCHAT-ROUTE ✅)
 - **Additional Source file types** — OCR for scanned documents, PDF annotation
 - **Performance optimization** — large dataset handling
 - **Themes** — dark/light theme toggle

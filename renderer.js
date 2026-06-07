@@ -159,6 +159,33 @@ function showFlagResolvedToast(message) {
   }, 3600);
 }
 
+let _routeToastEl = null;
+function showRoutedToast(destLabel) {
+  if (!_routeToastEl) {
+    _routeToastEl = document.createElement('div');
+    _routeToastEl.className = 'rb-toast rb-toast-bottom';
+    _routeToastEl.hidden = true;
+    document.body.appendChild(_routeToastEl);
+  }
+  const el = _routeToastEl;
+  el.innerHTML = '';
+  const msg = document.createTextNode(`Sent to ${destLabel} `);
+  const link = document.createElement('button');
+  link.type = 'button';
+  link.className = 'rb-toast-link';
+  link.textContent = 'Open →';
+  link.onclick = () => route(destLabel);
+  el.append(msg, link);
+  el.hidden = false;
+  void el.offsetWidth;
+  el.classList.add('rb-toast-visible');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => {
+    el.classList.remove('rb-toast-visible');
+    setTimeout(() => { el.hidden = true; }, 220);
+  }, 3600);
+}
+
 // --- PPASSIVE: passive status bar + linked-entries indicator ---------------
 // Shared by every two-column detail panel (and mirrored in popout.js). Both
 // surfaces are read-only — they summarise state and relationships, they never
@@ -8258,6 +8285,7 @@ function mountFlanaganFilter(rightCol, item, callbacks) {
                 dest.kind, created.id, 'open_questions', item.id
               ).catch(() => {});
               routeBtn.textContent = `✓ Sent to ${dest.label}`;
+              showRoutedToast(dest.label);
             }
           } catch {
             routeBtn.disabled = false;
@@ -8440,6 +8468,7 @@ function mountFlanaganHistory(rightCol, item, archivedFlag, callbacks) {
               dest.kind, created.id, 'open_questions', item.id
             ).catch(() => {});
             routeBtn.textContent = `✓ ${dest.label}`;
+            showRoutedToast(dest.label);
           }
         } catch {
           routeBtn.disabled = false;
@@ -8807,6 +8836,8 @@ const chatMessages = document.getElementById('chat-messages');
 const chatTools = document.getElementById('chat-tools');
 const chatRenameBtn = document.getElementById('chat-rename');
 const chatArchiveBtn = document.getElementById('chat-archive');
+const chatRouteBtn = document.getElementById('chat-route');
+const chatRoutePicker = document.getElementById('chat-route-picker');
 const chatRenameRow = document.getElementById('chat-rename-row');
 const chatRenameInput = document.getElementById('chat-rename-input');
 const chatRenameCancel = document.getElementById('chat-rename-cancel');
@@ -8921,6 +8952,15 @@ function _buildMsgEl(role, content, dbMsg) {
   body.textContent = content;
   wrap.appendChild(label);
   wrap.appendChild(body);
+
+  if (window.RevivalExtract && activeChatId != null) {
+    const activeChat = chatList.find((c) => c.id === activeChatId);
+    window.RevivalExtract.attach(body, {
+      workspace: 'Chat',
+      id: activeChatId,
+      title: activeChat ? activeChat.title : 'Chat',
+    });
+  }
 
   if (dbMsg) {
     const archiveBtn = document.createElement('button');
@@ -9071,6 +9111,7 @@ function renderChatTools() {
   const hasActive = activeChatId != null;
   chatRenameBtn.disabled = !hasActive;
   chatArchiveBtn.disabled = !hasActive;
+  chatRouteBtn.disabled = !hasActive;
 }
 
 // Collapsed "Archived chats" list; each row restores back to the active list.
@@ -9609,6 +9650,46 @@ chatArchiveBtn.addEventListener('click', async () => {
     // Reload rebuilds both lists and reselects a remaining active chat (or none).
     await loadChats();
   } finally {
+    renderChatTools();
+  }
+});
+
+// Route entire chat to a workspace — builds a transcript entry and navigates.
+chatRouteBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  chatRoutePicker.hidden = !chatRoutePicker.hidden;
+});
+
+document.addEventListener('click', (e) => {
+  if (!chatRoutePicker.hidden && !chatRoutePicker.contains(e.target) && e.target !== chatRouteBtn) {
+    chatRoutePicker.hidden = true;
+  }
+});
+
+chatRoutePicker.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.chat-route-dest');
+  if (!btn || activeChatId == null) return;
+  chatRoutePicker.hidden = true;
+
+  const apiName = btn.dataset.api;
+  const destLabel = btn.dataset.label;
+  const chat = chatList.find((c) => c.id === activeChatId);
+  const chatTitle = chat ? chat.title : 'Chat';
+
+  const lines = chatMessageHistory
+    .filter((m) => !m.is_archived)
+    .map((m) => `${m.role === 'user' ? 'You' : 'Claude'}: ${m.content}`);
+  if (lines.length === 0) return;
+
+  const title = chatTitle;
+  const body = `${lines.join('\n\n')}\n\n— From chat: "${chatTitle}"`;
+
+  chatRouteBtn.disabled = true;
+  try {
+    await window.revival[apiName].create({ title, body });
+    showRoutedToast(destLabel);
+  } finally {
+    chatRouteBtn.disabled = false;
     renderChatTools();
   }
 });

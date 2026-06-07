@@ -2343,6 +2343,39 @@
       }
       .btn-tool:hover { background: var(--hover); }
       .btn-tool:disabled { opacity: 0.45; cursor: default; }
+      .chat-route-wrap { position: relative; }
+      .chat-route-picker {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
+        z-index: 60;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 0;
+        min-width: 170px;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+      }
+      .chat-route-picker[hidden] { display: none; }
+      .chat-route-picker-label {
+        font-size: 11px;
+        color: var(--muted);
+        padding: 2px 14px 6px;
+        letter-spacing: 0.03em;
+      }
+      .chat-route-dest {
+        display: block;
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        padding: 7px 14px;
+        font: inherit;
+        font-size: 13px;
+        color: var(--text);
+        cursor: pointer;
+      }
+      .chat-route-dest:hover { background: var(--hover); }
       .chat-rename-row {
         display: flex;
         gap: 8px;
@@ -2748,6 +2781,27 @@
       }
       .rb-toast[hidden] { display: none; }
       .rb-toast.rb-toast-visible { opacity: 1; }
+      .rb-toast.rb-toast-bottom {
+        top: auto;
+        bottom: 28px;
+        transform: translateX(-50%);
+        min-width: 240px;
+        max-width: 360px;
+        font-size: 14px;
+        padding: 12px 20px;
+        border-left-color: #7c9d6e;
+      }
+      .rb-toast-link {
+        background: none;
+        border: none;
+        color: var(--accent, #d6a14f);
+        font-size: inherit;
+        font-family: inherit;
+        cursor: pointer;
+        padding: 0;
+        text-decoration: underline;
+      }
+      .rb-toast-link:hover { opacity: 0.8; }
 
       /* PCONFLICT-2 — inline hint + scan button on the Conflicts workspace.
          Sits in the left column directly under the + Add button so the
@@ -3632,6 +3686,17 @@
       <div class="chat-tools" id="chat-tools">
         <button id="chat-rename" class="btn-tool" type="button">Rename</button>
         <button id="chat-archive" class="btn-tool" type="button">Archive</button>
+        <div class="chat-route-wrap" id="chat-route-wrap">
+          <button id="chat-route" class="btn-tool" type="button">Route →</button>
+          <div class="chat-route-picker" id="chat-route-picker" hidden>
+            <div class="chat-route-picker-label">Route full chat to:</div>
+            <button class="chat-route-dest" data-api="brainstorm" data-label="Brainstorm" type="button">💡 Brainstorm</button>
+            <button class="chat-route-dest" data-api="research" data-label="Research" type="button">🔎 Research</button>
+            <button class="chat-route-dest" data-api="writingLab" data-label="Writing Lab" type="button">✍️ Writing Lab</button>
+            <button class="chat-route-dest" data-api="decisions" data-label="Decisions" type="button">⚖️ Decisions</button>
+            <button class="chat-route-dest" data-api="unsorted" data-label="Unsorted" type="button">📥 Unsorted</button>
+          </div>
+        </div>
       </div>
       <form class="chat-rename-row" id="chat-rename-row" hidden>
         <input id="chat-rename-input" type="text" aria-label="Chat title" />
