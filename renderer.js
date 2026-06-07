@@ -8088,6 +8088,14 @@ chatPreviewBtn.addEventListener('click', async () => {
   }
 });
 
+// Enter sends; Shift+Enter inserts a newline (standard chat convention).
+chatInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    chatComposer.requestSubmit();
+  }
+});
+
 // Live-update preview as user types.
 chatInput.addEventListener('input', () => { if (_previewOpen) refreshPreview(); });
 
