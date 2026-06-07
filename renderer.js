@@ -7547,6 +7547,31 @@ function _appendErrorEl(message) {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
+// P41 — Append a non-persisted notification card when Claude stages a proposal.
+// Shows the proposal title and a button to jump to Canon Review.
+function _appendProposalCard({ id, title }) {
+  const wrap = document.createElement('div');
+  wrap.className = 'chat-msg chat-msg-proposal';
+  const label = document.createElement('span');
+  label.className = 'chat-msg-label';
+  label.textContent = 'Canon Review';
+  const body = document.createElement('p');
+  body.className = 'chat-msg-body';
+  body.textContent = `Proposal staged: "${title}"`;
+  const btn = document.createElement('button');
+  btn.className = 'btn-tool chat-proposal-goto';
+  btn.type = 'button';
+  btn.textContent = '→ Open in Canon Review';
+  btn.addEventListener('click', () => {
+    route('Canon Review');
+  });
+  wrap.appendChild(label);
+  wrap.appendChild(body);
+  wrap.appendChild(btn);
+  chatMessages.appendChild(wrap);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
 // Load messages for the active chat from DB and re-render.
 async function loadChatMessages() {
   if (activeChatId == null) return;
@@ -7978,10 +8003,20 @@ chatComposer.addEventListener('submit', async (e) => {
   // Show thinking indicator while waiting for Claude.
   const thinkingEl = _appendThinkingEl();
 
-  let response;
+  let responseText;
+  let proposalsCreated = [];
   try {
     const systemPrompt = await buildSystemPrompt();
-    response = await window.revival.claude.send(history, systemPrompt, chatModelSelect.value);
+    const result = await window.revival.claude.send(
+      history, systemPrompt, chatModelSelect.value, activeChatId
+    );
+    // result is { text, proposalsCreated } (P41). Accept plain string for safety.
+    if (result && typeof result === 'object') {
+      responseText = result.text || '';
+      proposalsCreated = Array.isArray(result.proposalsCreated) ? result.proposalsCreated : [];
+    } else {
+      responseText = String(result || '');
+    }
   } catch (apiErr) {
     thinkingEl.remove();
     // Strip the Electron IPC wrapper ("Error invoking remote method '...': ") for readability.
@@ -7996,11 +8031,16 @@ chatComposer.addEventListener('submit', async (e) => {
   }
 
   thinkingEl.remove();
-  _appendMsgEl('assistant', response);
+  _appendMsgEl('assistant', responseText);
+
+  // P41 — show a proposal notification card for each staged proposal.
+  for (const p of proposalsCreated) {
+    _appendProposalCard(p);
+  }
 
   // Persist the assistant turn.
   try {
-    const saved = await window.revival.chatMessages.add(activeChatId, 'assistant', response);
+    const saved = await window.revival.chatMessages.add(activeChatId, 'assistant', responseText);
     chatMessageHistory.push(saved);
   } catch (err) {
     console.error('[chat] could not save assistant message:', err);
@@ -8057,6 +8097,7 @@ async function buildPreviewPayload() {
   const payload = {
     model: chatModelSelect.value,
     max_tokens: 8192,
+    tools: ['propose_canon_entry (P41 — see main.js for full schema)'],
     ...(systemPrompt ? { system: systemPrompt } : {}),
     messages,
   };

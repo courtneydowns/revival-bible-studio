@@ -268,6 +268,10 @@ function registerIpc() {
   ipcMain.handle('canonProposals:createFromExtract', (_event, payload) =>
     db.canonProposals.createFromExtract(payload)
   );
+  // P41 — Create a structured proposal from the AI assistant.
+  ipcMain.handle('canonProposals:createFromAI', (_event, payload) =>
+    db.canonProposals.createFromAI(payload)
+  );
 
   // P35 — Canon Review queue. list returns pending/sent_back/deferred (the
   // queue surface). updateFields edits proposed JSON in place; approve
@@ -414,22 +418,46 @@ function registerIpc() {
     db.chatMessages.add(chatId, role, content)
   );
 
-  // P40 — Claude API call. Runs in main so the API key never touches the
-  // renderer process. Returns the assistant's text content on success; throws
-  // a plain Error with a user-visible message on failure.
+  // P40/P41 — Claude API call. Runs in main so the API key never touches the
+  // renderer process. Returns { text, proposalsCreated } on success; throws a
+  // plain Error with a user-visible message on failure.
+  //
+  // P41: the propose_canon_entry tool lets Claude stage structured proposals
+  // directly into Canon Review. If Claude calls the tool, main creates the
+  // proposal rows, sends a tool_result turn to get Claude's acknowledgement
+  // text, and returns both the text and the list of created proposals.
   const ALLOWED_MODELS = new Set(['claude-sonnet-4-6', 'claude-opus-4-7']);
-  ipcMain.handle('claude:send', async (_e, messages, systemPrompt, model) => {
-    const apiKey = db.settings.getClaudeApiKey();
-    if (!apiKey) throw new Error('No Claude API key configured. Add one in Settings.');
 
-    const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
-    const body = {
-      model: safeModel,
-      max_tokens: 8192,
-      messages,
-      ...(systemPrompt ? { system: systemPrompt } : {}),
-    };
+  const PROPOSE_TOOL = {
+    name: 'propose_canon_entry',
+    description:
+      'Propose a new canon entry for the writer\'s Canon Review queue. ' +
+      'The proposal is NEVER written directly to the Canon Bible — it lands in ' +
+      'Canon Review so the writer can approve, edit, send back, or reject it. ' +
+      'Use this when the user asks you to propose or suggest a canon addition.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        entry_type: {
+          type: 'string',
+          description:
+            'Canon entry type. One of: character, location, event, rule, theme, ' +
+            'symbol, relationship, faction, timeline_event, subplot, motif, ' +
+            'artifact, institution, dialogue_sample, world_rule, belief_system, ' +
+            'technology, misc',
+        },
+        title: { type: 'string', description: 'Short, descriptive title for the canon entry.' },
+        body: { type: 'string', description: 'The proposed canon content. Be detailed and clear.' },
+        proposer_note: {
+          type: 'string',
+          description: 'Brief note explaining why you are proposing this.',
+        },
+      },
+      required: ['title', 'body'],
+    },
+  };
 
+  async function callClaudeAPI(apiKey, body) {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -439,22 +467,100 @@ function registerIpc() {
       },
       body: JSON.stringify(body),
     });
-
     if (!resp.ok) {
       let errMsg = `Claude API error (${resp.status})`;
       try {
         const errBody = await resp.json();
         if (errBody.error && errBody.error.message) errMsg = errBody.error.message;
-      } catch {
-        // ignore parse failures
-      }
+      } catch { /* ignore */ }
       throw new Error(errMsg);
     }
+    return resp.json();
+  }
 
-    const data = await resp.json();
-    const block = data.content && data.content[0];
-    if (!block || block.type !== 'text') throw new Error('Unexpected response shape from Claude API.');
-    return block.text;
+  // P41 — appended to every system prompt so Claude knows when to call the tool.
+  const PROPOSE_TOOL_INSTRUCTION =
+    '\n\n## Canon Proposal Tool\n' +
+    'You have a `propose_canon_entry` tool. When the user asks you to propose, suggest, ' +
+    'or add something to the Canon Bible or canon, call this tool — do not just describe ' +
+    'the proposal in plain text. The proposal lands in Canon Review; it is never written ' +
+    'directly to the Canon Bible. Use it for any phrasing like "propose a canon entry", ' +
+    '"add this to canon", "suggest for canon", "propose canon X", etc.';
+
+  ipcMain.handle('claude:send', async (_e, messages, systemPrompt, model, chatId) => {
+    const apiKey = db.settings.getClaudeApiKey();
+    if (!apiKey) throw new Error('No Claude API key configured. Add one in Settings.');
+
+    const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
+    const fullSystem = (systemPrompt || '') + PROPOSE_TOOL_INSTRUCTION;
+    const baseBody = {
+      model: safeModel,
+      max_tokens: 8192,
+      messages,
+      tools: [PROPOSE_TOOL],
+      system: fullSystem,
+    };
+
+    const data = await callClaudeAPI(apiKey, baseBody);
+
+    // Collect any tool_use blocks from the first response.
+    const toolUseBlocks = (data.content || []).filter((b) => b.type === 'tool_use');
+    const textBlock = (data.content || []).find((b) => b.type === 'text');
+
+    if (toolUseBlocks.length === 0) {
+      // No tool call — plain text response (common path).
+      if (!textBlock) throw new Error('Unexpected response shape from Claude API.');
+      return { text: textBlock.text, proposalsCreated: [] };
+    }
+
+    // Tool use path: create proposals in DB, then get Claude's acknowledgement.
+    const proposalsCreated = [];
+    const toolResults = [];
+
+    for (const block of toolUseBlocks) {
+      if (block.name !== 'propose_canon_entry') continue;
+      const input = block.input || {};
+      let resultText;
+      try {
+        const proposal = db.canonProposals.createFromAI({
+          entry_type: input.entry_type || null,
+          title: input.title || '',
+          body: input.body || '',
+          proposer_note: input.proposer_note || null,
+          chat_id: chatId != null ? Number(chatId) : null,
+        });
+        proposalsCreated.push({ id: proposal.id, title: input.title || '(untitled)' });
+        resultText = `Proposal staged in Canon Review with id ${proposal.id}.`;
+      } catch (err) {
+        resultText = `Failed to create proposal: ${err.message}`;
+      }
+      toolResults.push({
+        type: 'tool_result',
+        tool_use_id: block.id,
+        content: resultText,
+      });
+    }
+
+    // Follow-up turn: give Claude the tool results and get the acknowledgement.
+    const followUpMessages = [
+      ...messages,
+      { role: 'assistant', content: data.content },
+      { role: 'user', content: toolResults },
+    ];
+    const followUpBody = {
+      model: safeModel,
+      max_tokens: 2048,
+      messages: followUpMessages,
+      tools: [PROPOSE_TOOL],
+      system: fullSystem,
+    };
+    const followUpData = await callClaudeAPI(apiKey, followUpBody);
+    const followUpText = (followUpData.content || []).find((b) => b.type === 'text');
+
+    return {
+      text: followUpText ? followUpText.text : 'Proposal sent to Canon Review.',
+      proposalsCreated,
+    };
   });
 
   // PUI2 popout wiring.

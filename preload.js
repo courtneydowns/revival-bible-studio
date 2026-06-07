@@ -136,8 +136,8 @@ contextBridge.exposeInMainWorld('revival', {
   },
   // P40 — Claude API (call lives in main so the key never touches the renderer)
   claude: {
-    send: (messages, systemPrompt, model) =>
-      ipcRenderer.invoke('claude:send', messages, systemPrompt, model),
+    send: (messages, systemPrompt, model, chatId) =>
+      ipcRenderer.invoke('claude:send', messages, systemPrompt, model, chatId),
   },
   dashboard: {
     summary: (limit) => ipcRenderer.invoke('dashboard:summary', limit),
@@ -196,6 +196,7 @@ contextBridge.exposeInMainWorld('revival', {
   // defer/reject/delete. list returns pending+sent_back+deferred (the
   // actionable queue); approved/rejected are out of scope for the UI.
   canonProposals: {
+    createFromAI: (payload) => ipcRenderer.invoke('canonProposals:createFromAI', payload),
     createFromExtract: (payload) =>
       ipcRenderer.invoke('canonProposals:createFromExtract', payload),
     list: () => ipcRenderer.invoke('canonProposals:list'),
