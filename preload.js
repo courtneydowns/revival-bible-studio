@@ -138,6 +138,9 @@ contextBridge.exposeInMainWorld('revival', {
   claude: {
     send: (messages, systemPrompt, model, chatId) =>
       ipcRenderer.invoke('claude:send', messages, systemPrompt, model, chatId),
+    // P42 — natural-language search over approved canon entries.
+    canonSearch: (query, model) =>
+      ipcRenderer.invoke('claude:canonSearch', query, model),
   },
   dashboard: {
     summary: (limit) => ipcRenderer.invoke('dashboard:summary', limit),

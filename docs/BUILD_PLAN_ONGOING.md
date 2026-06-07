@@ -362,10 +362,13 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Claude-proposed structured canon changes land in Canon Review (never directly in Canon Bible)
 - **Smoke:** Ask Claude to propose a canon addition, confirm it appears in Canon Review, approve it, confirm in Canon Bible
 
-### P42 — AI canon search assistant
+### P42 — AI canon search assistant ✅
 - Natural language queries against approved canon ("what does Jordan know about the virus at S2E1?")
 - Returns grounded answers with source citations (T-code, canon entry)
 - Reads only approved canon_entries — no hallucination from general knowledge
+- "Ask the Canon" panel in Canon Bible Reference Mode (hidden in Edit Mode)
+- Enter to submit; Shift+Enter for newline; Clear to reset
+- Uses model from chat model selector; entry count shown in meta line
 - **Smoke:** Ask a question answerable from seeded canon, confirm answer cites the correct entry
 
 ### P43 — AI conflict detector

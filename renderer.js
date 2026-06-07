@@ -2075,6 +2075,98 @@ function renderCanonBiblePage(section) {
   conflictsHost.className = 'canon-conflicts-host';
   section.appendChild(conflictsHost);
 
+  // P42 — Canon Search panel. Hidden when Edit Mode is active (via CSS).
+  const canonSearchPanel = document.createElement('div');
+  canonSearchPanel.className = 'canon-search-panel';
+
+  const csLabel = document.createElement('div');
+  csLabel.className = 'canon-search-label';
+  csLabel.textContent = 'Ask the Canon';
+  canonSearchPanel.appendChild(csLabel);
+
+  const csForm = document.createElement('form');
+  csForm.className = 'canon-search-form';
+
+  const csInput = document.createElement('textarea');
+  csInput.className = 'canon-search-input';
+  csInput.placeholder = 'e.g. "What does Jordan know about the virus at S2E1?"';
+  csInput.rows = 2;
+  csForm.appendChild(csInput);
+
+  const csAskBtn = document.createElement('button');
+  csAskBtn.type = 'submit';
+  csAskBtn.className = 'btn-primary canon-search-ask';
+  csAskBtn.textContent = 'Ask';
+  csForm.appendChild(csAskBtn);
+  canonSearchPanel.appendChild(csForm);
+
+  const csResultWrap = document.createElement('div');
+  csResultWrap.hidden = true;
+  canonSearchPanel.appendChild(csResultWrap);
+
+  const csResult = document.createElement('div');
+  csResult.className = 'canon-search-result';
+  csResultWrap.appendChild(csResult);
+
+  const csMeta = document.createElement('div');
+  csMeta.className = 'canon-search-meta';
+  csResultWrap.appendChild(csMeta);
+
+  section.appendChild(canonSearchPanel);
+
+  csInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      csForm.requestSubmit();
+    }
+  });
+
+  csForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const query = csInput.value.trim();
+    if (!query) return;
+
+    csAskBtn.disabled = true;
+    csAskBtn.textContent = '…';
+    csResultWrap.hidden = false;
+    csResult.className = 'canon-search-result cs-thinking';
+    csResult.textContent = 'Searching canon…';
+    csMeta.innerHTML = '';
+
+    try {
+      const selectedModel = chatModelSelect.value || 'claude-sonnet-4-6';
+      const result = await window.revival.claude.canonSearch(query, selectedModel);
+      csResult.className = 'canon-search-result';
+      csResult.textContent = result.text;
+
+      const entryCount = result.entryCount || 0;
+      const clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.className = 'canon-search-clear';
+      clearBtn.textContent = 'Clear';
+      clearBtn.addEventListener('click', () => {
+        csResultWrap.hidden = true;
+        csResult.textContent = '';
+        csMeta.innerHTML = '';
+        csInput.value = '';
+        csInput.focus();
+      });
+      const countSpan = document.createElement('span');
+      countSpan.textContent = `Searched ${entryCount} canon entr${entryCount === 1 ? 'y' : 'ies'}`;
+      csMeta.appendChild(countSpan);
+      csMeta.appendChild(clearBtn);
+    } catch (err) {
+      const rawMsg = err.message || 'Canon search failed';
+      const cleanMsg = rawMsg.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+      csResult.className = 'canon-search-result cs-error';
+      csResult.textContent = cleanMsg;
+      csMeta.innerHTML = '';
+    } finally {
+      csAskBtn.disabled = false;
+      csAskBtn.textContent = 'Ask';
+    }
+  });
+
   // PTAG filter bar.
   let tagFilter = new Set();
   let entriesCache = [];

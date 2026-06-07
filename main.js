@@ -563,6 +563,57 @@ function registerIpc() {
     };
   });
 
+  // P42 — Canon search. Fetches all non-retired canon entries, injects them as
+  // read-only context, and asks Claude to answer only from that corpus. No
+  // tools, no propose path — this is a read-only query flow.
+  ipcMain.handle('claude:canonSearch', async (_e, query, model) => {
+    const apiKey = db.settings.getClaudeApiKey();
+    if (!apiKey) throw new Error('No Claude API key configured. Add one in Settings.');
+
+    const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
+
+    // Fetch all non-retired entries (includes legacy_ids for T-codes).
+    const entries = db.canon.list();
+    if (entries.length === 0) {
+      return { text: 'The Canon Bible is empty. Seed or approve some entries first.' };
+    }
+
+    // Serialize each entry as a compact context block.
+    const blocks = entries.map((e) => {
+      const primaryId = (e.legacy_ids || []).find((l) => l.isPrimary);
+      const tcode = primaryId ? primaryId.code : `#${e.id}`;
+      const parts = [`[${tcode}] ${e.entry_type.toUpperCase()}: ${e.title}`];
+      if (e.body) parts.push(e.body);
+      if (e.locked) parts.push('(locked)');
+      return parts.join('\n');
+    });
+
+    const canonContext =
+      `## Canon Bible — ${entries.length} approved entries\n\n` +
+      blocks.join('\n\n---\n\n');
+
+    const systemPrompt =
+      'You are a canon search assistant for a TV writers\' room. ' +
+      'Your ONLY knowledge source is the Canon Bible corpus provided below. ' +
+      'Do NOT use any outside knowledge. ' +
+      'For every fact you state, cite the canon entry using its identifier ' +
+      '(e.g. [T-001] or [#42]) and title. ' +
+      'If the answer is not in the corpus, say so clearly — do not invent. ' +
+      'Be concise and direct.\n\n' +
+      canonContext;
+
+    const data = await callClaudeAPI(apiKey, {
+      model: safeModel,
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: query }],
+    });
+
+    const textBlock = (data.content || []).find((b) => b.type === 'text');
+    if (!textBlock) throw new Error('Unexpected response shape from Claude API.');
+    return { text: textBlock.text, entryCount: entries.length };
+  });
+
   // PUI2 popout wiring.
   //  • popout:open spawns a new BrowserWindow for a single entry.
   //  • popout:changed is a one-way fan-out: whoever just mutated an entry

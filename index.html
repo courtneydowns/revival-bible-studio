@@ -879,6 +879,91 @@
         font-size: 12px;
         color: var(--muted);
       }
+      /* P42 — Canon Search panel. Sits between the top bar and the entry list
+         in Reference Mode; hidden in Edit Mode since search and editing don't
+         need to coexist. */
+      .canon-search-panel {
+        margin-bottom: 18px;
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-left: 3px solid #b08c4a;
+        border-radius: 6px;
+        background: rgba(176, 140, 74, 0.04);
+      }
+      .ws-canon.canon-edit-mode .canon-search-panel { display: none; }
+      .canon-search-form {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+      }
+      .canon-search-input {
+        flex: 1;
+        font: inherit;
+        font-size: 13px;
+        padding: 7px 10px;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        resize: none;
+        min-height: 38px;
+        max-height: 120px;
+        line-height: 1.45;
+      }
+      .canon-search-input:focus {
+        outline: none;
+        border-color: #b08c4a;
+      }
+      .canon-search-ask {
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .canon-search-result {
+        margin-top: 12px;
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--card);
+        font-size: 13px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+      }
+      .canon-search-result.cs-thinking {
+        color: var(--muted);
+        font-style: italic;
+      }
+      .canon-search-result.cs-error {
+        color: #c0392b;
+        border-color: rgba(192, 57, 43, 0.3);
+      }
+      .canon-search-meta {
+        margin-top: 6px;
+        font-size: 11px;
+        color: var(--muted);
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .canon-search-clear {
+        background: none;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        font-size: 12px;
+        padding: 0;
+        text-decoration: underline;
+      }
+      .canon-search-clear:hover { color: var(--text); }
+      .canon-search-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #b08c4a;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
       .canon-create-card { border-left-color: #d6a14f; }
       .canon-edit-card { border-left-color: #d6a14f; }
       /* P34 — supersede form card. Use a distinct accent so a card mid-
