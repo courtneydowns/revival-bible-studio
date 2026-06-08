@@ -3885,6 +3885,187 @@
         color: #c0654a;
         border: 1px solid rgba(192, 101, 74, 0.3);
       }
+
+      /* PBRAIN-STRUCT — thread groups, status badges, metadata section */
+      .bs-thread-group { margin-bottom: 2px; }
+      .bs-thread-group > summary { list-style: none; }
+      .bs-thread-group > summary::-webkit-details-marker { display: none; }
+      .bs-thread-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 5px 8px;
+        cursor: pointer;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        border-radius: 4px;
+        user-select: none;
+      }
+      .bs-thread-header:hover { color: var(--text); background: var(--hover); }
+      .bs-thread-title { flex: 1; min-width: 0; }
+      .bs-thread-actions {
+        display: flex;
+        gap: 4px;
+        opacity: 0;
+        transition: opacity 0.12s;
+      }
+      .bs-thread-header:hover .bs-thread-actions { opacity: 1; }
+      .bs-thread-action {
+        font-size: 10px;
+        padding: 2px 6px;
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        cursor: pointer;
+        color: var(--muted);
+      }
+      .bs-thread-action:hover { color: var(--text); border-color: var(--muted); }
+      .bs-thread-empty {
+        font-size: 12px;
+        color: var(--muted);
+        font-style: italic;
+        padding: 4px 14px 4px 14px;
+      }
+      .bs-new-thread-btn {
+        display: block;
+        width: 100%;
+        padding: 5px 10px;
+        background: transparent;
+        border: 1px dashed var(--border);
+        border-radius: 4px;
+        font-size: 12px;
+        color: var(--muted);
+        cursor: pointer;
+        text-align: left;
+        margin-bottom: 8px;
+        box-sizing: border-box;
+      }
+      .bs-new-thread-btn:hover { color: var(--text); border-color: var(--accent); }
+
+      .bs-thread-input-row {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 8px;
+        box-sizing: border-box;
+      }
+      .bs-thread-input-row input {
+        flex: 1;
+        min-width: 0;
+        padding: 4px 8px;
+        background: var(--input-bg, var(--sidebar));
+        border: 1px solid var(--accent);
+        border-radius: 4px;
+        font-size: 12px;
+        color: var(--text);
+        outline: none;
+      }
+      .bs-thread-input-row button {
+        padding: 4px 8px;
+        font-size: 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--muted);
+      }
+      .bs-thread-input-row button.confirm { border-color: var(--accent); color: var(--accent); }
+      .bs-thread-input-row button:hover { color: var(--text); }
+
+      /* Status badges on list items */
+      .badge-bs-rough      { color: #888; border-color: #888; }
+      .badge-bs-developing { color: #c9862a; border-color: #c9862a; }
+      .badge-bs-ready      { color: #4d9e6d; border-color: #4d9e6d; }
+
+      /* Detail panel brainstorm metadata section */
+      .bs-meta-section {
+        padding: 10px 0 8px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .bs-meta-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        flex-wrap: wrap;
+      }
+      .bs-meta-label {
+        color: var(--muted);
+        font-size: 12px;
+        min-width: 100px;
+        flex-shrink: 0;
+      }
+      .bs-status-selector { display: flex; gap: 4px; flex-wrap: wrap; }
+      .bs-status-btn {
+        font-size: 11px;
+        padding: 3px 10px;
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        cursor: pointer;
+        color: var(--muted);
+      }
+      .bs-status-btn:hover { color: var(--text); border-color: var(--muted); }
+      .bs-status-btn.active { font-weight: 600; color: var(--text); border-color: var(--muted); }
+      .bs-status-btn-rough.active      { color: #888; border-color: #888; }
+      .bs-status-btn-developing.active { color: #c9862a; border-color: #c9862a; }
+      .bs-status-btn-ready.active      { color: #4d9e6d; border-color: #4d9e6d; }
+      .bs-thread-select {
+        font-size: 12px;
+        padding: 3px 6px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: var(--surface);
+        color: var(--text);
+        cursor: pointer;
+      }
+      .bs-devinto-link { font-size: 13px; color: var(--text); }
+      .bs-devinto-goto, .bs-devinto-clear {
+        font-size: 11px;
+        padding: 2px 8px;
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        cursor: pointer;
+        color: var(--muted);
+      }
+      .bs-devinto-goto:hover, .bs-devinto-clear:hover { color: var(--text); }
+      .bs-devinto-pick {
+        font-size: 12px;
+        padding: 3px 10px;
+        background: transparent;
+        border: 1px dashed var(--border);
+        border-radius: 4px;
+        cursor: pointer;
+        color: var(--muted);
+      }
+      .bs-devinto-pick:hover { color: var(--text); border-color: var(--accent); }
+      .bs-devinto-ws-select, .bs-devinto-entry-select {
+        font-size: 12px;
+        padding: 3px 6px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: var(--surface);
+        color: var(--text);
+      }
+      .bs-devfrom-section {
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid var(--border);
+      }
+      .bs-devfrom-heading {
+        font-size: 11px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      .bs-devfrom-row { padding: 2px 0; }
     </style>
   </head>
   <body>

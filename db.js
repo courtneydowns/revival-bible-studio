@@ -1710,6 +1710,33 @@ const MIGRATIONS = [
       `);
     },
   },
+
+  {
+    name: '048_pbrain_struct',
+    up(db) {
+      // PBRAIN-STRUCT — brainstorm internal structure.
+      // - brainstorm_threads: named collapsible groups for brainstorm_items.
+      // - thread_id FK on brainstorm_items (ON DELETE SET NULL — threads can be
+      //   archived/deleted without losing their entries).
+      // - dev_into_kind / dev_into_id: "developed into" pointer to any other
+      //   workspace entry (link-don't-copy, bi-directional via links.for query).
+      // - bs_status: Rough / Developing / Ready to Route — user-set badge.
+      db.exec(`
+        CREATE TABLE brainstorm_threads (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          title       TEXT NOT NULL,
+          created_at  TEXT NOT NULL,
+          updated_at  TEXT NOT NULL,
+          archived_at TEXT
+        );
+
+        ALTER TABLE brainstorm_items ADD COLUMN thread_id      INTEGER REFERENCES brainstorm_threads(id) ON DELETE SET NULL;
+        ALTER TABLE brainstorm_items ADD COLUMN dev_into_kind  TEXT;
+        ALTER TABLE brainstorm_items ADD COLUMN dev_into_id    INTEGER;
+        ALTER TABLE brainstorm_items ADD COLUMN bs_status      TEXT CHECK(bs_status IN ('rough','developing','ready'));
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -1953,6 +1980,92 @@ decisions.createFromQuestion = (questionId, { title, body } = {}) => {
   return decision;
 };
 const brainstorm = makeEntryRepo('brainstorm_items');
+
+// PBRAIN-STRUCT — thread management and item-level metadata mutations.
+const brainstormThreads = {
+  list() {
+    return getDb()
+      .prepare('SELECT * FROM brainstorm_threads WHERE archived_at IS NULL ORDER BY created_at ASC, id ASC')
+      .all();
+  },
+  listArchived() {
+    return getDb()
+      .prepare('SELECT * FROM brainstorm_threads WHERE archived_at IS NOT NULL ORDER BY archived_at DESC, id DESC')
+      .all();
+  },
+  create(title) {
+    const clean = (title || '').trim();
+    if (!clean) throw new Error('Thread title is required.');
+    const now = new Date().toISOString();
+    const info = getDb()
+      .prepare('INSERT INTO brainstorm_threads (title, created_at, updated_at) VALUES (?, ?, ?)')
+      .run(clean, now, now);
+    return getDb().prepare('SELECT * FROM brainstorm_threads WHERE id = ?').get(info.lastInsertRowid);
+  },
+  update(id, title) {
+    const clean = (title || '').trim();
+    if (!clean) throw new Error('Thread title is required.');
+    const now = new Date().toISOString();
+    getDb()
+      .prepare('UPDATE brainstorm_threads SET title = ?, updated_at = ? WHERE id = ?')
+      .run(clean, now, id);
+    return getDb().prepare('SELECT * FROM brainstorm_threads WHERE id = ?').get(id);
+  },
+  archive(id) {
+    const now = new Date().toISOString();
+    getDb()
+      .prepare('UPDATE brainstorm_threads SET archived_at = ? WHERE id = ?')
+      .run(now, id);
+    // Ungroup entries so they are not stranded in an invisible thread.
+    getDb()
+      .prepare('UPDATE brainstorm_items SET thread_id = NULL WHERE thread_id = ?')
+      .run(id);
+    return getDb().prepare('SELECT * FROM brainstorm_threads WHERE id = ?').get(id);
+  },
+  restore(id) {
+    getDb()
+      .prepare('UPDATE brainstorm_threads SET archived_at = NULL WHERE id = ?')
+      .run(id);
+    return getDb().prepare('SELECT * FROM brainstorm_threads WHERE id = ?').get(id);
+  },
+  delete(id) {
+    getDb().prepare('UPDATE brainstorm_items SET thread_id = NULL WHERE thread_id = ?').run(id);
+    const info = getDb().prepare('DELETE FROM brainstorm_threads WHERE id = ?').run(id);
+    return { deleted: info.changes > 0 };
+  },
+};
+
+brainstorm.setThread = (id, threadId) => {
+  getDb()
+    .prepare('UPDATE brainstorm_items SET thread_id = ?, updated_at = ? WHERE id = ?')
+    .run(threadId || null, new Date().toISOString(), id);
+  return getDb().prepare('SELECT * FROM brainstorm_items WHERE id = ?').get(id);
+};
+
+brainstorm.setDevInto = (id, kind, targetId) => {
+  getDb()
+    .prepare('UPDATE brainstorm_items SET dev_into_kind = ?, dev_into_id = ?, updated_at = ? WHERE id = ?')
+    .run(kind || null, targetId || null, new Date().toISOString(), id);
+  return getDb().prepare('SELECT * FROM brainstorm_items WHERE id = ?').get(id);
+};
+
+brainstorm.setStatus = (id, status) => {
+  const valid = ['rough', 'developing', 'ready', null];
+  if (!valid.includes(status)) throw new Error('Invalid status value.');
+  getDb()
+    .prepare('UPDATE brainstorm_items SET bs_status = ?, updated_at = ? WHERE id = ?')
+    .run(status || null, new Date().toISOString(), id);
+  return getDb().prepare('SELECT * FROM brainstorm_items WHERE id = ?').get(id);
+};
+
+brainstorm.devIntoBackRefs = (kind, targetId) => {
+  return getDb()
+    .prepare(
+      'SELECT id, title FROM brainstorm_items WHERE dev_into_kind = ? AND dev_into_id = ? AND archived_at IS NULL'
+    )
+    .all(kind, targetId);
+};
+
 const research = makeEntryRepo('research_items');
 // Backed by `characters_workspace` / `episodes_workspace` (renamed from
 // `characters` / `episodes` in migration 033 to match the FINAL canon schema).
@@ -4623,12 +4736,23 @@ const links = {
       }
     }
 
+    // PBRAIN-STRUCT — back-references from brainstorm items that were
+    // "developed into" this entry (bi-directional visibility).
+    const brainstormDevFrom = getDb()
+      .prepare(
+        'SELECT id, title FROM brainstorm_items WHERE dev_into_kind = ? AND dev_into_id = ? AND archived_at IS NULL'
+      )
+      .all(kind, id)
+      .map((r) => ({ id: r.id, title: r.title || '(untitled)' }));
+
     return {
       attachments,
       canonLinks,
+      brainstormDevFrom,
       counts: {
         attachments: attachments.length,
         canonLinks: canonLinks.length,
+        brainstormDevFrom: brainstormDevFrom.length,
       },
     };
   },
@@ -5337,6 +5461,7 @@ module.exports = {
   conflicts,
   decisions,
   brainstorm,
+  brainstormThreads,
   research,
   characters,
   characterRelationships,

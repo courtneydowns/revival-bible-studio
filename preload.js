@@ -68,6 +68,20 @@ contextBridge.exposeInMainWorld('revival', {
     delete: (id) => ipcRenderer.invoke('brainstorm:delete', id),
     archive: (id) => ipcRenderer.invoke('brainstorm:archive', id),
     restore: (id) => ipcRenderer.invoke('brainstorm:restore', id),
+    // PBRAIN-STRUCT — threads
+    threads: {
+      list: () => ipcRenderer.invoke('brainstorm:threads.list'),
+      listArchived: () => ipcRenderer.invoke('brainstorm:threads.listArchived'),
+      create: (title) => ipcRenderer.invoke('brainstorm:threads.create', title),
+      update: (id, title) => ipcRenderer.invoke('brainstorm:threads.update', id, title),
+      archive: (id) => ipcRenderer.invoke('brainstorm:threads.archive', id),
+      restore: (id) => ipcRenderer.invoke('brainstorm:threads.restore', id),
+      delete: (id) => ipcRenderer.invoke('brainstorm:threads.delete', id),
+    },
+    // PBRAIN-STRUCT — item metadata
+    setThread: (id, threadId) => ipcRenderer.invoke('brainstorm:setThread', id, threadId),
+    setDevInto: (id, kind, targetId) => ipcRenderer.invoke('brainstorm:setDevInto', id, kind, targetId),
+    setStatus: (id, status) => ipcRenderer.invoke('brainstorm:setStatus', id, status),
   },
   research: {
     list: () => ipcRenderer.invoke('research:list'),

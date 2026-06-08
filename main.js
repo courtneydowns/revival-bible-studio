@@ -127,6 +127,18 @@ function registerIpc() {
   ipcMain.handle('brainstorm:delete', (_event, id) => { const r = db.brainstorm.delete(id); recordEvent('Brainstorm', 'deleted'); return r; });
   ipcMain.handle('brainstorm:archive', (_event, id) => { const r = db.brainstorm.archive(id); recordEvent('Brainstorm', 'archived'); return r; });
   ipcMain.handle('brainstorm:restore', (_event, id) => db.brainstorm.restore(id));
+  // PBRAIN-STRUCT — thread management
+  ipcMain.handle('brainstorm:threads.list', () => db.brainstormThreads.list());
+  ipcMain.handle('brainstorm:threads.listArchived', () => db.brainstormThreads.listArchived());
+  ipcMain.handle('brainstorm:threads.create', (_event, title) => db.brainstormThreads.create(title));
+  ipcMain.handle('brainstorm:threads.update', (_event, id, title) => db.brainstormThreads.update(id, title));
+  ipcMain.handle('brainstorm:threads.archive', (_event, id) => db.brainstormThreads.archive(id));
+  ipcMain.handle('brainstorm:threads.restore', (_event, id) => db.brainstormThreads.restore(id));
+  ipcMain.handle('brainstorm:threads.delete', (_event, id) => db.brainstormThreads.delete(id));
+  // PBRAIN-STRUCT — item metadata
+  ipcMain.handle('brainstorm:setThread', (_event, id, threadId) => db.brainstorm.setThread(id, threadId));
+  ipcMain.handle('brainstorm:setDevInto', (_event, id, kind, targetId) => db.brainstorm.setDevInto(id, kind, targetId));
+  ipcMain.handle('brainstorm:setStatus', (_event, id, status) => db.brainstorm.setStatus(id, status));
 
   ipcMain.handle('research:list', () => db.research.list());
   ipcMain.handle('research:listArchived', () => db.research.listArchived());

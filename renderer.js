@@ -355,6 +355,29 @@ function renderLinkedList(listHost, data) {
       listHost.appendChild(row);
     }
   }
+  // PBRAIN-STRUCT — back-references: brainstorm items developed into this entry.
+  if (data.brainstormDevFrom && data.brainstormDevFrom.length) {
+    const h = document.createElement('div');
+    h.className = 'tc-linked-heading';
+    h.textContent = 'Developed from Brainstorm';
+    listHost.appendChild(h);
+    for (const it of data.brainstormDevFrom) {
+      const row = document.createElement('div');
+      row.className = 'tc-linked-row';
+      const titleBtn = document.createElement('button');
+      titleBtn.type = 'button';
+      titleBtn.className = 'tc-linked-goto';
+      titleBtn.textContent = it.title;
+      titleBtn.title = `Go to Brainstorm → ${it.title}`;
+      titleBtn.addEventListener('click', () => route('Brainstorm', it.id));
+      row.appendChild(titleBtn);
+      const src = document.createElement('span');
+      src.className = 'tc-linked-src';
+      src.textContent = 'Brainstorm';
+      row.appendChild(src);
+      listHost.appendChild(row);
+    }
+  }
 }
 
 // Passive count that expands to the linked list on click. Mounts immediately
@@ -377,20 +400,61 @@ function mountLinkedIndicator(host, entityKind, id) {
     .then((data) => {
       const a = data.counts.attachments;
       const c = data.counts.canonLinks;
-      if (a === 0 && c === 0) {
+      const d = data.counts.brainstormDevFrom || 0;
+      if (a === 0 && c === 0 && d === 0) {
         summary.textContent = '🔗 No linked entries';
         summary.classList.add('tc-linked-empty');
         return;
       }
-      summary.textContent =
-        `🔗 ${a} attachment${a === 1 ? '' : 's'} / ` +
-        `${c} canon link${c === 1 ? '' : 's'}`;
+      const parts = [];
+      parts.push(`${a} attachment${a === 1 ? '' : 's'}`);
+      parts.push(`${c} canon link${c === 1 ? '' : 's'}`);
+      if (d > 0) parts.push(`${d} brainstorm ref${d === 1 ? '' : 's'}`);
+      summary.textContent = `🔗 ${parts.join(' / ')}`;
       renderLinkedList(listHost, data);
     })
     .catch(() => {
       summary.textContent = '🔗 Links unavailable';
       summary.classList.add('tc-linked-empty');
     });
+}
+
+// PBRAIN-STRUCT — passive back-reference panel. Shown on any workspace entry
+// that a brainstorm item was "developed into". Loads async; renders nothing
+// if there are no back-refs so it never clutters clean entries.
+function mountBrainstormDevFromSection(host, entityKind, id) {
+  if (!entityKind || !window.revival.links) return;
+  // Only valid target kinds can have back-refs.
+  const VALID_TARGET_KINDS = new Set([
+    'decisions', 'research', 'open_questions', 'writing_lab', 'documents', 'unsorted',
+    'conflicts', 'characters', 'episodes', 'source_material',
+  ]);
+  if (!VALID_TARGET_KINDS.has(entityKind)) return;
+
+  window.revival.links.for(entityKind, id).then((data) => {
+    const refs = data.brainstormDevFrom || [];
+    if (!refs.length) return;
+
+    const section = document.createElement('div');
+    section.className = 'bs-devfrom-section';
+    const heading = document.createElement('div');
+    heading.className = 'bs-devfrom-heading';
+    heading.textContent = `Developed from Brainstorm (${refs.length})`;
+    section.appendChild(heading);
+    for (const ref of refs) {
+      const row = document.createElement('div');
+      row.className = 'bs-devfrom-row';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'tc-linked-goto';
+      btn.textContent = ref.title;
+      btn.title = `Go to Brainstorm → ${ref.title}`;
+      btn.addEventListener('click', () => route('Brainstorm', ref.id));
+      row.appendChild(btn);
+      section.appendChild(row);
+    }
+    host.appendChild(section);
+  }).catch(() => { /* non-fatal */ });
 }
 
 // P36 + global expand — cross-workspace attachment section (all entry workspaces).
@@ -971,6 +1035,9 @@ function makeEntryWorkspace(config) {
       if (tagList.length) btn.appendChild(window.RevivalTags.buildBadges(tagList));
     }
 
+    // PBRAIN-STRUCT: workspace-specific list item extras (e.g. status badges).
+    if (config.listItemExtra) config.listItemExtra(btn, item, archivedFlag);
+
     btn.addEventListener('click', () => {
       selectedId = item.id;
       renderList();
@@ -1005,6 +1072,9 @@ function makeEntryWorkspace(config) {
         ? 'No entries match the selected tag(s).'
         : 'No entries yet.';
       list.appendChild(empty);
+    } else if (config.customRenderActive) {
+      // PBRAIN-STRUCT: workspace-specific active-list rendering (e.g. thread groups).
+      config.customRenderActive(list, filteredActive, buildListItem);
     } else {
       for (const item of filteredActive) {
         list.appendChild(buildListItem(item, false));
@@ -1231,22 +1301,9 @@ function makeEntryWorkspace(config) {
     }
     rightCol.appendChild(meta);
 
-    if (item.body) {
-      const body = document.createElement('div');
-      body.className = 'tc-detail-body';
-      body.textContent = item.body;
-      rightCol.appendChild(body);
-      // PUI3: selecting text inside the body opens the extract-and-route menu.
-      // Source attribution carries the originating workspace + entry title so
-      // the routed entry remembers where the snippet came from.
-      if (window.RevivalExtract && workspaceName) {
-        window.RevivalExtract.attach(body, {
-          workspace: workspaceName,
-          id: item.id,
-          title: item.title,
-        });
-      }
-    }
+    // PBRAIN-STRUCT: workspace-specific top-panel insert (e.g. status/thread/devinto
+    // for Brainstorm). Called before the body so it's always visible without scrolling.
+    if (config.showViewTop) config.showViewTop(rightCol, item, archivedFlag);
 
     const pendingDraft = !archivedFlag && Drafts.get(item.id);
     if (pendingDraft) {
@@ -1339,7 +1396,25 @@ function makeEntryWorkspace(config) {
 
     rightCol.appendChild(actions);
 
-    // PTAG — tag bar below the action row. Available on archived entries too
+    // Body rendered AFTER actions so Archive/Edit/Delete are always at the top
+    // regardless of how long the body is. (Long bodies from routed chats would
+    // otherwise push the actions far below the visible viewport.)
+    if (item.body) {
+      const body = document.createElement('div');
+      body.className = 'tc-detail-body';
+      body.textContent = item.body;
+      rightCol.appendChild(body);
+      // PUI3: selecting text inside the body opens the extract-and-route menu.
+      if (window.RevivalExtract && workspaceName) {
+        window.RevivalExtract.attach(body, {
+          workspace: workspaceName,
+          id: item.id,
+          title: item.title,
+        });
+      }
+    }
+
+    // PTAG — tag bar below the body. Available on archived entries too
     // so the user can adjust metadata without restoring first. Refreshes the
     // bulk-tags map so list badges stay in sync when a chip changes.
     if (entityKind && window.RevivalTags) {
@@ -1355,6 +1430,9 @@ function makeEntryWorkspace(config) {
     } else {
       mountLinkedIndicator(rightCol, entityKind, item.id);
     }
+    // PBRAIN-STRUCT — passive back-reference: brainstorm items that were
+    // developed into this entry. Shown on all workspaces that can be targets.
+    mountBrainstormDevFromSection(rightCol, entityKind, item.id);
 
     // P37 — optional workspace-specific detail-panel extension (e.g. relationships section)
     if (config.detailExtra) config.detailExtra(rightCol, item, archivedFlag);
@@ -1521,6 +1599,8 @@ function makeEntryWorkspace(config) {
     ]);
     activeItems = items;
     archivedItems = archs;
+    // PBRAIN-STRUCT: workspace-specific extra data load (e.g. threads for Brainstorm).
+    if (config.loadListExtra) await config.loadListExtra();
     // PTAG — bulk tags for badges + filter matching, one round-trip per
     // list reload. Tags are read-only here; mutations go through the tag
     // bar in the detail panel, which calls refreshTagBadges itself.
@@ -10203,24 +10283,455 @@ const CONTENT_RENDERERS = {
       callbacks.refreshHistory = refresh;
     },
   }),
-  // Brainstorm: full five-mode filter.
-  'Brainstorm': makeEntryWorkspace({
-    apiName: 'brainstorm',
-    entityKind: 'brainstorm',
-    draftPrefix: 'brainstorm',
-    addLabel: 'Add Idea',
-    titlePlaceholder: 'What is the idea?',
-    bodyPlaceholder: 'Where it might go, what sparked it (optional)',
-    detailExtra(rightCol, item, archivedFlag) {
-      const callbacks = {};
-      if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
-        entityKind: 'brainstorm',
-        workspaceName: 'Brainstorm',
+  // Brainstorm: full five-mode filter + PBRAIN-STRUCT internal structure.
+  // Wrapped in an IIFE so `threads` and `reloadRef` are shared across all hooks
+  // without leaking into the outer workspace-config scope.
+  'Brainstorm': (() => {
+    let threads = [];
+    // reloadRef.fn is set by leftColExtra (called at mount time, before any
+    // renderList invocation) so customRenderActive can trigger a reload.
+    const reloadRef = { fn: null };
+
+    // Workspaces valid as "developed into" targets.
+    const DEV_INTO_WS = [
+      { kind: 'decisions',      label: 'Decisions',      apiKey: 'decisions' },
+      { kind: 'research',       label: 'Research',       apiKey: 'research' },
+      { kind: 'open_questions', label: 'Open Questions', apiKey: 'openQuestions' },
+      { kind: 'writing_lab',    label: 'Writing Lab',    apiKey: 'writingLab' },
+      { kind: 'documents',      label: 'Documents',      apiKey: 'documents' },
+      { kind: 'unsorted',       label: 'Unsorted',       apiKey: 'unsorted' },
+    ];
+    const DEV_INTO_LABEL = Object.fromEntries(DEV_INTO_WS.map((w) => [w.kind, w.label]));
+    const DEV_INTO_API   = Object.fromEntries(DEV_INTO_WS.map((w) => [w.kind, w.apiKey]));
+
+    const STATUS_OPTIONS = [
+      { value: null,          label: 'None' },
+      { value: 'rough',       label: 'Rough' },
+      { value: 'developing',  label: 'Developing' },
+      { value: 'ready',       label: 'Ready to Route' },
+    ];
+    const STATUS_LABEL = Object.fromEntries(
+      STATUS_OPTIONS.filter((o) => o.value).map((o) => [o.value, o.label])
+    );
+
+    function mountBrainstormMeta(rightCol, item, reload) {
+      const section = document.createElement('div');
+      section.className = 'bs-meta-section';
+
+      // Status selector
+      const statusRow = document.createElement('div');
+      statusRow.className = 'bs-meta-row';
+      const statusLabel = document.createElement('span');
+      statusLabel.className = 'bs-meta-label';
+      statusLabel.textContent = 'Status:';
+      statusRow.appendChild(statusLabel);
+      const statusBtnGroup = document.createElement('div');
+      statusBtnGroup.className = 'bs-status-selector';
+      for (const opt of STATUS_OPTIONS) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'bs-status-btn' + (opt.value ? ` bs-status-btn-${opt.value}` : '');
+        if (item.bs_status === opt.value) btn.classList.add('active');
+        btn.textContent = opt.label;
+        btn.addEventListener('click', async () => {
+          if (item.bs_status === opt.value) return;
+          try {
+            await window.revival.brainstorm.setStatus(item.id, opt.value);
+            await reload();
+          } catch { /* non-fatal */ }
+        });
+        statusBtnGroup.appendChild(btn);
+      }
+      statusRow.appendChild(statusBtnGroup);
+      section.appendChild(statusRow);
+
+      // Thread assignment
+      const threadRow = document.createElement('div');
+      threadRow.className = 'bs-meta-row';
+      const threadLabel = document.createElement('span');
+      threadLabel.className = 'bs-meta-label';
+      threadLabel.textContent = 'Thread:';
+      threadRow.appendChild(threadLabel);
+      const threadSelect = document.createElement('select');
+      threadSelect.className = 'bs-thread-select';
+      const noneOpt = document.createElement('option');
+      noneOpt.value = '';
+      noneOpt.textContent = '(Ungrouped)';
+      threadSelect.appendChild(noneOpt);
+      for (const t of threads) {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.title;
+        if (item.thread_id === t.id) opt.selected = true;
+        threadSelect.appendChild(opt);
+      }
+      threadSelect.addEventListener('change', async () => {
+        const val = threadSelect.value ? Number(threadSelect.value) : null;
+        try {
+          await window.revival.brainstorm.setThread(item.id, val);
+          await reload();
+        } catch { /* non-fatal */ }
       });
-      const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'brainstorm');
-      callbacks.refreshHistory = refresh;
-    },
-  }),
+      threadRow.appendChild(threadSelect);
+      section.appendChild(threadRow);
+
+      // Developed into
+      const devIntoRow = document.createElement('div');
+      devIntoRow.className = 'bs-meta-row bs-devinto-row';
+      const devIntoLabel = document.createElement('span');
+      devIntoLabel.className = 'bs-meta-label';
+      devIntoLabel.textContent = 'Developed into:';
+      devIntoRow.appendChild(devIntoLabel);
+
+      function renderDevIntoState(row) {
+        // clear after the label
+        while (row.children.length > 1) row.removeChild(row.lastChild);
+
+        if (item.dev_into_kind && item.dev_into_id) {
+          const linkSpan = document.createElement('span');
+          linkSpan.className = 'bs-devinto-link';
+          linkSpan.textContent = `${DEV_INTO_LABEL[item.dev_into_kind] || item.dev_into_kind}: …`;
+          const apiKey = DEV_INTO_API[item.dev_into_kind];
+          if (apiKey && window.revival[apiKey] && window.revival[apiKey].list) {
+            window.revival[apiKey].list().then((items) => {
+              const found = items.find((i) => i.id === item.dev_into_id);
+              linkSpan.textContent = `${DEV_INTO_LABEL[item.dev_into_kind] || item.dev_into_kind}: ${found ? found.title : '(not found)'}`;
+            }).catch(() => { linkSpan.textContent += ' (error)'; });
+          }
+          row.appendChild(linkSpan);
+
+          const gotoBtn = document.createElement('button');
+          gotoBtn.type = 'button';
+          gotoBtn.className = 'bs-devinto-goto';
+          gotoBtn.textContent = 'Go →';
+          gotoBtn.title = 'Go to linked entry';
+          gotoBtn.addEventListener('click', () => {
+            const ws = DEV_INTO_LABEL[item.dev_into_kind];
+            if (ws) route(ws, item.dev_into_id);
+          });
+          row.appendChild(gotoBtn);
+
+          const clearBtn = document.createElement('button');
+          clearBtn.type = 'button';
+          clearBtn.className = 'bs-devinto-clear';
+          clearBtn.textContent = '✕ Clear';
+          clearBtn.addEventListener('click', async () => {
+            try {
+              await window.revival.brainstorm.setDevInto(item.id, null, null);
+              await reload();
+            } catch { /* non-fatal */ }
+          });
+          row.appendChild(clearBtn);
+        } else {
+          const pickerBtn = document.createElement('button');
+          pickerBtn.type = 'button';
+          pickerBtn.className = 'bs-devinto-pick';
+          pickerBtn.textContent = 'Link to entry…';
+          pickerBtn.addEventListener('click', () => showDevIntoPicker(row, item, reload));
+          row.appendChild(pickerBtn);
+        }
+      }
+
+      renderDevIntoState(devIntoRow);
+      section.appendChild(devIntoRow);
+      rightCol.appendChild(section);
+    }
+
+    function showDevIntoPicker(row, item, reload) {
+      // clear after the label
+      while (row.children.length > 1) row.removeChild(row.lastChild);
+
+      const wsSelect = document.createElement('select');
+      wsSelect.className = 'bs-devinto-ws-select';
+      const wsPlaceholder = document.createElement('option');
+      wsPlaceholder.value = '';
+      wsPlaceholder.textContent = 'Workspace…';
+      wsSelect.appendChild(wsPlaceholder);
+      for (const ws of DEV_INTO_WS) {
+        const opt = document.createElement('option');
+        opt.value = ws.kind;
+        opt.textContent = ws.label;
+        wsSelect.appendChild(opt);
+      }
+      row.appendChild(wsSelect);
+
+      const entrySelect = document.createElement('select');
+      entrySelect.className = 'bs-devinto-entry-select';
+      entrySelect.disabled = true;
+      const entryPlaceholder = document.createElement('option');
+      entryPlaceholder.value = '';
+      entryPlaceholder.textContent = 'Entry…';
+      entrySelect.appendChild(entryPlaceholder);
+      row.appendChild(entrySelect);
+
+      const linkBtn = document.createElement('button');
+      linkBtn.type = 'button';
+      linkBtn.className = 'btn-primary btn-sm';
+      linkBtn.textContent = 'Link';
+      linkBtn.disabled = true;
+      row.appendChild(linkBtn);
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'btn-secondary btn-sm';
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.addEventListener('click', async () => { await reload(); });
+      row.appendChild(cancelBtn);
+
+      wsSelect.addEventListener('change', async () => {
+        const kind = wsSelect.value;
+        entrySelect.innerHTML = '';
+        entrySelect.disabled = true;
+        linkBtn.disabled = true;
+        if (!kind) return;
+        const apiKey = DEV_INTO_API[kind];
+        if (!apiKey || !window.revival[apiKey] || !window.revival[apiKey].list) return;
+        try {
+          const entries = await window.revival[apiKey].list();
+          const ph = document.createElement('option');
+          ph.value = '';
+          ph.textContent = entries.length ? 'Entry…' : '(no entries)';
+          entrySelect.appendChild(ph);
+          for (const e of entries) {
+            const opt = document.createElement('option');
+            opt.value = e.id;
+            opt.textContent = e.title;
+            entrySelect.appendChild(opt);
+          }
+          entrySelect.disabled = false;
+        } catch { /* non-fatal */ }
+      });
+
+      entrySelect.addEventListener('change', () => {
+        linkBtn.disabled = !entrySelect.value;
+      });
+
+      linkBtn.addEventListener('click', async () => {
+        const kind = wsSelect.value;
+        const targetId = Number(entrySelect.value);
+        if (!kind || !targetId) return;
+        linkBtn.disabled = true;
+        try {
+          await window.revival.brainstorm.setDevInto(item.id, kind, targetId);
+          await reload();
+        } catch { linkBtn.disabled = false; }
+      });
+    }
+
+    return makeEntryWorkspace({
+      apiName: 'brainstorm',
+      entityKind: 'brainstorm',
+      draftPrefix: 'brainstorm',
+      addLabel: 'Add Idea',
+      titlePlaceholder: 'What is the idea?',
+      bodyPlaceholder: 'Where it might go, what sparked it (optional)',
+
+      loadListExtra: async () => {
+        threads = await window.revival.brainstorm.threads.list();
+      },
+
+      listItemExtra(btn, item, archivedFlag) {
+        if (archivedFlag || !item.bs_status || !STATUS_LABEL[item.bs_status]) return;
+        const titleRow = btn.querySelector('.tc-list-title');
+        if (!titleRow) return;
+        const badge = document.createElement('span');
+        badge.className = `tc-list-badge badge-bs-${item.bs_status}`;
+        badge.textContent = STATUS_LABEL[item.bs_status];
+        // Insert before the title text node (same position as other badges).
+        titleRow.insertBefore(badge, titleRow.lastChild);
+      },
+
+      customRenderActive(listEl, filteredActive, buildListItem) {
+        if (threads.length === 0) {
+          // No threads — flat list.
+          for (const item of filteredActive) listEl.appendChild(buildListItem(item, false));
+          return;
+        }
+
+        // Group by thread_id.
+        const threadMap = new Map();
+        const ungrouped = [];
+        for (const item of filteredActive) {
+          if (item.thread_id) {
+            if (!threadMap.has(item.thread_id)) threadMap.set(item.thread_id, []);
+            threadMap.get(item.thread_id).push(item);
+          } else {
+            ungrouped.push(item);
+          }
+        }
+
+        for (const thread of threads) {
+          const items = threadMap.get(thread.id) || [];
+          const group = document.createElement('details');
+          group.className = 'bs-thread-group';
+          group.open = true;
+
+          const summary = document.createElement('summary');
+          summary.className = 'bs-thread-header';
+
+          const titleSpan = document.createElement('span');
+          titleSpan.className = 'bs-thread-title';
+          titleSpan.textContent = thread.title;
+          summary.appendChild(titleSpan);
+
+          const actionsSpan = document.createElement('span');
+          actionsSpan.className = 'bs-thread-actions';
+
+          const renameBtn = document.createElement('button');
+          renameBtn.type = 'button';
+          renameBtn.className = 'bs-thread-action';
+          renameBtn.textContent = 'Rename';
+          renameBtn.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            // Replace the summary content with an inline input so window.prompt
+            // (disabled in Electron 31) is never needed.
+            const row = document.createElement('div');
+            row.className = 'bs-thread-input-row';
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.value = thread.title;
+            const saveBtn = document.createElement('button');
+            saveBtn.type = 'button';
+            saveBtn.className = 'confirm';
+            saveBtn.textContent = 'Save';
+            const cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.textContent = 'Cancel';
+            row.appendChild(inp);
+            row.appendChild(saveBtn);
+            row.appendChild(cancelBtn);
+            summary.replaceWith(row);
+            inp.focus();
+            inp.select();
+            const commit = async () => {
+              const val = inp.value.trim();
+              if (val) {
+                try {
+                  await window.revival.brainstorm.threads.update(thread.id, val);
+                  if (reloadRef.fn) await reloadRef.fn();
+                } catch { /* non-fatal */ }
+              } else {
+                if (reloadRef.fn) await reloadRef.fn();
+              }
+            };
+            saveBtn.addEventListener('click', commit);
+            cancelBtn.addEventListener('click', () => { if (reloadRef.fn) reloadRef.fn(); });
+            inp.addEventListener('keydown', (ev) => {
+              if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+              if (ev.key === 'Escape') { if (reloadRef.fn) reloadRef.fn(); }
+            });
+          });
+
+          const archiveBtn = document.createElement('button');
+          archiveBtn.type = 'button';
+          archiveBtn.className = 'bs-thread-action';
+          archiveBtn.textContent = 'Archive';
+          archiveBtn.title = 'Archive thread — entries become ungrouped';
+          archiveBtn.addEventListener('click', async (e) => {
+            e.preventDefault(); e.stopPropagation();
+            try {
+              await window.revival.brainstorm.threads.archive(thread.id);
+              if (reloadRef.fn) await reloadRef.fn();
+            } catch { /* non-fatal */ }
+          });
+
+          actionsSpan.append(renameBtn, archiveBtn);
+          summary.appendChild(actionsSpan);
+          group.appendChild(summary);
+
+          if (items.length === 0) {
+            const emptyMsg = document.createElement('div');
+            emptyMsg.className = 'bs-thread-empty';
+            emptyMsg.textContent = 'No entries in this thread.';
+            group.appendChild(emptyMsg);
+          } else {
+            for (const it of items) group.appendChild(buildListItem(it, false));
+          }
+          listEl.appendChild(group);
+        }
+
+        // Ungrouped section — only shown when there are threads defined.
+        if (ungrouped.length > 0) {
+          const ugGroup = document.createElement('details');
+          ugGroup.className = 'bs-thread-group bs-thread-ungrouped';
+          ugGroup.open = true;
+          const ugSummary = document.createElement('summary');
+          ugSummary.className = 'bs-thread-header';
+          ugSummary.textContent = `Ungrouped (${ungrouped.length})`;
+          ugGroup.appendChild(ugSummary);
+          for (const it of ungrouped) ugGroup.appendChild(buildListItem(it, false));
+          listEl.appendChild(ugGroup);
+        }
+      },
+
+      showViewTop(rightCol, item, archivedFlag) {
+        // Status / thread / developed-into — always visible at the top, before body.
+        if (!archivedFlag) {
+          mountBrainstormMeta(rightCol, item, async () => {
+            if (reloadRef.fn) await reloadRef.fn();
+          });
+        }
+      },
+
+      detailExtra(rightCol, item, archivedFlag) {
+        const callbacks = {};
+        if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
+          entityKind: 'brainstorm',
+          workspaceName: 'Brainstorm',
+        });
+        const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'brainstorm');
+        callbacks.refreshHistory = refresh;
+      },
+
+      leftColExtra(leftCol, rightCol, ctx) {
+        reloadRef.fn = ctx.reloadList;
+
+        const newThreadBtn = document.createElement('button');
+        newThreadBtn.type = 'button';
+        newThreadBtn.className = 'bs-new-thread-btn';
+        newThreadBtn.textContent = '+ New Thread';
+        newThreadBtn.addEventListener('click', () => {
+          // window.prompt is disabled in Electron 31 — use an inline input instead.
+          const row = document.createElement('div');
+          row.className = 'bs-thread-input-row';
+          const inp = document.createElement('input');
+          inp.type = 'text';
+          inp.placeholder = 'Thread name';
+          const saveBtn = document.createElement('button');
+          saveBtn.type = 'button';
+          saveBtn.className = 'confirm';
+          saveBtn.textContent = 'Create';
+          const cancelBtn = document.createElement('button');
+          cancelBtn.type = 'button';
+          cancelBtn.textContent = 'Cancel';
+          row.appendChild(inp);
+          row.appendChild(saveBtn);
+          row.appendChild(cancelBtn);
+          newThreadBtn.replaceWith(row);
+          inp.focus();
+          const restore = () => row.replaceWith(newThreadBtn);
+          const commit = async () => {
+            const val = inp.value.trim();
+            restore();
+            if (val) {
+              try {
+                await window.revival.brainstorm.threads.create(val);
+              } catch { /* non-fatal */ }
+            }
+            await ctx.reloadList();
+          };
+          const cancel = () => { restore(); ctx.reloadList(); };
+          saveBtn.addEventListener('click', commit);
+          cancelBtn.addEventListener('click', cancel);
+          inp.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+            if (ev.key === 'Escape') cancel();
+          });
+        });
+        leftCol.insertBefore(newThreadBtn, ctx.list);
+      },
+    });
+  })(),
   // Research shares the lifecycle but is styled distinctly (blue source accent +
   // tailored labels) so it never reads like Brainstorm's open ideation.
   'Research': makeEntryWorkspace({
