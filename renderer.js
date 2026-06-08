@@ -4860,13 +4860,33 @@ function renderCanonReviewPage(section, workspaceName) {
     if (p.updated_at && p.updated_at !== p.created_at) {
       chunks.push(`edited ${new Date(p.updated_at).toLocaleString()}`);
     }
-    if (p.source_kind) {
-      chunks.push(`from ${sourceKindLabel(p.source_kind)}${p.source_entry_id ? ` #${p.source_entry_id}` : ''}`);
-    }
     if (p.reviewed_at && (p.status === 'sent_back' || p.status === 'deferred')) {
       chunks.push(`${p.status === 'sent_back' ? 'Sent back' : 'Deferred'} ${new Date(p.reviewed_at).toLocaleString()}`);
     }
+    // PAUDIT-5 — source attribution: clickable back-link when source is a navigable entry.
+    const CR_SOURCE_KIND_TO_WORKSPACE = {
+      writing_lab: 'Writing Lab', characters_workspace: 'Characters', characters: 'Characters',
+      episodes_workspace: 'Episodes', episodes: 'Episodes', open_questions: 'Open Questions',
+      decisions: 'Decisions', conflicts: 'Conflicts', brainstorm_items: 'Brainstorm',
+      brainstorm: 'Brainstorm', research_items: 'Research', research: 'Research',
+      unsorted: 'Unsorted', source_material: 'Source Material', documents: 'Documents',
+    };
     meta.textContent = chunks.join(' · ');
+    if (p.source_kind) {
+      const targetWs = p.source_entry_id ? CR_SOURCE_KIND_TO_WORKSPACE[p.source_kind] : null;
+      meta.appendChild(document.createTextNode(' · '));
+      if (targetWs) {
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.className = 'cr-source-link';
+        link.textContent = `from ${sourceKindLabel(p.source_kind)} #${p.source_entry_id}`;
+        link.title = `Go to ${targetWs} entry`;
+        link.addEventListener('click', () => route(targetWs, p.source_entry_id));
+        meta.appendChild(link);
+      } else {
+        meta.appendChild(document.createTextNode(`from ${sourceKindLabel(p.source_kind)}${p.source_entry_id ? ` #${p.source_entry_id}` : ''}`));
+      }
+    }
     rightCol.appendChild(meta);
 
     if (p.review_note) {
@@ -8015,8 +8035,6 @@ function renderWritingLabPage(section) {
 
     const status = document.createElement('span');
     status.className = 'draft-status wl-status';
-    const counter = document.createElement('span');
-    counter.className = 'wl-counter';
     const spacer = document.createElement('span');
     spacer.className = 'wl-bar-spacer';
 
@@ -8050,9 +8068,9 @@ function renderWritingLabPage(section) {
     })() : [];
 
     if (archivedAtStart) {
-      bar.append(status, counter, spacer, ...wlPopoutParts, archiveBtn, deleteBtn);
+      bar.append(status, spacer, ...wlPopoutParts, archiveBtn, deleteBtn);
     } else {
-      bar.append(status, counter, spacer, proposeBtn, ...wlPopoutParts, archiveBtn, deleteBtn);
+      bar.append(status, spacer, proposeBtn, ...wlPopoutParts, archiveBtn, deleteBtn);
     }
 
     // P44 — source attachment row: always visible below the editor bar.
@@ -8191,8 +8209,15 @@ function renderWritingLabPage(section) {
     }
     mountTagBarIfReady();
 
+    // PAUDIT-5 — word count and section count live in the status bar.
+    // Sections are lines matching "--- Name ---" (PWLAB-SECTIONS pattern).
+    let wlWordSeg = null;
+    let wlSectionSeg = null;
     function updateCounter() {
-      counter.textContent = `${wordCount(bodyInput.value)} word(s)`;
+      const words = wordCount(bodyInput.value);
+      const sections = (bodyInput.value.match(/^---\s+.+\s+---\s*$/mg) || []).length;
+      if (wlWordSeg) wlWordSeg.lastChild.textContent = `${words}`;
+      if (wlSectionSeg) wlSectionSeg.lastChild.textContent = `${sections}`;
     }
     updateCounter();
     setStatus(
@@ -8617,11 +8642,25 @@ function renderWritingLabPage(section) {
     }
 
     // PPOL2b-12 — linked-entries indicator (same passive pattern as other workspaces).
-    // PPOL2b-03 — status bar (workspace · type · created · edited · status).
+    // PPOL2b-03 / PAUDIT-5 — status bar with word count and section count.
     // Both are gated on item existing — new unsaved drafts have no DB row yet.
     if (item) {
       mountAttachmentsSection(rightCol, 'writing_lab', item.id);
-      rightCol.appendChild(buildStatusBar('Writing Lab', item, archivedAtStart));
+      const wlStatusBar = buildStatusBar('Writing Lab', item, archivedAtStart);
+      // PAUDIT-5: append updateable word-count and section-count segments.
+      const mkSeg = (label, value) => {
+        const s = document.createElement('span');
+        s.className = 'tc-statusbar-seg';
+        const k = document.createElement('span');
+        k.className = 'tc-statusbar-key';
+        k.textContent = label;
+        s.append(k, document.createTextNode(value));
+        return s;
+      };
+      wlWordSeg = mkSeg('Words', String(wordCount(bodyInput.value)));
+      wlSectionSeg = mkSeg('Sections', String((bodyInput.value.match(/^---\s+.+\s+---\s*$/mg) || []).length));
+      wlStatusBar.append(wlWordSeg, wlSectionSeg);
+      rightCol.appendChild(wlStatusBar);
     }
 
     // Cleanup: remove the fixed-position source picker and document listener
@@ -10267,6 +10306,87 @@ const CONTENT_RENDERERS = {
     entityKind: 'unsorted',
     draftPrefix: 'unsorted',
     addLabel: 'Add to Unsorted',
+    // PAUDIT-5 — "Route to…" action. Unsorted is a routing queue; every entry
+    // needs a one-click path to a destination workspace. Same destinations as
+    // highlight-extract-route minus Unsorted itself.
+    detailExtra(rightCol, item, archivedFlag) {
+      if (archivedFlag) return;
+      const UNSORTED_ROUTE_TARGETS = [
+        { label: 'Brainstorm',      create: (t, b) => window.revival.brainstorm.create({ title: t, body: b }),      workspace: 'Brainstorm' },
+        { label: 'Open Questions',  create: (t, b) => window.revival.openQuestions.create({ title: t, body: b }),    workspace: 'Open Questions' },
+        { label: 'Decisions',       create: (t, b) => window.revival.decisions.create({ title: t, body: b }),        workspace: 'Decisions' },
+        { label: 'Conflicts',       create: (t, b) => window.revival.conflicts.create({ title: t, body: b }),        workspace: 'Conflicts' },
+        { label: 'Research',        create: (t, b) => window.revival.research.create({ title: t, body: b }),         workspace: 'Research' },
+        { label: 'Canon Review',    create: (t, b) => window.revival.canonProposals.createFromExtract({
+          title: t, body: b,
+          source_kind: 'unsorted', source_entry_id: item.id,
+          proposer_note: `Routed from Unsorted — "${item.title}"`,
+        }), workspace: 'Canon Review' },
+      ];
+
+      const section = document.createElement('div');
+      section.className = 'unsorted-route-section';
+
+      const routeBtn = document.createElement('button');
+      routeBtn.type = 'button';
+      routeBtn.className = 'btn-secondary unsorted-route-btn';
+      routeBtn.textContent = 'Route to…';
+      section.appendChild(routeBtn);
+
+      const picker = document.createElement('div');
+      picker.className = 'unsorted-route-picker';
+      picker.hidden = true;
+      section.appendChild(picker);
+
+      let routeStatus = null;
+
+      routeBtn.addEventListener('click', () => {
+        if (!picker.hidden) { picker.hidden = true; return; }
+        picker.innerHTML = '';
+        picker.hidden = false;
+        for (const target of UNSORTED_ROUTE_TARGETS) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'unsorted-route-item';
+          btn.textContent = target.label;
+          btn.addEventListener('click', async () => {
+            picker.hidden = true;
+            btn.disabled = true;
+            try {
+              await target.create(item.title, item.body || '');
+              if (!routeStatus) {
+                routeStatus = document.createElement('span');
+                routeStatus.className = 'unsorted-route-status';
+                section.appendChild(routeStatus);
+              }
+              routeStatus.textContent = `Sent to ${target.label} ✓`;
+              setTimeout(() => { if (routeStatus) routeStatus.textContent = ''; }, 3000);
+            } catch (err) {
+              if (!routeStatus) {
+                routeStatus = document.createElement('span');
+                routeStatus.className = 'unsorted-route-status unsorted-route-error';
+                section.appendChild(routeStatus);
+              }
+              routeStatus.textContent = `Failed: ${err.message || err}`;
+            }
+          });
+          picker.appendChild(btn);
+        }
+      });
+
+      document.addEventListener('click', function closeOnOutside(e) {
+        if (!section.contains(e.target)) {
+          picker.hidden = true;
+        }
+      });
+
+      const actionsRow = rightCol.querySelector('.tc-detail-actions');
+      if (actionsRow && actionsRow.nextSibling) {
+        rightCol.insertBefore(section, actionsRow.nextSibling);
+      } else {
+        rightCol.appendChild(section);
+      }
+    },
   }),
   'Source Material': makeEntryWorkspace({
     apiName: 'sourceMaterial',
@@ -10279,6 +10399,89 @@ const CONTENT_RENDERERS = {
     // a hoisted declaration, so referencing it here before its definition is
     // fine — it only runs when a source is mutated at runtime.
     onChange: () => loadActiveSources(),
+    // PAUDIT-5 — surface file_kind and file_path (DB columns, never previously shown).
+    detailExtra(rightCol, item, archivedFlag) {
+      const FILE_KIND_OPTIONS = ['', 'text', 'pdf', 'image', 'other'];
+      const FILE_KIND_LABELS = { '': 'None', text: 'Text', pdf: 'PDF', image: 'Image', other: 'Other' };
+
+      const section = document.createElement('div');
+      section.className = 'sm-file-meta-section';
+
+      function renderFileMeta() {
+        section.innerHTML = '';
+        const head = document.createElement('div');
+        head.className = 'sm-file-meta-head';
+        head.textContent = 'File info';
+        section.appendChild(head);
+
+        const kindRow = document.createElement('div');
+        kindRow.className = 'sm-file-meta-row';
+        const kindLabel = document.createElement('span');
+        kindLabel.className = 'sm-file-meta-label';
+        kindLabel.textContent = 'Kind:';
+        kindRow.appendChild(kindLabel);
+
+        if (archivedFlag) {
+          const val = document.createElement('span');
+          val.className = 'sm-file-meta-value';
+          val.textContent = FILE_KIND_LABELS[item.file_kind || ''] || item.file_kind || '—';
+          kindRow.appendChild(val);
+        } else {
+          const sel = document.createElement('select');
+          sel.className = 'sm-file-meta-select';
+          for (const k of FILE_KIND_OPTIONS) {
+            const opt = document.createElement('option');
+            opt.value = k;
+            opt.textContent = FILE_KIND_LABELS[k];
+            if ((item.file_kind || '') === k) opt.selected = true;
+            sel.appendChild(opt);
+          }
+          sel.addEventListener('change', async () => {
+            try {
+              const updated = await window.revival.sourceMaterial.setFileMeta(item.id, { file_kind: sel.value || null, file_path: item.file_path });
+              Object.assign(item, updated);
+            } catch { /* non-fatal */ }
+          });
+          kindRow.appendChild(sel);
+        }
+        section.appendChild(kindRow);
+
+        const pathRow = document.createElement('div');
+        pathRow.className = 'sm-file-meta-row';
+        const pathLabel = document.createElement('span');
+        pathLabel.className = 'sm-file-meta-label';
+        pathLabel.textContent = 'Path:';
+        pathRow.appendChild(pathLabel);
+
+        if (archivedFlag) {
+          const val = document.createElement('span');
+          val.className = 'sm-file-meta-value';
+          val.textContent = item.file_path || '—';
+          pathRow.appendChild(val);
+        } else {
+          const inp = document.createElement('input');
+          inp.type = 'text';
+          inp.className = 'sm-file-meta-input';
+          inp.placeholder = 'File path (optional)';
+          inp.value = item.file_path || '';
+          let pathTimer = null;
+          inp.addEventListener('input', () => {
+            clearTimeout(pathTimer);
+            pathTimer = setTimeout(async () => {
+              try {
+                const updated = await window.revival.sourceMaterial.setFileMeta(item.id, { file_kind: item.file_kind, file_path: inp.value });
+                Object.assign(item, updated);
+              } catch { /* non-fatal */ }
+            }, 600);
+          });
+          pathRow.appendChild(inp);
+        }
+        section.appendChild(pathRow);
+      }
+
+      renderFileMeta();
+      rightCol.appendChild(section);
+    },
   }),
   'Documents': makeEntryWorkspace({
     apiName: 'documents',
@@ -10296,24 +10499,146 @@ const CONTENT_RENDERERS = {
       callbacks.refreshHistory = refresh;
     },
   }),
-  'Open Questions': makeEntryWorkspace({
-    apiName: 'openQuestions',
-    entityKind: 'open_questions',
-    draftPrefix: 'open_questions',
-    addLabel: 'Add Question',
-    detailExtra(rightCol, item, archivedFlag) {
-      // PBLOCK panel first — must be reachable without heavy scrolling.
-      mountPBlockPanel(rightCol, item, archivedFlag);
-      const callbacks = {};
-      if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
-        entityKind: 'open_questions',
-        workspaceName: 'Open Questions',
-        showOptions: true,
-      });
-      const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'open_questions');
-      callbacks.refreshHistory = refresh;
-    },
-  }),
+  // PAUDIT-5 — Open Questions wrapped in IIFE so categoryFilter state is shared
+  // across list filter and detail hooks without leaking into the outer scope.
+  'Open Questions': (() => {
+    let categoryFilter = '';
+    const reloadRef = { fn: null };
+
+    return makeEntryWorkspace({
+      apiName: 'openQuestions',
+      entityKind: 'open_questions',
+      draftPrefix: 'open_questions',
+      addLabel: 'Add Question',
+
+      matchesExtra(item) {
+        if (!categoryFilter) return true;
+        return (item.category || '').toLowerCase().includes(categoryFilter.toLowerCase());
+      },
+
+      isFilterActive() {
+        return categoryFilter !== '';
+      },
+
+      listItemExtra(btn, item, archivedFlag) {
+        if (archivedFlag || !item.category) return;
+        const titleRow = btn.querySelector('.tc-list-title');
+        if (!titleRow) return;
+        const badge = document.createElement('span');
+        badge.className = 'tc-list-badge badge-oq-category';
+        badge.textContent = item.category;
+        titleRow.insertBefore(badge, titleRow.lastChild);
+      },
+
+      leftColExtra(leftCol, rightCol, ctx) {
+        reloadRef.fn = ctx.reloadList;
+        const filterRow = document.createElement('div');
+        filterRow.className = 'oq-category-filter-row';
+        const filterLabel = document.createElement('label');
+        filterLabel.className = 'oq-category-filter-label';
+        filterLabel.textContent = 'Category:';
+        const filterInput = document.createElement('input');
+        filterInput.type = 'text';
+        filterInput.className = 'oq-category-filter-input';
+        filterInput.placeholder = 'Filter by category…';
+        filterInput.value = categoryFilter;
+        filterInput.addEventListener('input', () => {
+          categoryFilter = filterInput.value;
+          if (reloadRef.fn) reloadRef.fn();
+        });
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'oq-category-filter-clear';
+        clearBtn.textContent = '×';
+        clearBtn.title = 'Clear category filter';
+        clearBtn.addEventListener('click', () => {
+          categoryFilter = '';
+          filterInput.value = '';
+          if (reloadRef.fn) reloadRef.fn();
+        });
+        filterLabel.append(filterInput, clearBtn);
+        filterRow.appendChild(filterLabel);
+        leftCol.insertBefore(filterRow, ctx.list);
+      },
+
+      detailExtra(rightCol, item, archivedFlag) {
+        // PAUDIT-5 — category field (inline edit, saves via setCategory).
+        const catSection = document.createElement('div');
+        catSection.className = 'oq-category-section';
+        function renderCategoryUI() {
+          catSection.innerHTML = '';
+          const row = document.createElement('div');
+          row.className = 'oq-category-row';
+          const label = document.createElement('span');
+          label.className = 'oq-category-label';
+          label.textContent = 'Category:';
+          row.appendChild(label);
+          const val = document.createElement('span');
+          val.className = 'oq-category-value';
+          val.textContent = item.category || '—';
+          row.appendChild(val);
+          if (!archivedFlag) {
+            const editBtn = document.createElement('button');
+            editBtn.type = 'button';
+            editBtn.className = 'btn-secondary oq-category-btn';
+            editBtn.textContent = 'Edit';
+            editBtn.addEventListener('click', () => {
+              row.innerHTML = '';
+              const inp = document.createElement('input');
+              inp.type = 'text';
+              inp.className = 'oq-category-input';
+              inp.placeholder = 'Category (optional)';
+              inp.value = item.category || '';
+              const saveBtn = document.createElement('button');
+              saveBtn.type = 'button';
+              saveBtn.className = 'btn-primary oq-category-btn';
+              saveBtn.textContent = 'Save';
+              const cancelBtn = document.createElement('button');
+              cancelBtn.type = 'button';
+              cancelBtn.className = 'btn-secondary oq-category-btn';
+              cancelBtn.textContent = 'Cancel';
+              const commit = async () => {
+                try {
+                  const updated = await window.revival.openQuestions.setCategory(item.id, inp.value);
+                  Object.assign(item, updated);
+                  if (reloadRef.fn) await reloadRef.fn();
+                  renderCategoryUI();
+                } catch { renderCategoryUI(); }
+              };
+              saveBtn.addEventListener('click', commit);
+              cancelBtn.addEventListener('click', renderCategoryUI);
+              inp.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+                if (ev.key === 'Escape') renderCategoryUI();
+              });
+              row.append(inp, saveBtn, cancelBtn);
+            });
+            row.appendChild(editBtn);
+          }
+          catSection.appendChild(row);
+        }
+        renderCategoryUI();
+        // Insert before the pblock panel (which inserts after actions row).
+        const actionsRow = rightCol.querySelector('.tc-detail-actions');
+        if (actionsRow && actionsRow.nextSibling) {
+          rightCol.insertBefore(catSection, actionsRow.nextSibling);
+        } else {
+          rightCol.appendChild(catSection);
+        }
+
+        // PBLOCK panel — must be reachable without heavy scrolling.
+        mountPBlockPanel(rightCol, item, archivedFlag);
+        const callbacks = {};
+        if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
+          entityKind: 'open_questions',
+          workspaceName: 'Open Questions',
+          showOptions: true,
+        });
+        const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'open_questions');
+        callbacks.refreshHistory = refresh;
+      },
+    });
+  })(),
   // Conflicts: lightweight filter (Editorial Filter + North Star only).
   'Conflicts': makeEntryWorkspace({
     apiName: 'conflicts',
@@ -10388,6 +10713,7 @@ const CONTENT_RENDERERS = {
   // without leaking into the outer workspace-config scope.
   'Brainstorm': (() => {
     let threads = [];
+    let archivedThreads = [];
     // reloadRef.fn is set by leftColExtra (called at mount time, before any
     // renderList invocation) so customRenderActive can trigger a reload.
     const reloadRef = { fn: null };
@@ -10627,7 +10953,10 @@ const CONTENT_RENDERERS = {
       bodyPlaceholder: 'Where it might go, what sparked it (optional)',
 
       loadListExtra: async () => {
-        threads = await window.revival.brainstorm.threads.list();
+        [threads, archivedThreads] = await Promise.all([
+          window.revival.brainstorm.threads.list(),
+          window.revival.brainstorm.threads.listArchived(),
+        ]);
       },
 
       listItemExtra(btn, item, archivedFlag) {
@@ -10829,6 +11158,52 @@ const CONTENT_RENDERERS = {
           });
         });
         leftCol.insertBefore(newThreadBtn, ctx.list);
+
+        // PAUDIT-5 — collapsed archived threads section below the main archived entries.
+        const archThreadsSection = document.createElement('details');
+        archThreadsSection.className = 'bs-archived-threads-section';
+        const archThreadsSummary = document.createElement('summary');
+        archThreadsSummary.className = 'bs-archived-threads-summary';
+        archThreadsSection.appendChild(archThreadsSummary);
+        const archThreadsList = document.createElement('div');
+        archThreadsList.className = 'bs-archived-threads-list';
+        archThreadsSection.appendChild(archThreadsList);
+        leftCol.appendChild(archThreadsSection);
+
+        function renderArchivedThreads() {
+          archThreadsSummary.textContent = `Archived Threads (${archivedThreads.length})`;
+          archThreadsSection.style.display = archivedThreads.length === 0 ? 'none' : '';
+          archThreadsList.innerHTML = '';
+          for (const thread of archivedThreads) {
+            const row = document.createElement('div');
+            row.className = 'bs-archived-thread-row';
+            const title = document.createElement('span');
+            title.className = 'bs-archived-thread-title';
+            title.textContent = thread.title;
+            const restoreBtn = document.createElement('button');
+            restoreBtn.type = 'button';
+            restoreBtn.className = 'btn-secondary bs-thread-action';
+            restoreBtn.textContent = 'Restore';
+            restoreBtn.addEventListener('click', async () => {
+              restoreBtn.disabled = true;
+              try {
+                await window.revival.brainstorm.threads.restore(thread.id);
+                if (reloadRef.fn) await reloadRef.fn();
+              } catch { restoreBtn.disabled = false; }
+            });
+            row.append(title, restoreBtn);
+            archThreadsList.appendChild(row);
+          }
+        }
+
+        // Keep the section in sync after each list reload.
+        const origReload = reloadRef.fn;
+        const patchedReload = async () => {
+          if (origReload) await origReload();
+          renderArchivedThreads();
+        };
+        reloadRef.fn = patchedReload;
+        renderArchivedThreads();
       },
     });
   })(),

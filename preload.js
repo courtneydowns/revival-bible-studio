@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('revival', {
     delete: (id) => ipcRenderer.invoke('sourceMaterial:delete', id),
     archive: (id) => ipcRenderer.invoke('sourceMaterial:archive', id),
     restore: (id) => ipcRenderer.invoke('sourceMaterial:restore', id),
+    setFileMeta: (id, meta) => ipcRenderer.invoke('sourceMaterial:setFileMeta', id, meta),
   },
   documents: {
     list: () => ipcRenderer.invoke('documents:list'),
@@ -40,6 +41,7 @@ contextBridge.exposeInMainWorld('revival', {
     restore: (id) => ipcRenderer.invoke('openQuestions:restore', id),
     escalateTier: (id) => ipcRenderer.invoke('openQuestions:escalateTier', id),
     setBlocking: (id, opts) => ipcRenderer.invoke('openQuestions:setBlocking', id, opts),
+    setCategory: (id, cat) => ipcRenderer.invoke('openQuestions:setCategory', id, cat),
     get: (id) => ipcRenderer.invoke('openQuestions:get', id),
   },
   conflicts: {

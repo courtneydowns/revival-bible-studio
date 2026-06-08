@@ -1949,6 +1949,19 @@ function makeEntryRepo(table) {
 }
 
 const sourceMaterial = makeEntryRepo('source_material');
+
+// PAUDIT-5 — update file_kind and file_path on a Source Material entry.
+sourceMaterial.setFileMeta = (id, { file_kind, file_path } = {}) => {
+  const db = getDb();
+  if (!db.prepare('SELECT 1 FROM source_material WHERE id = ?').get(id)) throw new Error('Entry not found.');
+  const VALID_KINDS = new Set(['text', 'pdf', 'image', 'other']);
+  const kind = VALID_KINDS.has(file_kind) ? file_kind : null;
+  const fpath = (file_path || '').trim() || null;
+  db.prepare(`UPDATE source_material SET file_kind = ?, file_path = ?, updated_at = ? WHERE id = ?`)
+    .run(kind, fpath, new Date().toISOString(), id);
+  return db.prepare('SELECT * FROM source_material WHERE id = ?').get(id);
+};
+
 const documents = makeEntryRepo('documents');
 const openQuestions = makeEntryRepo('open_questions');
 
@@ -1964,6 +1977,16 @@ openQuestions.escalateTier = (id) => {
         SET tier = 1, tier_escalated_at = ?, tier_escalated_from = ?, updated_at = ?
       WHERE id = ?`
   ).run(now, q.tier, now, id);
+  return db.prepare('SELECT * FROM open_questions WHERE id = ?').get(id);
+};
+
+// PAUDIT-5 — set the free-text category on an Open Question.
+openQuestions.setCategory = (id, category) => {
+  const db = getDb();
+  if (!db.prepare('SELECT 1 FROM open_questions WHERE id = ?').get(id)) throw new Error('Entry not found.');
+  const cat = (category || '').trim() || null;
+  db.prepare(`UPDATE open_questions SET category = ?, updated_at = ? WHERE id = ?`)
+    .run(cat, new Date().toISOString(), id);
   return db.prepare('SELECT * FROM open_questions WHERE id = ?').get(id);
 };
 
@@ -3495,7 +3518,7 @@ const CANON_TYPE_CONFIG = {
     label: 'Episode',
     table: 'canon_episodes',
     fields: [
-      { col: 'season_entry_id',  label: 'Season entry ID',  kind: 'number',
+      { col: 'season_entry_id',  label: 'Season entry ID',  kind: 'number', canon_fk: true,
         hint: 'canon_entries.id of the season this episode belongs to (optional).' },
       { col: 'episode_number',   label: 'Episode number',   kind: 'number' },
       { col: 'episode_code',     label: 'Episode code',     kind: 'text', hint: 'e.g. S1E1' },
@@ -3509,7 +3532,7 @@ const CANON_TYPE_CONFIG = {
     label: 'Locked scene',
     table: 'canon_locked_scenes',
     fields: [
-      { col: 'episode_entry_id',  label: 'Episode entry ID', kind: 'number',
+      { col: 'episode_entry_id',  label: 'Episode entry ID', kind: 'number', canon_fk: true,
         hint: 'canon_entries.id of the episode this scene belongs to (optional).' },
       { col: 'code',              label: 'Scene code',       kind: 'text' },
       { col: 'scene_description', label: 'Scene description', kind: 'textarea', required: true },
@@ -3520,8 +3543,8 @@ const CANON_TYPE_CONFIG = {
     label: 'Locked line',
     table: 'canon_locked_lines',
     fields: [
-      { col: 'episode_entry_id',   label: 'Episode entry ID',   kind: 'number' },
-      { col: 'character_entry_id', label: 'Character entry ID', kind: 'number' },
+      { col: 'episode_entry_id',   label: 'Episode entry ID',   kind: 'number', canon_fk: true },
+      { col: 'character_entry_id', label: 'Character entry ID', kind: 'number', canon_fk: true },
       { col: 'code',               label: 'Line code',          kind: 'text' },
       { col: 'line_state',         label: 'Line state',         kind: 'select',
         options: ['locked', 'texture_locked_words_open', 'architecture_locked', 'open'],
@@ -3539,7 +3562,7 @@ const CANON_TYPE_CONFIG = {
       { col: 'scheme',              label: 'Scheme',         kind: 'select',
         options: ['T', 'A', 'CF'], default: 'A', required: true },
       { col: 'parent_code',         label: 'Parent code',    kind: 'text' },
-      { col: 'session_id',          label: 'Session ID',     kind: 'number' },
+      { col: 'session_id',          label: 'Session ID',     kind: 'number', sessions_fk: true },
       { col: 'session_date',        label: 'Session date',   kind: 'text',
         hint: 'YYYY-MM-DD.' },
       { col: 'body',                label: 'Decision body',  kind: 'textarea', required: true },
@@ -3956,6 +3979,25 @@ const canon = {
 
     const detailColumns = pickDetailColumns(entryType, payload.detail);
     if (detailColumns) ensureRequiredFields(entryType, detailColumns);
+
+    // Validate FK fields before the transaction to avoid a cryptic SQLite FK error.
+    // canon_fk fields point to canon_entries.id; sessions_fk fields to sessions.id.
+    // If the referenced row doesn't exist, null the field out and continue — the
+    // entry is created without the broken link; the user can fix it via edit.
+    if (detailColumns) {
+      const db = getDb();
+      const cfg = CANON_TYPE_CONFIG[entryType];
+      for (const f of (cfg.fields || [])) {
+        if (!f.canon_fk && !f.sessions_fk) continue;
+        const val = detailColumns[f.col];
+        if (val == null) continue;
+        const table = f.canon_fk ? 'canon_entries' : 'sessions';
+        const exists = db.prepare(`SELECT 1 FROM ${table} WHERE id = ?`).get(val);
+        if (!exists) {
+          detailColumns[f.col] = null;
+        }
+      }
+    }
 
     const now = new Date().toISOString();
     const db = getDb();

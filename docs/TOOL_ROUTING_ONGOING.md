@@ -83,7 +83,7 @@
 | **PAUDIT-2b Preview payload sync** | **VS Code ext** ✅  | Sync buildPreviewPayload to match buildSystemPrompt |
 | **PAUDIT-3 Canon Bible popout + Decisions back-link** | **VS Code ext** | Two plain UI omissions — trigger button + source_question_id render |
 | **PAUDIT-4 P46-B analysis lock fix** | **VS Code ext** | Add resolved_by_decision_id as second lock condition |
-| **PAUDIT-5 Omitted UI fields + Brainstorm archived threads** | **VS Code ext / CLI** | WL status bar, Source Material fields, OQ category, Unsorted route action, Canon Review attribution link, Brainstorm archived threads |
+| **PAUDIT-5 Omitted UI fields + Brainstorm archived threads** | **VS Code ext / CLI** ✅ | WL status bar, Source Material fields, OQ category, Unsorted route action, Canon Review attribution link, Brainstorm archived threads |
 | **PAUDIT-6 Research external_url + OQ tier setter** | **VS Code ext** | Two DB columns with no UI — Research URL field, OQ tier set/edit |
 | **PAUDIT-7 Command palette regression fix** | **CLI** | Restore Cmd+K to working state — regression from a later phase |
 | **PAUDIT-8 Dead IPC cleanup** | **CLI** | Remove dead bridges from main.js + preload.js; run after PAUDIT-5 |

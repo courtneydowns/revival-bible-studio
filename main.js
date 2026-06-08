@@ -84,6 +84,7 @@ function registerIpc() {
   ipcMain.handle('sourceMaterial:delete', (_event, id) => { const r = db.sourceMaterial.delete(id); recordEvent('Source Material', 'deleted'); return r; });
   ipcMain.handle('sourceMaterial:archive', (_event, id) => { const r = db.sourceMaterial.archive(id); recordEvent('Source Material', 'archived'); return r; });
   ipcMain.handle('sourceMaterial:restore', (_event, id) => db.sourceMaterial.restore(id));
+  ipcMain.handle('sourceMaterial:setFileMeta', (_event, id, meta) => db.sourceMaterial.setFileMeta(id, meta));
 
   ipcMain.handle('documents:list', () => db.documents.list());
   ipcMain.handle('documents:listArchived', () => db.documents.listArchived());
@@ -102,6 +103,7 @@ function registerIpc() {
   ipcMain.handle('openQuestions:restore', (_event, id) => db.openQuestions.restore(id));
   ipcMain.handle('openQuestions:escalateTier', (_event, id) => { const r = db.openQuestions.escalateTier(id); recordEvent('Open Questions', 'tier-escalated'); return r; });
   ipcMain.handle('openQuestions:setBlocking', (_event, id, opts) => db.openQuestions.setBlocking(id, opts));
+  ipcMain.handle('openQuestions:setCategory', (_event, id, cat) => db.openQuestions.setCategory(id, cat));
   ipcMain.handle('openQuestions:get', (_event, id) => db.openQuestions.get(id));
 
   ipcMain.handle('conflicts:list', () => db.conflicts.list());

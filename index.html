@@ -4193,6 +4193,52 @@
       .ep-filter-btn-outline.active { color: #c9862a; border-color: #c9862a; }
       .ep-filter-btn-draft.active   { color: #4a90d9; border-color: #4a90d9; }
       .ep-filter-btn-locked.active  { color: #4d9e6d; border-color: #4d9e6d; }
+
+      /* PAUDIT-5 — Source Material file meta section */
+      .sm-file-meta-section { margin: 10px 0; padding: 8px 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 0.82em; }
+      .sm-file-meta-head { font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.9em; }
+      .sm-file-meta-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+      .sm-file-meta-label { color: var(--muted); min-width: 40px; }
+      .sm-file-meta-value { color: var(--text); }
+      .sm-file-meta-select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-size: 0.9em; }
+      .sm-file-meta-input { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-size: 0.9em; flex: 1; }
+
+      /* PAUDIT-5 — Open Questions category field */
+      .oq-category-section { margin: 8px 0; padding: 6px 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 0.85em; }
+      .oq-category-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .oq-category-label { color: var(--muted); font-weight: 600; }
+      .oq-category-value { color: var(--text); }
+      .oq-category-input { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 0.9em; flex: 1; min-width: 120px; }
+      .oq-category-btn { font-size: 0.82em; padding: 2px 8px; }
+      /* category badge on list items */
+      .badge-oq-category { background: #7c5cbf22; color: #7c5cbf; border: 1px solid #7c5cbf55; font-size: 0.72em; padding: 1px 5px; border-radius: 3px; }
+      /* category filter row above the list */
+      .oq-category-filter-row { padding: 4px 8px 0; }
+      .oq-category-filter-label { display: flex; align-items: center; gap: 4px; font-size: 0.82em; color: var(--muted); }
+      .oq-category-filter-input { flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; font-size: 0.9em; }
+      .oq-category-filter-clear { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0 2px; font-size: 1em; }
+      .oq-category-filter-clear:hover { color: var(--text); }
+
+      /* PAUDIT-5 — Unsorted route action */
+      .unsorted-route-section { margin: 8px 0; display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+      .unsorted-route-btn { }
+      .unsorted-route-picker { display: flex; flex-direction: column; gap: 2px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 4px; min-width: 160px; }
+      .unsorted-route-item { background: none; border: none; text-align: left; padding: 5px 10px; border-radius: 4px; cursor: pointer; color: var(--text); font-size: 0.9em; }
+      .unsorted-route-item:hover { background: var(--hover); }
+      .unsorted-route-status { font-size: 0.82em; color: #4d9e6d; align-self: center; }
+      .unsorted-route-error { color: var(--danger, #e05c5c); }
+
+      /* PAUDIT-5 — Canon Review source attribution back-link */
+      .cr-source-link { background: none; border: none; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; font-size: inherit; }
+      .cr-source-link:hover { color: var(--text); }
+
+      /* PAUDIT-5 — Brainstorm archived threads section */
+      .bs-archived-threads-section { margin-top: 8px; }
+      .bs-archived-threads-summary { cursor: pointer; font-size: 0.82em; color: var(--muted); padding: 4px 8px; user-select: none; }
+      .bs-archived-threads-list { padding: 4px 0; }
+      .bs-archived-thread-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; gap: 8px; }
+      .bs-archived-thread-row:hover { background: var(--hover); border-radius: 4px; }
+      .bs-archived-thread-title { font-size: 0.85em; color: var(--muted); flex: 1; }
     </style>
   </head>
   <body>

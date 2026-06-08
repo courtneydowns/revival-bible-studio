@@ -364,7 +364,7 @@ Two plain UI omissions, same file, grouped:
 - Fix: pass `item.resolved_by_decision_id` as a second lock condition alongside `archivedAtStart`
 - **Smoke:** Promote an OQ to a Decision (do not archive it); open its Flanagan history; confirm re-run buttons are disabled. Archive a different OQ; confirm same lock behavior.
 
-### PAUDIT-5 — Omitted UI fields + Brainstorm archived threads
+### PAUDIT-5 — Omitted UI fields + Brainstorm archived threads ✅
 **Tool:** VS Code ext / CLI (multi-file)
 Plain implementation omissions surfaced by the audit — data exists in the DB, UI never renders it:
 - **Writing Lab word count:** move from action bar to status bar (spec location). Add scene/section count to status bar (currently absent entirely).
@@ -374,6 +374,7 @@ Plain implementation omissions surfaced by the audit — data exists in the DB, 
 - **Canon Review source attribution back-link:** render source attribution (e.g. "from Characters #5") as a navigable click-through to the originating entry, not plain text.
 - **Brainstorm archived threads section:** `brainstorm:threads.listArchived` IPC exists but archived threads have no UI section. Add collapsed archived threads section to Brainstorm, matching the archive pattern used across all other workspaces.
 - **Smoke:** (1) Open a Writing Lab draft; confirm word count and section count both appear in status bar. (2) Open a Source Material entry; confirm file_kind and file_path visible and editable. (3) Open an Open Questions entry; confirm category field visible, editable, and filterable in list. (4) Open an Unsorted entry; confirm "Route to…" action button present; route it; confirm entry created in target workspace. (5) Open a Canon Review proposal created from a Characters entry; click source attribution; confirm navigation to the originating Character entry. (6) Archive a Brainstorm thread; confirm it appears in collapsed archived threads section; restore it.
+- Smoke passed 2026-06-08. Also fixed Canon Review approve FK constraint error (invalid season/episode/character IDs now silently nulled instead of blocking with cryptic SQLite error).
 
 ### PAUDIT-6 — Research external_url + Open Questions tier setter
 **Tool:** VS Code ext
