@@ -1362,7 +1362,7 @@ function makeEntryWorkspace(config) {
         archiveBtn.disabled = true;
         try {
           await api.archive(item.id);
-          UndoStack.push({ type: 'archive', apiName, id: item.id, title: item.title || '(untitled)' });
+          UndoStack.push({ type: 'archive', apiName: config.apiName, id: item.id, title: item.title || '(untitled)' });
           await loadList();
         } catch {
           archiveBtn.disabled = false;
@@ -1474,7 +1474,7 @@ function makeEntryWorkspace(config) {
         const savedTitle = item.title || '(untitled)';
         const savedBody = item.body || '';
         await api.delete(item.id);
-        UndoStack.push({ type: 'delete', apiName, title: savedTitle, body: savedBody });
+        UndoStack.push({ type: 'delete', apiName: config.apiName, title: savedTitle, body: savedBody });
         Drafts.clear(item.id);
         selectedId = null;
         await loadList();
@@ -7972,7 +7972,6 @@ function renderWritingLabPage(section) {
 
     let currentId = item ? item.id : null;
     let saveTimer = null;
-    let saving = false;
     let savedTitle = item ? item.title : '';
     let savedBody = item ? item.body || '' : '';
     const archivedAtStart = isArchived(item);
@@ -8188,7 +8187,6 @@ function renderWritingLabPage(section) {
       if (currentId == null && title.trim() === '' && body.trim() === '') {
         return null;
       }
-      saving = true;
       setStatus(status, 'Saving…');
       try {
         let rec;
@@ -8227,8 +8225,6 @@ function renderWritingLabPage(section) {
       } catch (e) {
         setStatus(status, `Save failed: ${e.message || e}`);
         return null;
-      } finally {
-        saving = false;
       }
     }
 
@@ -12048,11 +12044,6 @@ async function attachItem(item, mode, row) {
   } catch (e) {
     row.querySelectorAll('button').forEach((b) => (b.disabled = false));
   }
-}
-
-// Legacy alias used by Source Material onChange callback.
-function attachSource(src, mode, row) {
-  return attachItem(src, mode, row);
 }
 
 function setActiveChat(id) {
