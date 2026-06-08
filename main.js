@@ -181,6 +181,7 @@ function registerIpc() {
   ipcMain.handle('episodes:delete', (_event, id) => { const r = db.episodes.delete(id); recordEvent('Episodes', 'deleted'); return r; });
   ipcMain.handle('episodes:archive', (_event, id) => { const r = db.episodes.archive(id); recordEvent('Episodes', 'archived'); return r; });
   ipcMain.handle('episodes:restore', (_event, id) => db.episodes.restore(id));
+  ipcMain.handle('episodes:setStatus', (_event, id, status) => db.episodes.setStatus(id, status));
 
   ipcMain.handle('writingLab:list', () => db.writingLab.list());
   ipcMain.handle('writingLab:listArchived', () => db.writingLab.listArchived());

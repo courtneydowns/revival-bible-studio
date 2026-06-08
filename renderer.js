@@ -5517,8 +5517,8 @@ function buildNeedsAttentionPanel(container) {
     head.appendChild(refreshBtn);
     wrap.appendChild(head);
 
-    const { tier1Questions, stalledConflicts, pendingProposals, blockingQuestions = [] } = data;
-    const total = tier1Questions.length + stalledConflicts.length + pendingProposals.length + blockingQuestions.length;
+    const { tier1Questions, stalledConflicts, pendingProposals, blockingQuestions = [], outlineEpisodes = [] } = data;
+    const total = tier1Questions.length + stalledConflicts.length + pendingProposals.length + blockingQuestions.length + outlineEpisodes.length;
 
     if (total === 0) {
       const empty = document.createElement('p');
@@ -5606,6 +5606,41 @@ function buildNeedsAttentionPanel(container) {
         const k = item.blocking_type || 'item';
         const t = item.blocking_target;
         subEl.textContent = t ? `Blocking ${k}: "${t}"` : 'Marked as blocking';
+        btn.append(titleEl, subEl);
+        grid.appendChild(btn);
+      }
+      cat.appendChild(grid);
+      wrap.appendChild(cat);
+    }
+
+    // PEPISODE-STATUS: Outline-stage episodes always surface (no staleness gate).
+    if (outlineEpisodes.length > 0) {
+      const cat = document.createElement('div');
+      cat.className = 'na-category';
+      const catHead = document.createElement('div');
+      catHead.className = 'na-category-head';
+      const catLabel = document.createElement('span');
+      catLabel.className = 'na-category-label';
+      catLabel.textContent = 'Episodes at Outline stage';
+      const badge = document.createElement('span');
+      badge.className = 'na-count-badge';
+      badge.textContent = String(outlineEpisodes.length);
+      catHead.append(catLabel, badge);
+      cat.appendChild(catHead);
+      const grid = document.createElement('div');
+      grid.className = 'na-items';
+      for (const item of outlineEpisodes) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'na-item';
+        btn.title = 'Go to Episodes';
+        btn.addEventListener('click', () => route('Episodes'));
+        const titleEl = document.createElement('div');
+        titleEl.className = 'na-item-title';
+        titleEl.textContent = item.title || '(untitled)';
+        const subEl = document.createElement('div');
+        subEl.className = 'na-item-age';
+        subEl.textContent = 'Status: Outline';
         btn.append(titleEl, subEl);
         grid.appendChild(btn);
       }
@@ -10900,27 +10935,154 @@ const CONTENT_RENDERERS = {
       },
     });
   })(),
-  // Episodes (P27+P38): basic create/edit/delete/archive/restore on episode entries
-  // (name + outline/scene list/beats/draft notes). P38 adds canon proposal button.
-  'Episodes': makeEntryWorkspace({
-    apiName: 'episodes',
-    entityKind: 'episodes',
-    draftPrefix: 'episodes',
-    addLabel: 'Add Episode',
-    sectionClass: 'ws-episodes',
-    titlePlaceholder: 'Episode title',
-    bodyPlaceholder: 'Outline, scene list, beats, draft notes (optional)',
-    detailExtra(rightCol, item, archivedFlag) {
-      if (!archivedFlag) mountProposeCanonSection(rightCol, item, 'episodes_workspace');
-      const callbacks = {};
-      if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
-        entityKind: 'episodes',
-        workspaceName: 'Episodes',
+  // Episodes (P27+P38+PEPISODE-STATUS): CRUD lifecycle + canon proposal + status field.
+  // Wrapped in an IIFE so statusFilter state is shared across list filter and detail
+  // panel hooks without leaking into the outer scope (same pattern as Characters).
+  'Episodes': (() => {
+    const EP_STATUS_OPTIONS = [
+      { value: 'outline', label: 'Outline' },
+      { value: 'draft',   label: 'Draft' },
+      { value: 'locked',  label: 'Locked' },
+    ];
+    const EP_STATUS_LABEL = Object.fromEntries(
+      EP_STATUS_OPTIONS.map((o) => [o.value, o.label])
+    );
+
+    // PEPISODE-STATUS: null = show all; a status string = filter to that status.
+    let statusFilter = null;
+    // Ref so leftColExtra can trigger a full list+detail reload after a status change.
+    const reloadRef = { fn: null };
+
+    function mountEpStatusMeta(container, item, reload) {
+      const section = document.createElement('div');
+      section.className = 'ep-status-section';
+
+      const label = document.createElement('span');
+      label.className = 'ep-status-label';
+      label.textContent = 'Status:';
+      section.appendChild(label);
+
+      const btnGroup = document.createElement('div');
+      btnGroup.className = 'ep-status-selector';
+
+      const noneBtn = document.createElement('button');
+      noneBtn.type = 'button';
+      noneBtn.className = 'ep-status-btn';
+      if (!item.ep_status) noneBtn.classList.add('active');
+      noneBtn.textContent = 'None';
+      noneBtn.addEventListener('click', async () => {
+        if (!item.ep_status) return;
+        try {
+          await window.revival.episodes.setStatus(item.id, null);
+          await reload();
+        } catch { /* non-fatal */ }
       });
-      const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'episodes');
-      callbacks.refreshHistory = refresh;
-    },
-  }),
+      btnGroup.appendChild(noneBtn);
+
+      for (const opt of EP_STATUS_OPTIONS) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `ep-status-btn ep-status-btn-${opt.value}`;
+        if (item.ep_status === opt.value) btn.classList.add('active');
+        btn.textContent = opt.label;
+        btn.addEventListener('click', async () => {
+          if (item.ep_status === opt.value) return;
+          try {
+            await window.revival.episodes.setStatus(item.id, opt.value);
+            await reload();
+          } catch { /* non-fatal */ }
+        });
+        btnGroup.appendChild(btn);
+      }
+
+      section.appendChild(btnGroup);
+      container.appendChild(section);
+    }
+
+    return makeEntryWorkspace({
+      apiName: 'episodes',
+      entityKind: 'episodes',
+      draftPrefix: 'episodes',
+      addLabel: 'Add Episode',
+      sectionClass: 'ws-episodes',
+      titlePlaceholder: 'Episode title',
+      bodyPlaceholder: 'Outline, scene list, beats, draft notes (optional)',
+
+      matchesExtra(item) {
+        return statusFilter === null || item.ep_status === statusFilter;
+      },
+
+      isFilterActive() {
+        return statusFilter !== null;
+      },
+
+      listItemExtra(btn, item, archivedFlag) {
+        if (archivedFlag || !item.ep_status) return;
+        const titleRow = btn.querySelector('.tc-list-title');
+        if (!titleRow) return;
+        const badge = document.createElement('span');
+        badge.className = `tc-list-badge badge-ep-${item.ep_status}`;
+        badge.textContent = EP_STATUS_LABEL[item.ep_status] || item.ep_status;
+        titleRow.insertBefore(badge, titleRow.lastChild);
+      },
+
+      showViewTop(rightCol, item, archivedFlag) {
+        if (!archivedFlag) {
+          mountEpStatusMeta(rightCol, item, async () => {
+            if (reloadRef.fn) await reloadRef.fn();
+          });
+        }
+      },
+
+      detailExtra(rightCol, item, archivedFlag) {
+        if (!archivedFlag) mountProposeCanonSection(rightCol, item, 'episodes_workspace');
+        const callbacks = {};
+        if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
+          entityKind: 'episodes',
+          workspaceName: 'Episodes',
+        });
+        const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'episodes');
+        callbacks.refreshHistory = refresh;
+      },
+
+      leftColExtra(leftCol, rightCol, ctx) {
+        reloadRef.fn = ctx.reloadList;
+
+        // Status filter bar — inserted before the + Add button.
+        const filterBar = document.createElement('div');
+        filterBar.className = 'ep-status-filter-bar';
+
+        function renderFilterBar() {
+          filterBar.innerHTML = '';
+          const allBtn = document.createElement('button');
+          allBtn.type = 'button';
+          allBtn.className = 'ep-filter-btn' + (statusFilter === null ? ' active' : '');
+          allBtn.textContent = 'All';
+          allBtn.addEventListener('click', () => {
+            statusFilter = null;
+            renderFilterBar();
+            ctx.reloadList();
+          });
+          filterBar.appendChild(allBtn);
+
+          for (const opt of EP_STATUS_OPTIONS) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `ep-filter-btn ep-filter-btn-${opt.value}` + (statusFilter === opt.value ? ' active' : '');
+            btn.textContent = opt.label;
+            btn.addEventListener('click', () => {
+              statusFilter = opt.value;
+              renderFilterBar();
+              ctx.reloadList();
+            });
+            filterBar.appendChild(btn);
+          }
+        }
+        renderFilterBar();
+        leftCol.insertBefore(filterBar, ctx.addBtn);
+      },
+    });
+  })(),
 };
 
 const nav = document.getElementById('nav');

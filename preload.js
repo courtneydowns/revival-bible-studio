@@ -121,6 +121,7 @@ contextBridge.exposeInMainWorld('revival', {
     delete: (id) => ipcRenderer.invoke('episodes:delete', id),
     archive: (id) => ipcRenderer.invoke('episodes:archive', id),
     restore: (id) => ipcRenderer.invoke('episodes:restore', id),
+    setStatus: (id, status) => ipcRenderer.invoke('episodes:setStatus', id, status),
   },
   writingLab: {
     list: () => ipcRenderer.invoke('writingLab:list'),

@@ -318,12 +318,12 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Feeds character arc tracker and episode continuity checker
 - **Smoke passed.**
 
-### PEPISODE-STATUS — Episode status field
+### PEPISODE-STATUS — Episode status field ✅
 - Add **Outline / Draft / Locked** status field to every Episode entry
 - Visible as a badge on list items and detail panel
 - Filterable in Episodes list
 - Feeds Needs Attention panel (Outline-stage episodes surface there)
-- **Smoke:** Set status on three episodes; filter by Outline, confirm only Outline episodes show; confirm badge visible in list and detail panel
+- **Smoke passed.**
 
 ### PDECISION-STATUS — Decision status badges
 - Add **Open / Tentative / Final** status field to every Decision entry

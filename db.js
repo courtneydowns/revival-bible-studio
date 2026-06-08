@@ -1749,6 +1749,17 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '050_pepisode_status',
+    up(db) {
+      // PEPISODE-STATUS — Outline / Draft / Locked status field on every Episode
+      // entry. Nullable — existing rows get NULL (no status set).
+      // Feeds the Needs Attention panel (Outline-stage episodes surface there).
+      db.exec(`
+        ALTER TABLE episodes_workspace ADD COLUMN ep_status TEXT CHECK(ep_status IN ('outline','draft','locked'));
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -2094,6 +2105,13 @@ characters.setStatus = function(id, status) {
   return characters.get(id);
 };
 const episodes = makeEntryRepo('episodes_workspace');
+// PEPISODE-STATUS — set ep_status on an episode entry.
+episodes.setStatus = function(id, status) {
+  getDb()
+    .prepare('UPDATE episodes_workspace SET ep_status = ?, updated_at = ? WHERE id = ?')
+    .run(status || null, new Date().toISOString(), id);
+  return episodes.get(id);
+};
 
 // --- Character relationships repository (P37) ------------------------------
 // Typed edges between characters_workspace entries. Queries join both sides
@@ -2877,7 +2895,16 @@ const dashboard = {
       )
       .all();
 
-    return { tier1Questions, stalledConflicts, pendingProposals, blockingQuestions };
+    // PEPISODE-STATUS: Outline-stage episodes always surface (no staleness gate).
+    const outlineEpisodes = db
+      .prepare(
+        `SELECT id, title, created_at FROM episodes_workspace
+          WHERE archived_at IS NULL AND ep_status = 'outline'
+          ORDER BY updated_at ASC`
+      )
+      .all();
+
+    return { tier1Questions, stalledConflicts, pendingProposals, blockingQuestions, outlineEpisodes };
   },
   // PHOME: the three nav badge counts. Unsorted = total active items; Canon
   // Review = proposals still awaiting a decision (pending); Open Questions =
