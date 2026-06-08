@@ -233,6 +233,8 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 ## Chat routing
 
 ### PCHAT-ROUTE — Chat: route full chat to workspace ✅
+- **Known gap:** "Route entire chat" action (distinct from highlight-extract-route) is missing or broken. Expected: a button in chat toolbar routing the full transcript as a single entry with attribution. Logged in POLISH_NOTES_ONGOING.md (PCHAT-ROUTE-GAP). Fix in PPOL3 or PPOL-ONGOING.
+- **Note:** Flanagan Filter on chat is not supported by design — Flanagan runs on workspace entries only. Intended workflow: route chat content to an OQ entry first, then run Flanagan on the OQ.
 
 ---
 

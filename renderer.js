@@ -9843,7 +9843,8 @@ function mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, entityKin
     const cardActions = document.createElement('div');
     cardActions.className = 'ff-history-card-actions';
 
-    if (!archivedFlag && !analysis.is_stale) {
+    const isLocked = archivedFlag || !!item.resolved_by_decision_id;
+    if (!isLocked && !analysis.is_stale) {
       const reopenBtn = document.createElement('button');
       reopenBtn.type = 'button';
       reopenBtn.className = 'btn-secondary';
@@ -9863,10 +9864,12 @@ function mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, entityKin
         }
       });
       cardActions.appendChild(reopenBtn);
-    } else if (archivedFlag) {
+    } else if (isLocked) {
       const lockedNote = document.createElement('div');
       lockedNote.className = 'ff-history-locked-note';
-      lockedNote.textContent = 'Analysis locked — entry is archived.';
+      lockedNote.textContent = item.resolved_by_decision_id
+        ? 'Analysis locked — promoted to a Decision.'
+        : 'Analysis locked — entry is archived.';
       card.appendChild(lockedNote);
     }
 

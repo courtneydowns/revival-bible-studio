@@ -94,3 +94,7 @@ Running log of UI/UX observations from smoke tests. Addressed in PPOL1 (pre-impo
 - [x] P46-C route buttons now show a bottom-center "Sent to X — Open →" toast; stays on current workspace ✅
 - [x] PUI3 highlight-extract-route wired to chat message bodies ✅
 - [x] PCHAT-ROUTE: "Route →" button in chat toolbar routes full transcript to Brainstorm / Research / Writing Lab / Decisions / Unsorted ✅
+
+### Noticed during PAUDIT audit pass
+- [ ] PCHAT-ROUTE-GAP [PCHAT-ROUTE] "Route entire chat to workspace" button is either missing or not functional as a distinct action from highlight-extract-route. Expected: a button in the chat toolbar/window that routes the full chat content as a single entry (with attribution) to a selected workspace (OQ, Decisions, Brainstorm, Research, etc.). PCHAT-ROUTE is marked ✅ but this flow is broken or incomplete. Address in PPOL3 or PPOL-ONGOING.
+- [ ] PCHAT-FLANAGAN-NOTE [PFLAN-EXPAND] Flanagan Filter is not available on chat — this is by design. Flanagan runs on workspace entries only. Intended workflow: route chat content (via highlight-extract or full-chat route) to an OQ entry, then run Flanagan on the OQ. No fix needed; note here for reference.
