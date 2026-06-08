@@ -357,12 +357,12 @@ Two plain UI omissions, same file, grouped:
 - **Decisions source_question_id back-link:** When a Decision was promoted from an Open Question, `source_question_id` is stored in the DB but never rendered. Display it as a navigable back-link in the Decisions detail panel ("From question: [title]").
 - **Smoke passed.**
 
-### PAUDIT-4 — P46-B analysis lock fix
+### PAUDIT-4 — P46-B analysis lock fix ✅
 **Tool:** VS Code ext
 - Flanagan analyses lock when an OQ is archived, but not when it is resolved via `resolved_by_decision_id`
 - A question promoted to a Decision but not yet archived still shows active re-run buttons on locked-spec analyses
 - Fix: pass `item.resolved_by_decision_id` as a second lock condition alongside `archivedAtStart`
-- **Smoke:** Promote an OQ to a Decision (do not archive it); open its Flanagan history; confirm re-run buttons are disabled. Archive a different OQ; confirm same lock behavior.
+- **Smoke passed.**
 
 ### PAUDIT-5 — Omitted UI fields + Brainstorm archived threads ✅
 **Tool:** VS Code ext / CLI (multi-file)
@@ -409,6 +409,20 @@ Remove dead IPC bridges confirmed by the audit as having no renderer callers. Mu
 **DB columns:** leave all schema-forward columns in place (`category`, `canon_promoted_entry_id`, `external_url`, `canon_character_id`, `canon_episode_id`, `decided_at`). These are planned features; SQLite column drops require table recreation.
 
 - **Smoke:** `npm run dev` — clean launch, zero migration errors. Confirm Brainstorm, Characters, and Canon Bible all load normally after removals.
+
+---
+
+## Cancel button fix (app-wide)
+
+### PPOL-CANCEL — Cancel / dismiss / close button fix
+**Tool:** CLI
+Cancel buttons do not work reliably in virtually every modal, form, dialog, and edit state across the app.
+
+- Audit every cancel / close / dismiss button and ensure it reliably: (1) dismisses the UI element, (2) discards unsaved changes without touching the data layer, (3) returns focus to the prior view without stale state or partial writes
+- Scope: entry create/edit forms, archive/delete confirmation dialogs, Canon Review approve/reject dialogs, import review dialogs, diff-on-save modal, Canon lock/unlock confirmations, tag pickers, route pickers, quick-capture modal
+- No new features. No layout changes. Touch only cancel/dismiss/close handlers.
+- After fixing, log any cancel buttons that were wired to wrong handlers or missing handlers entirely in a comment block at the top of each file touched.
+- **Smoke:** Open and cancel the entry create form in: Unsorted, Characters, Episodes, Open Questions, Canon Bible (Edit Mode), Writing Lab. Open and cancel the archive confirmation on one entry. Open and cancel the delete confirmation on one entry. Open and cancel the Canon Review approve dialog. Open and cancel the quick-capture modal (Cmd+Shift+N). Confirm no partial data written in any case. Confirm no stale state lingers after cancel (reopening the same form shows blank/original state).
 
 ---
 
