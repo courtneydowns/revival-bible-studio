@@ -10177,7 +10177,7 @@ function mountPBlockPanel(rightCol, item, archivedFlag) {
       jumpBtn.type = 'button';
       jumpBtn.className = 'btn-secondary pblock-btn';
       jumpBtn.textContent = 'Open →';
-      jumpBtn.addEventListener('click', () => route('Decisions'));
+      jumpBtn.addEventListener('click', () => route('Decisions', item.resolved_by_decision_id));
       row.append(note, jumpBtn);
       wrap.appendChild(row);
       return;
