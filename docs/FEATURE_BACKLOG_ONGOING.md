@@ -7,6 +7,173 @@ Items marked with a phase code are planned. Items without are agreed but not yet
 
 ---
 
+## PSTALE — Stale item nudges
+
+Passive age-awareness across the app for items that haven't been touched.
+
+- **Nav badge aging:** badges on Canon Review, Conflicts, Open Questions show count + age of oldest unresolved item ("3 · 45d")
+- **Staleness indicator on list items:** subtle visual marker on entries not touched in 30+ days
+- **Thresholds configurable** in Settings (default: 14 days Tier-1 questions, 30 days conflicts, 7 days Canon Review)
+- Never auto-resolves or auto-archives anything — surfacing only
+
+---
+
+## PDRAFT-LOCK — Character/Episode "locked for this draft" state
+
+A "done for now" state distinct from archived.
+
+- Draft Lock: marks a Character or Episode entry as stable for a named draft/season. Read-only until explicitly unlocked.
+- Different from Canon Bible locking — this is working-document stability, not canonical truth
+- Locked entries show a draft-lock badge; still visible, still searchable, not editable without unlocking
+- Unlock requires confirmation + optional note ("unlocking for S2 development")
+
+---
+
+## PARC — Character arc tracker
+
+Two views showing character arc over time across seasons/episodes. Both read from existing data — no new data entry required. Character status field (Active / Recurring / Departed / Deceased) feeds both views.
+
+**Written timeline (PARC-A):**
+- Episode-by-episode structured list per character
+- What is canon for this character at this moment
+- What open questions are unresolved at this point in their arc
+- What decisions have been made that affect them
+- Filterable by character, season, arc status
+
+**Visual timeline (PARC-B):**
+- Horizontal scroll, season/episode markers on X axis
+- Character state plotted at each marker
+- Color-coded by character; multiple characters togglable
+- Locked canon events shown as fixed markers; working/draft events shown as softer markers
+- Click any marker to open the source entry
+
+---
+
+## PEPISODE-STRUCT — Episode structure checklist
+
+Per-episode production checklist derived from the Flanagan Master episodic structure rules.
+
+For each episode entry, a checklist panel showing:
+- [ ] Cold open: in medias res (not a recap)
+- [ ] Act Two: at least one rewatch-layer scene identified
+- [ ] Act Three: consequence scene present
+- [ ] Coda: quiet devastation candidate identified and named
+- [ ] Quiet devastation: satisfies structural signature (mundane action, subtext not text, camera holds)
+
+Checklist items are manually checked by the user — not auto-evaluated.
+AI-assist option: "Evaluate this episode against the checklist" — Claude reads the episode entry and gives a verdict per item. User confirms or overrides each.
+
+---
+
+## PQUIET — Quiet devastation tracker
+
+Dedicated tracker for the Flanagan Master's locked quiet devastation requirement.
+
+- Per-episode status: No candidate / Candidate identified / Locked
+- Four pre-seeded locked quiet devastations from THE_FLANAGAN_MASTER (Episodes 1, 4, 6, 8) — seeded at migration, not editable
+- Add candidate: link to a Writing Lab draft, scene note, or freeform description
+- Lock a quiet devastation: marks it as final, read-only
+- Dashboard view: all 24 episodes in a grid showing QD status at a glance
+- Surfaces in Needs Attention panel for any episode without a candidate
+
+---
+
+## PLOCKED-SPECIFICS — Locked specifics reference panel
+
+Passive reference layer surfacing the non-negotiable locked items from THE_FLANAGAN_MASTER in relevant workspaces.
+
+Locked specifics include:
+- Two physical markers only (T-015): pupil response anomaly + vascular discoloration
+- Mirror motif (T-227): inverse deployment rules
+- Virus-is-not-a-metaphor standing rule
+- The Spirituality Principle
+- The Found Family Principle
+- Jordan's no-arrest rule
+- The closing line ("I tried. I'm still trying." — lands on "trying")
+- Recovery Authenticity Mandate
+
+**Where it surfaces:**
+- Characters entries (character-relevant specifics only)
+- Episodes entries (all applicable)
+- Writing Lab drafts (all applicable)
+- Canon Bible entries in Edit Mode (all applicable)
+- Canon Review proposals (passive check before approving)
+
+Displayed as a collapsed reference panel — not modal, not blocking. Always available, never intrusive. User reads and applies; no auto-enforcement.
+
+---
+
+## PEPISODE-CONT — AI episode continuity checker
+
+AI-powered check for episode-level arc and timeline inconsistencies — distinct from Canon Bible contradiction detection.
+
+- On-demand per episode entry: Claude reads the episode content + linked character entries + relevant canon + prior episode entries
+- Reads character status field (Active / Recurring / Departed / Deceased) to flag state inconsistencies
+- Flags: timeline contradictions, character state inconsistencies ("Jordan appears here but his S1E2 arc suggests he's gone"), arc breaks
+- Results surface as a list of flagged items with source citations
+- User reviews each flag; can route to Conflicts, Open Questions, or dismiss
+- Never auto-resolves; never touches canon
+- Runs only when user explicitly triggers it
+
+---
+
+## PRESEARCH-CITE — Research source citation
+
+Research entries get a structured source field.
+
+- Source field: freeform text OR link to a Source Material entry (picker)
+- If linked to Source Material: bi-directional visibility
+- Citation visible on list item preview
+- Filterable: filter Research by cited vs. uncited
+- Exportable: Research export includes citation field
+
+---
+
+## PEMPTY-STATE — Empty state + onboarding
+
+First-launch and empty workspace experience.
+
+- Empty state copy for every workspace: what it's for, what to do first
+- First-session guide: a non-modal walkthrough available from Home on first launch
+- "Start here" suggested sequence: Settings (API key + Project Rules) → Source Material → Canon Bible → Open Questions
+- Dismissable; never re-surfaces after dismissed
+- Not a tutorial — a one-page orientation
+
+---
+
+## PHEALTH — App health indicator
+
+Lightweight database and app health display in Settings.
+
+- Migration count and last migration run
+- SQLite file size
+- Record counts by workspace (passive, read-only)
+- Orphan detection: flag any orphaned records (linked entries whose parent no longer exists)
+- One-click orphan cleanup (with confirmation and preview of what will be removed)
+
+---
+
+## PCONFIG-BACKUP — Settings config backup/restore
+
+Export and restore app configuration separately from data.
+
+- Export: Project Rules text, staleness thresholds, tag library (user-created only). API key excluded for security.
+- Import: restore config from export file
+- Separate from Panic Export (which covers data)
+- Useful for machine migration or recovery from a broken state
+
+---
+
+## PPOL3 — UI Polish: post-PBRAIN-STRUCT
+
+Polish pass for items accumulated since PPOL2b.
+
+- Print/PDF export for single entries: Source Material, Brainstorm, Research, Writing Lab, Open Questions analysis history
+- Log all items in `POLISH_NOTES_ONGOING.md` during smoke tests
+- No new features — polish and print/PDF only
+
+---
+
 ## PFLAN-EXPAND — Flanagan Filter: workspace expansion
 
 Expand the Flanagan Filter (currently scoped to Open Questions in P46-A/B/C) to all workspaces where creative/narrative decisions are made.
@@ -74,38 +241,6 @@ Documents is currently isolated. Wire it as a first-class workspace.
 
 ---
 
-## PCHAT-ATTACH — Chat attachment expansion
-
-Expand Chat attachment beyond Source Material to a defined permitted list.
-
-**Permitted additions (keep active / next message only, same modes as Source Material):**
-- Canon Bible entries
-- Characters entries
-- Episodes entries
-- Documents entries
-
-**Not permitted in Chat:** Unsorted, Brainstorm, Research, Open Questions, Conflicts, Decisions (too noisy; use highlight-extract-route to bring content into those workspaces instead).
-
-Active attachments visible at all times. Same "what Claude is using" transparency as Source Material.
-
----
-
-## PHOME-NEEDS — Home: Needs Attention panel ✅
-
-Replace passive Home with an actionable session-start surface.
-
-- **Needs Attention panel:** surfaced priorities based on staleness + tier + blocking status
-  - Tier-1 Open Questions unresolved for 14+ days
-  - Conflicts open for 30+ days
-  - Canon Review proposals pending for 7+ days
-  - Episodes with no quiet devastation candidate
-  - Characters with no arc entry for the current season
-- App surfaces the priority list; user decides what to act on — no auto-routing
-- Staleness thresholds configurable in Settings
-- Replaces "Recently Viewed" as primary Home content (Recently Viewed moves to a collapsed section)
-
----
-
 ## PUNDO — App-level undo
 
 Cmd+Z undo for destructive actions across the app.
@@ -161,182 +296,233 @@ Brainstorm is currently a flat list. Add lightweight structure without adding co
 
 ---
 
-## PSTALE — Stale item nudges
+## PDECISION-PROMOTE — Decisions: promote to Canon Review
 
-Passive age-awareness across the app for items that haven't been touched.
+One-click "Promote to Canon Review" action on any Decision entry.
 
-- **Nav badge aging:** badges on Canon Review, Conflicts, Open Questions show count + age of oldest unresolved item ("3 · 45d")
-- **Staleness indicator on list items:** subtle visual marker on entries not touched in 30+ days
-- **Thresholds configurable** in Settings (default: 14 days Tier-1 questions, 30 days conflicts, 7 days Canon Review)
-- Never auto-resolves or auto-archives anything — surfacing only
-
----
-
-## PDRAFT-LOCK — Character/Episode "locked for this draft" state
-
-A "done for now" state distinct from archived.
-
-- Draft Lock: marks a Character or Episode entry as stable for a named draft/season. Read-only until explicitly unlocked.
-- Different from Canon Bible locking — this is working-document stability, not canonical truth
-- Locked entries show a draft-lock badge; still visible, still searchable, not editable without unlocking
-- Unlock requires confirmation + optional note ("unlocking for S2 development")
+- Creates a Canon Review proposal pre-filled with the decision content
+- Back-link to the source Decision — link-don't-copy
+- Source Decision shows a passive indicator that a Canon Review proposal exists
+- Same approval discipline as all other Canon Review paths — no direct write to Canon Bible
+- Available on all Decision entries regardless of status badge (Open / Tentative / Final)
 
 ---
 
-## PARC — Character arc tracker
+## PDECISION-STATUS — Decision status badges
 
-Two views showing character arc over time across seasons/episodes.
-
-**Visual timeline:**
-- Horizontal scroll, season/episode markers on X axis
-- Character state plotted at each marker (key canon facts, arc status, open questions)
-- Color-coded by character
-- Locked canon events shown as fixed markers; working/draft events shown as softer markers
-- Click any marker to open the source entry
-
-**Written timeline:**
-- Episode-by-episode structured list for each character
-- What is canon for this character at this moment
-- What open questions are unresolved at this point in their arc
-- What decisions have been made that affect them
-
-Both views are read-only displays generated from existing data — no new data entry required. Updates automatically as canon and episode entries change.
+- Status field on every Decision entry: **Open / Tentative / Final** — user-set
+- Visible as a badge on list items and detail panel
+- Filterable: filter Decisions by status
+- Makes the Decisions workspace actionable as a record of what is settled vs. still live
 
 ---
 
-## PEPISODE-STRUCT — Episode structure checklist
+## PCANON-CONFIDENCE — Canon entry confidence level
 
-Per-episode production checklist derived from the Flanagan Master episodic structure rules.
-
-For each episode entry, a checklist panel showing:
-- [ ] Cold open: in medias res (not a recap)
-- [ ] Act Two: at least one rewatch-layer scene identified
-- [ ] Act Three: consequence scene present
-- [ ] Coda: quiet devastation candidate identified and named
-- [ ] Quiet devastation: satisfies structural signature (mundane action, subtext not text, camera holds)
-
-Checklist items are manually checked by the user — not auto-evaluated.
-AI-assist option: "Evaluate this episode against the checklist" — Claude reads the episode entry and gives a verdict per item. User confirms or overrides each.
+- Confidence field on every canon entry: **Confirmed / Probable / Speculative**
+- Distinct from lock status: lock = approved for now; confidence = how certain this will hold
+- Passive badge on list items and detail panel — no workflow gate, no approval required
+- Filterable in Canon Bible browse
 
 ---
 
-## PQUIET — Quiet devastation tracker
+## PCANON-DIFF — Canon edit diff on save
 
-Dedicated tracker for the Flanagan Master's locked quiet devastation requirement.
-
-- Per-episode status: No candidate / Candidate identified / Locked
-- Four pre-seeded locked quiet devastations from THE_FLANAGAN_MASTER (Episodes 1, 4, 6, 8)
-- Add candidate: link to a Writing Lab draft, Scene note, or freeform description
-- Lock a quiet devastation: marks it as final, read-only
-- Dashboard view: all 24 episodes in a grid showing QD status at a glance
-- Surfaces in Needs Attention panel for any episode without a candidate
+- When saving an edit to a canon entry in Edit Mode, show a before/after diff before the save completes
+- User must confirm the diff before changes persist
+- Applies to all field edits on canon entries
+- One more deliberate friction point to prevent accidental canon mutation
 
 ---
 
-## PLOCKED-SPECIFICS — Locked specifics reference panel
+## PCANON-AFFECTED — Affected-by reverse lookup on superseded entries
 
-Passive reference layer surfacing the non-negotiable locked items from THE_FLANAGAN_MASTER in relevant workspaces.
-
-Locked specifics include:
-- Two physical markers only (T-015): pupil response anomaly + vascular discoloration
-- Mirror motif (T-227): inverse deployment rules
-- Virus-is-not-a-metaphor standing rule
-- The Spirituality Principle
-- The Found Family Principle
-- Jordan's no-arrest rule
-- The closing line ("I tried. I'm still trying." — lands on "trying")
-- Recovery Authenticity Mandate
-
-**Where it surfaces:**
-- Characters entries (character-relevant specifics only)
-- Episodes entries (all applicable)
-- Writing Lab drafts (all applicable)
-- Canon Bible entries in Edit Mode (all applicable)
-- Canon Review proposals (passive check before approving)
-
-Displayed as a collapsed reference panel — not modal, not blocking. Always available, never intrusive. User reads and applies; no auto-enforcement.
+- When viewing a retired or superseded canon entry, a read-only panel shows all downstream entries (Characters, Episodes, Decisions) that were linked to it at the time it was retired
+- Prevents stale links from going unnoticed when canon changes
+- Panel is collapsed by default; expandable on click
 
 ---
 
-## PEPISODE-CONT — AI episode continuity checker
+## PCONFLICT-SEV — Conflict severity badge
 
-AI-powered check for episode-level arc and timeline inconsistencies — distinct from Canon Bible contradiction detection.
-
-- On-demand per episode entry: Claude reads the episode content + linked character entries + relevant canon + prior episode entries
-- Flags: timeline contradictions, character state inconsistencies ("Jordan appears here but his S1E2 arc suggests he's gone"), arc breaks
-- Results surface as a list of flagged items with source citations
-- User reviews each flag; can route to Conflicts, Open Questions, or dismiss
-- Never auto-resolves; never touches canon
-- Runs only when user explicitly triggers it
+- Severity field on every Conflicts entry: **Minor / Significant / Blocking** — user-set
+- Visible as a badge on list items and detail panel
+- Filterable in Conflicts list
+- **Blocking** conflicts surface in the Needs Attention panel
+- Prevents the Conflicts list from becoming an undifferentiated pile as it grows
 
 ---
 
-## PRESEARCH-CITE — Research source citation
+## PWLAB-CANON-COMPARE — Writing Lab draft vs. canon comparison
 
-Research entries get a structured source field.
+On-demand AI check of the active Writing Lab draft against the full Canon Bible.
 
-- Source field: freeform text OR link to a Source Material entry (picker)
-- If linked to Source Material: bi-directional visibility
-- Citation visible on list item preview
-- Filterable: filter Research by cited vs. uncited
-- Exportable: Research export includes citation field
-
----
-
-## PEMPTY-STATE — Empty state + onboarding
-
-First-launch and empty workspace experience.
-
-- Empty state copy for every workspace: what it's for, what to do first
-- First-session guide: a non-modal walkthrough available from Home on first launch
-- "Start here" suggested sequence: Settings (API key + Project Rules) → Source Material → Canon Bible → Open Questions
-- Dismissable; never re-surfaces after dismissed
-- Not a tutorial — a one-page orientation
+- User triggers from the draft — never runs automatically
+- Claude reads the draft body + all locked canon entries
+- Surfaces any draft details that diverge from locked canon
+- Results as a flagged list with source citations (canon entry + draft location)
+- User reviews each flag; can route to Conflicts or Open Questions, or dismiss
+- Distinct from PEPISODE-CONT (episode-scoped); this is draft-scoped against the full Canon Bible
 
 ---
 
-## PHEALTH — App health indicator
+## PWLAB-SECTIONS — Writing Lab scene/section markers
 
-Lightweight database and app health display in Settings.
+Lightweight named dividers within a Writing Lab draft body.
 
-- Migration count and last migration run
-- SQLite file size
-- Record counts by workspace (passive, read-only)
-- Orphan detection: flag any orphaned records (linked entries whose parent no longer exists)
-- One-click orphan cleanup (with confirmation and preview of what will be removed)
-
----
-
-## PCONFIG-BACKUP — Settings config backup/restore
-
-Export and restore app configuration separately from data.
-
-- Export: Project Rules text, API key (masked), staleness thresholds, tag library (user-created only)
-- Import: restore config from export file
-- Separate from Panic Export (which covers data)
-- Useful for machine migration or recovery from a broken state
+- User inserts a named section marker ("--- Act Two ---") anywhere in the draft
+- Section names appear in a jump-to list on the draft detail panel
+- Click a section name to scroll to it within the draft
+- No hierarchy — flat list of named anchors only
+- Not an outline system; does not create separate entries
 
 ---
 
-## PPOL3 — UI Polish: post-P46
+## PCHAR-STATUS — Character status field
 
-Polish pass after P46-C is complete. Scoped to print/PDF only.
-
-- Print/PDF export for single entries: Source Material, Brainstorm, Research, Writing Lab, Open Questions analysis history
-- No new features — print/PDF only
+- Status field on every Character entry: **Active / Recurring / Departed / Deceased** — user-set
+- Visible as a badge on list items and detail panel
+- Filterable in Characters list
+- Feeds the character arc tracker (PARC-A / PARC-B) and episode continuity checker (PEPISODE-CONT) with state they currently have to infer
 
 ---
 
-## Chat routing ✅
+## PEPISODE-STATUS — Episode status field
 
-- **PCHAT-ROUTE** (implemented): "Route →" button in chat toolbar sends full non-archived transcript to Brainstorm, Research, Writing Lab, Documents, Open Questions, Canon Review, Decisions, or Unsorted as a new entry. Canon Review routes as a proposal via `createFromExtract`. Toast confirms with "Open →" jump link.
-- PUI3 highlight-extract-route also wired to individual chat message bodies for selective routing.
+- Status field on every Episode entry: **Outline / Draft / Locked** — user-set
+- Visible as a badge on list items and detail panel
+- Filterable in Episodes list
+- Feeds Needs Attention panel (episodes still at Outline stage surface there)
+
+---
+
+## PEPISODE-PREVON — "Previously on" canon snapshot
+
+- On any Episode entry, one-click generates a read-only summary of what canon facts are locked as of the prior episode
+- Generated from existing canon data — no new input required
+- Useful reference when drafting: "what does the audience know at the start of this episode?"
+- Displayed in a collapsed panel on the episode detail; exportable as plain text
+
+---
+
+## PRESEARCH-USED — Research "Used in" indicator
+
+- Passive indicator on every Research entry showing whether it has been linked or routed anywhere
+- Shows as a subtle badge on list items ("linked" vs. "unused")
+- Filterable: filter Research by used vs. unused
+- Surfaces orphaned research that was gathered but never applied
+
+---
+
+## PSCATCHPAD — Entry-level scratchpad
+
+Lightweight freeform scratchpad available on every entry across all workspaces.
+
+- Collapsed by default — does not clutter the detail panel
+- Freeform text, not autosaved to the entry body
+- Not canon, not routable, not exportable as part of the entry
+- For thinking out loud, temp notes, questions to self
+- Persists with the entry (survives app restarts) but is clearly distinct from the entry body
+
+---
+
+## PSESSION-RESUME — Session resume on launch
+
+- On app launch, surface the last entry the user had open rather than defaulting to Home
+- Zero clicks to get back into flow
+- If the last entry was deleted or archived since last session, fall back to Home
+- Opt-out available in Settings for users who prefer to start at Home
+
+---
+
+## PBREADCRUMB — Back-reference breadcrumb
+
+- When clicking through to an entry from a linked-entries panel or back-reference, a one-line breadcrumb appears at the top of the detail panel showing where you came from ("← Jordan (Characters)")
+- Single back-step only — clicking the breadcrumb returns to the origin entry
+- No deep history stack; breadcrumb clears on any other navigation action
+
+---
+
+## PWHERE-REF — "Where is this referenced?" panel
+
+Expands the existing linked entries indicator into a full read-only reference panel.
+
+- Click the linked entries indicator on any entry to expand a panel listing every workspace and entry that references this one
+- Grouped by workspace
+- Each item is a click-through to the referencing entry
+- Read-only — no actions in this panel
+- Useful once the web of cross-workspace links gets dense
+
+---
+
+## PNAV-ACTIVITY — Workspace activity indicator
+
+- Subtle visual signal on each nav item showing when you were last active in that workspace
+- Not a badge count — a recency indicator only (e.g. a faint dot or muted timestamp)
+- Aids reorientation at session start without cluttering the nav
+- Does not surface entry counts or queue depths — that belongs to the existing badge system
+
+---
+
+## PKEYSHEET — Keyboard shortcut cheat sheet
+
+- Cmd+? opens a non-modal overlay listing all keyboard shortcuts in the app
+- One-screen layout, organized by context (Global, Canon Bible, Queues, Navigation, etc.)
+- Dismissable with Escape or Cmd+?
+- No new shortcuts added — surfaces what PKEY already built
+- Discoverable from the Help menu as well
+
+---
+
+## PPALETTE-RECENTS — Command palette recents
+
+- Last 5 entries opened appear at the top of the Cmd+K command palette before the user types
+- Labeled "Recent" with workspace context ("Jordan — Characters", "S1E4 — Episodes")
+- Clears on app quit (session-scoped)
+- Typing in the palette immediately hides recents and shows search results
+
+---
+
+## PROUTE-HISTORY — "Send to" picker history
+
+- The last 3 destinations routed to appear at the top of the highlight-extract-route picker
+- Labeled "Recent" above the full destination list
+- Reduces repetitive clicking during active routing sessions
+- History is session-scoped — clears on app quit
+
+---
+
+## POQ-DEPENDS — Open Question dependencies
+
+- Mark one Open Question as "depends on" another Open Question
+- Dependency shown as a soft block indicator on the dependent question's list item ("blocked by: [Q title]")
+- Dependency is one-directional — the blocking question is not affected
+- Blocked questions surface with reduced visual priority in the list while the blocker is unresolved
+- Removing the dependency requires confirmation; does not affect either question's content
+
+---
+
+## PCHAT-ATTACH — Chat attachment expansion
+
+Expand Chat attachment beyond Source Material to a defined permitted list.
+
+**Permitted additions (keep active / next message only, same modes as Source Material):**
+- Canon Bible entries
+- Characters entries
+- Episodes entries
+- Documents entries
+
+**Not permitted in Chat:** Unsorted, Brainstorm, Research, Open Questions, Conflicts, Decisions (too noisy; use highlight-extract-route to bring content into those workspaces instead).
+
+Active attachments visible at all times. Same "what Claude is using" transparency as Source Material.
+
+---
 
 ## Chat search + export (deferred)
 
 - Chat search: search across all chat history by keyword
 - Chat pop-out: dedicated window for Chat, independent of main app
-- Chat plain-text export: download a chat as .txt or .md file (routing to workspaces covered by PCHAT-ROUTE ✅)
+- Chat export: export a chat as plain text or markdown
 - Address after core feature set is stable
 
 ---

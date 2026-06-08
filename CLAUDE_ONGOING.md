@@ -27,18 +27,6 @@ Local-first creative/editorial workspace for the **Revival project only**. Not a
 
 ---
 
-## Smoke test output rule
-
-**When Claude produces output that includes changes — code, phase specs, file updates, design decisions — it must append a numbered smoke test list at the end of the response.** Format:
-
-1. [Action to take]
-2. [What to confirm]
-3. ...
-
-The list should be tight and specific to what was just changed. No filler items.
-
----
-
 ## UI principles — every screen must answer
 
 1. Where am I.
@@ -54,12 +42,17 @@ The list should be tight and specific to what was just changed. No filler items.
 - **Two-column layout:** every workspace. Left = list with title/type/status badge/preview line. Right = full detail panel, editable, with actions.
 - **Full-screen popout:** available from any detail panel. Full edit, rename, delete, archive/restore within the popout. Independent window state.
 - **Reference Mode / Edit Mode:** Canon Bible defaults to read-only Reference Mode. Edit Mode requires a deliberate toggle. Popout has independent mode state.
-- **Status bar:** thin persistent bar at bottom of every detail panel showing workspace, entry type, created date, last edited, lock status.
-- **Linked entries indicator:** passive count on every detail panel ("3 attachments / 2 canon links"), expandable on click.
+- **Status bar:** thin persistent bar at bottom of every detail panel showing workspace, entry type, created date, last edited, lock status. Writing Lab also shows word count and scene/section count passively.
+- **Linked entries indicator:** passive count on every detail panel ("3 attachments / 2 canon links"), expandable on click. Expanding shows a full read-only panel of every workspace that references this entry ("Where is this referenced?").
 - **Collapsed archive/retired sections:** at bottom of the same page. No separate archive page anywhere.
 - **Global quick-capture:** Cmd+Shift+N from anywhere opens a minimal modal — title + body, saves to Unsorted. Dismissable with Escape.
-- **Command palette:** Cmd+K opens palette for jumping to any workspace, recent entry, or action. Full keyboard navigation throughout: tab through list items, Enter to open detail, keyboard shortcuts for approve/defer/route/archive in queues.
-- **Highlight-extract-route:** select any text in a detail panel or popout → extract menu appears → route to Unsorted, Brainstorm, Open Questions, Decisions, Conflicts, Research, Canon Review. Creates a new entry pre-filled with selection and source attribution. Available on AI analysis output text (P46-C).
+- **Command palette:** Cmd+K opens palette for jumping to any workspace, recent entry, or action. Last 5 entries opened appear at the top before typing. Full keyboard navigation throughout: tab through list items, Enter to open detail, keyboard shortcuts for approve/defer/route/archive in queues.
+- **Keyboard shortcut cheat sheet:** Cmd+? opens a non-modal overlay listing all shortcuts. One-screen, dismissable. Surfaces what PKEY built — no new shortcuts added here.
+- **Highlight-extract-route:** select any text in a detail panel or popout → extract menu appears → route to Unsorted, Brainstorm, Open Questions, Decisions, Conflicts, Research, Canon Review. Creates a new entry pre-filled with selection and source attribution. Available on AI analysis output text. "Send to" history: last 3 destinations appear at the top of the picker.
+- **Breadcrumb navigation:** when clicking through from a back-reference or linked entry, a one-line breadcrumb shows the origin ("← Jordan (Characters)"). Single back-step only — no deep history stack.
+- **Entry scratchpad:** every entry across all workspaces has a lightweight freeform scratchpad section, collapsed by default. Not autosaved to body, not canon, not routable. For thinking out loud only.
+- **Session resume:** on launch, the app surfaces the last entry the user had open, not just Home. Zero clicks to get back into flow.
+- **Workspace activity indicator:** subtle recency signal on each nav item showing when you were last active in that workspace. Not a badge count — visual only. Aids reorientation at session start.
 
 ---
 
@@ -77,11 +70,9 @@ Do not invent new top-level workspaces.
 - Multiple chats inside this one Revival project.
 - Title dropdown, rename, archive, restore. Search comes later.
 - Expands without taking over the app. Pop-out window comes later. Export comes later.
-- **Current attachments: Source Material only.** No "Context Packets."
-- **Planned (PCHAT-ATTACH):** Canon Bible entries, Characters entries, Episodes entries, Documents entries will also be attachable. Permitted list is fixed — no other workspaces.
+- **Current attachments: Source Material + Canon Bible entries + Characters entries + Episodes entries + Documents entries (PCHAT-ATTACH — complete).** Permitted list is fixed — no other workspaces.
 - Attach modes: (1) keep active in this chat, (2) use for next message only.
 - Active attachments must be visible at all times so the user knows what Claude is using.
-- **Chat history page (PCHAT-HISTORY):** Chat nav item opens a dedicated two-column page. Left = list of past chats (title, date, last message preview), sorted most recent first; archived chats in collapsed section at bottom. Right = full read-only transcript of selected chat. "Continue" button opens that chat in the drawer as the active session. "New Chat" button at top of left column opens a fresh drawer session. Drawer stays as-is — page is a history surface, not a replacement.
 
 ---
 
@@ -108,6 +99,7 @@ Do not invent new top-level workspaces.
 
 - Working surface for **character development and synthesis**, not just a list of names.
 - Holds character entries with a development view per character.
+- Each character has a **status field:** Active / Recurring / Departed / Deceased. Filters the character list. Feeds the arc tracker and episode continuity checker.
 - Supports a **relational view** showing how characters connect (relationships, factions, arcs, conflicts).
 - Resolved items from other workspaces (Decisions, Open Questions, Conflicts, Brainstorm, Research) can be **attached/linked** to a character — see Cross-workspace attachments below.
 - Settled character facts that should become canon flow to **Canon Bible via Canon Review**. Same approval discipline as everything else. No direct writes to Canon Bible.
@@ -119,9 +111,18 @@ Do not invent new top-level workspaces.
 ## Episodes workspace
 
 - Working surface for **episode drafting and outlining** (outlines, scene lists, beats, draft notes).
+- Each episode has a **status field:** Outline / Draft / Locked. User-set. Filters the episode list. Feeds Needs Attention panel.
 - Canon facts that emerge from an episode flow to **Canon Bible via Canon Review**. Same approval discipline.
 - Canon Bible holds the locked canonical version of episode facts. Episodes workspace is where the drafting work happens.
 - Standard lifecycle: edit, delete (for mistakes), collapsed archive section at bottom of the same page.
+
+---
+
+## Decisions workspace
+
+- Records creative decisions that have been made — not a live queue, a settled record.
+- Each decision has a **status badge:** Open / Tentative / Final. User-set. Makes the list actionable as a record of what is settled vs. still live.
+- Decisions can be **promoted to Canon Review** via a one-click action. Creates a Canon Review proposal pre-filled with the decision content and a back-link to the source Decision. Link-don't-copy. Same approval discipline as all other Canon Review paths.
 
 ---
 
@@ -145,9 +146,38 @@ Do not invent new top-level workspaces.
 - **Locked canon = currently accepted, not impossible to change.**
 - All canon changes flow through Canon Review proposals — never written directly to canon_entries.
 - Retired / superseded canon stays in a collapsed section on the same page.
+- **"What changed" diff on edit:** when saving an edit to a canon entry in Edit Mode, a before/after diff is shown for confirmation before the save completes. Prevents accidental mutation.
+- **Confidence level:** each canon entry carries a confidence badge — Confirmed / Probable / Speculative. Distinct from lock status. Lock = approved for now; confidence = how certain the creative team is this will hold. Passive badge, no workflow gate.
+- **"Affected by" reverse lookup on superseded entries:** when viewing a retired/superseded entry, a read-only panel shows what downstream entries (Characters, Episodes, Decisions) were linked to it at time of retirement. Prevents stale links from going unnoticed.
 - Downstream corrections are tracked in canon_downstream_corrections (child of locked decisions), not as prose.
 - Tags apply to all canon entries via taggable_tags.
 - **Conflict detection (PCONFLICT-2 / PCONFLICT-3 — complete):** on-demand scan from Canon Bible checks all canon entries for direct contradictions. Detected collisions auto-route to the Conflicts workspace (dedup by signature — no duplicate rows on re-scan). Scan never runs automatically. Re-running the scan from the Conflicts page auto-archives resolved/stale conflicts. Editing/archiving/superseding/deleting a canon entry referenced by an open Conflicts row fires a toast reminding the user to re-run detection. IPCs: `canonConflicts.scanAndRoute()`, `canonConflicts.openFlagEntryIds()`.
+
+---
+
+## Conflicts workspace
+
+- Each conflict has a **severity badge:** Minor / Significant / Blocking. User-set. Blocking conflicts surface in the Needs Attention panel. Prevents the list from being a flat undifferentiated pile as it grows.
+
+---
+
+## Open Questions workspace
+
+- Questions can be marked as **dependent on** another Open Question. Surfaces as a soft block indicator in the list. Prevents answering Q2 before Q1 is resolved without realizing it.
+
+---
+
+## Writing Lab
+
+- Drafts can contain **scene / section markers** — lightweight named dividers within a draft body. Let the user jump to a named section within a long draft. No hierarchy, just named anchors. Not an outline system.
+- **Draft vs. canon comparison:** on demand, Claude reads the active draft and surfaces any details that diverge from locked canon entries. Draft-scoped (vs. episode continuity checker which is episode-scoped). Flags route to Conflicts or Open Questions. User-triggered only; never automatic.
+- Word count and scene/section count shown passively in the status bar.
+
+---
+
+## Research workspace
+
+- Each Research entry shows a **"Used in" indicator** — a passive flag showing if the entry has been linked or routed anywhere. Surfaces orphaned research that was never applied.
 
 ---
 
@@ -162,7 +192,7 @@ All AI features use Claude only. No provider routing. No OpenAI scaffolding.
 - **Highlight-extract-route applies to all AI output text** — any analysis or response can be selected and routed to relevant workspaces.
 - **Export to Brainstorm / Research:** one-click on full AI output creates a new entry in the target workspace, pre-filled with content and source attribution. Link-don't-copy discipline.
 
-### P46 — AI open questions analyst (The Flanagan Filter)
+### P46 — AI open questions analyst (The Flanagan Filter) — complete
 The Flanagan filter feature applies THE_FLANAGAN_MASTER document as an analytical and generative tool against Open Questions entries.
 
 **Four scan modes:**
@@ -185,14 +215,14 @@ The Flanagan filter feature applies THE_FLANAGAN_MASTER document as an analytica
 - Re-run with different mode: one-click after analysis returns, no re-entry required.
 - Keyboard shortcut to trigger analysis (consistent with PKEY).
 
-**Analysis history (P46-B):**
+**Analysis history (P46-B — complete):**
 - Saved analyses attach to the Open Questions entry.
 - Each record tagged with scan mode + Flanagan document version used.
 - Collapsed history section on the entry, same pattern as archive sections.
 - Analyses lock (read-only) when the question is resolved/closed.
 - "Reopen with new context" action flags a saved analysis as stale and queues re-run (user-triggered only).
 
-**Routing + tags (P46-C):**
+**Routing + tags (P46-C — complete):**
 - One-click "Send to Brainstorm" / "Send to Research" on full analysis output. Link-don't-copy, source attribution to originating Open Question.
 - Highlight-extract-route available on all analysis output text.
 - AI tag suggestions on save: Claude proposes tags from existing library; user confirms, discards, or adds manually.
@@ -203,32 +233,52 @@ The Flanagan filter feature applies THE_FLANAGAN_MASTER document as an analytica
 
 These features are in `docs/FEATURE_BACKLOG_ONGOING.md` and `docs/BUILD_PLAN_ONGOING.md`. Do not implement any of these without an explicit build instruction. Listed here so Claude Code does not contradict them in design decisions.
 
-- **PCHAT-HISTORY:** Chat nav item opens a two-column history page. Left = chat list (title, date, last message preview); right = read-only transcript. "Continue" button opens chat in drawer. "New Chat" opens fresh drawer session. Drawer stays as-is.
+- **PSTALE:** Nav badge aging, staleness indicators on list items, configurable thresholds in Settings.
+- **PDRAFT-LOCK:** Characters and Episodes get a "locked for this draft" state distinct from archive.
+- **PARC-A / PARC-B:** Character arc tracker — written timeline (list) and visual timeline (horizontal scroll). Read-only, generated from existing data. Character status field feeds these views.
+- **PEPISODE-STRUCT:** Per-episode structure checklist (Flanagan Master episodic rules) + optional AI evaluation.
+- **PQUIET:** Quiet devastation tracker — per-episode status, pre-seeded locked QDs, dashboard view. Episodes without a candidate surface in Needs Attention.
+- **PLOCKED-SPECIFICS:** Collapsed reference panel on Characters, Episodes, Writing Lab, Canon Bible (Edit Mode), Canon Review — surfaces locked non-negotiables from THE_FLANAGAN_MASTER.
+- **PEPISODE-CONT:** AI episode continuity checker — on-demand, flags arc/timeline inconsistencies, routes to Conflicts/Open Questions. Reads character status field.
+- **PRESEARCH-CITE:** Research entries get a source citation field, linkable to Source Material.
+- **PEMPTY-STATE:** Empty state copy on all workspaces + first-session guide on Home (dismissable, non-recurring).
+- **PHEALTH:** App health panel in Settings — migration count, SQLite size, record counts, orphan detection + cleanup.
+- **PCONFIG-BACKUP:** Config export/import in Settings (Project Rules, thresholds, user tags — no API key).
 - **PFLAN-EXPAND:** Flanagan Filter expands to Brainstorm, Writing Lab, Characters, Episodes, Canon Review, Canon Bible (Edit Mode), Conflicts (lightweight), Decisions (lightweight). Fifth mode: Production Check (Tier 3 only).
 - **PAI-WIRE:** AI features wire to each other — P44→P41, P42→P43, P46→P41, P45→P43. All user-triggered, no automatic routing.
 - **PDOC-WIRE:** Documents becomes first-class — Chat-attachable, highlight-extract-route target, linkable to Characters/Episodes, Flanagan Filter, Canon proposal path.
-- **PCHAT-ATTACH:** Chat permits Canon Bible entries, Characters, Episodes, Documents in addition to Source Material.
-- **PHOME-NEEDS:** Home gets Needs Attention panel (staleness + tier + blocking). Recently Viewed moves to collapsed section. ✅ Complete.
 - **PUNDO:** Cmd+Z undo for archive/delete/resolve/approve/reject. Session-only, last 20 actions. Canon Bible chain actions excluded.
 - **PWLAB-VERSIONS:** Writing Lab draft versioning — manual save, named versions, side-by-side diff, restore.
 - **PSESSION-LOG:** Auto-generated session log at app close. Audit trail only, not editable.
 - **PBLOCK:** Open Questions gets blocking flag, tier escalation, and Promote to Decision action.
 - **PBRAIN-STRUCT:** Brainstorm gets threads/clusters, "developed into" links, status badges.
-- **PSTALE:** Nav badge aging, staleness indicators on list items, configurable thresholds in Settings.
-- **PDRAFT-LOCK:** Characters and Episodes get a "locked for this draft" state distinct from archive.
-- **PARC-A / PARC-B:** Character arc tracker — written timeline (list) and visual timeline (horizontal scroll). Read-only, generated from existing data.
-- **PEPISODE-STRUCT:** Per-episode structure checklist (Flanagan Master episodic rules) + optional AI evaluation.
-- **PQUIET:** Quiet devastation tracker — per-episode status, pre-seeded locked QDs, dashboard view.
-- **PLOCKED-SPECIFICS:** Collapsed reference panel on Characters, Episodes, Writing Lab, Canon Bible (Edit Mode), Canon Review — surfaces locked non-negotiables from THE_FLANAGAN_MASTER.
-- **PEPISODE-CONT:** AI episode continuity checker — on-demand, flags arc/timeline inconsistencies, routes to Conflicts/Open Questions.
-- **PRESEARCH-CITE:** Research entries get a source citation field, linkable to Source Material.
-- **PEMPTY-STATE:** Empty state copy on all workspaces + first-session guide on Home (dismissable, non-recurring).
-- **PHEALTH:** App health panel in Settings — migration count, SQLite size, record counts, orphan detection + cleanup.
-- **PCONFIG-BACKUP:** Config export/import in Settings (Project Rules, thresholds, user tags — no API key).
+- **PPOL3:** Print/PDF export for single entries: Source Material, Brainstorm, Research, Writing Lab, Open Questions analysis history.
+- **PDECISION-PROMOTE:** Decisions workspace gets "Promote to Canon Review" action. Creates Canon Review proposal pre-filled with decision content + back-link to source Decision. Link-don't-copy.
+- **PCANON-CONFIDENCE:** Canon entry confidence level — Confirmed / Probable / Speculative. Passive badge, no workflow gate.
+- **PCANON-DIFF:** "What changed" diff shown on Edit Mode save before confirming. Prevents accidental canon mutation.
+- **PCANON-AFFECTED:** "Affected by" reverse lookup on retired/superseded entries — shows downstream entries linked at time of retirement.
+- **PCONFLICT-SEV:** Conflict severity badge — Minor / Significant / Blocking. Blocking surfaces in Needs Attention.
+- **PWLAB-CANON-COMPARE:** Writing Lab draft vs. canon comparison — on-demand AI check against full Canon Bible. Routes flags to Conflicts or Open Questions.
+- **PWLAB-SECTIONS:** Scene/section markers in Writing Lab drafts — named anchors for navigation within long drafts.
+- **PCHAR-STATUS:** Character status field — Active / Recurring / Departed / Deceased. Filters list. Feeds arc tracker and continuity checker.
+- **PEPISODE-STATUS:** Episode status field — Outline / Draft / Locked. Filters list. Feeds Needs Attention.
+- **PEPISODE-PREVON:** "Previously on" canon snapshot — one-click read-only summary of canon facts locked as of the prior episode. Generated from existing data.
+- **PRESEARCH-USED:** "Used in" indicator on Research entries — passive flag if the entry has been linked or routed anywhere.
+- **PDECISION-STATUS:** Decision status badges — Open / Tentative / Final. User-set.
+- **PCANON-AFFECTED:** Affected-by reverse lookup on superseded/retired canon entries.
+- **PSCATCHPAD:** Entry-level scratchpad — freeform, collapsed by default, not canon, not routable.
+- **PSESSION-RESUME:** On launch, surface the last entry the user had open. Zero clicks to resume.
+- **PBREADCRUMB:** Breadcrumb on linked entry click-through — single back-step ("← Jordan (Characters)").
+- **PWHERE-REF:** "Where is this referenced?" — dedicated read-only panel showing every workspace referencing this entry. Expands the existing linked entries indicator.
+- **PNAV-ACTIVITY:** Workspace activity indicator on nav — subtle last-active recency signal per nav item.
+- **PKEYSHEET:** Cmd+? keyboard shortcut cheat sheet — non-modal overlay, dismissable.
+- **PPALETTE-RECENTS:** Last 5 opened entries at top of Cmd+K palette before typing.
+- **PROUTE-HISTORY:** "Send to" picker history — last 3 destinations at top of route picker.
+- **POQ-DEPENDS:** Open Question dependency links — mark one question as depending on another. Soft block indicator in list.
 
 ---
 
-## Lifecycle
+## Lifecycle patterns
 
 - Every workspace supports editing.
 - Most workspaces support delete (for mistakes).
@@ -256,4 +306,3 @@ These features are in `docs/FEATURE_BACKLOG_ONGOING.md` and `docs/BUILD_PLAN_ONG
 - Ask before doing anything ambiguous.
 - If a request conflicts with the rules above, surface the conflict and stop. Do not silently comply.
 - Never assume; confirm.
-- **After any response that includes changes (phase specs, design decisions, file updates), append a numbered smoke test list.** Tight and specific to what changed.
