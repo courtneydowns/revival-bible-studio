@@ -1047,8 +1047,10 @@ function makeEntryWorkspace(config) {
   }
 
   // PTAG — AND match: the item must carry every selected filter tag.
+  // config.matchesExtra: optional per-workspace extra predicate (e.g. status filter).
   // (makeEntryWorkspace instance — used by all standard workspaces incl. Conflicts)
   function matchesFilter(item) {
+    if (config.matchesExtra && !config.matchesExtra(item)) return false;
     if (tagFilter.size === 0) return true;
     const itemTags = tagsById[item.id] || [];
     const have = new Set(itemTags.map((t) => t.id));
@@ -1068,8 +1070,8 @@ function makeEntryWorkspace(config) {
     if (filteredActive.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'tc-list-empty';
-      empty.textContent = tagFilter.size
-        ? 'No entries match the selected tag(s).'
+      empty.textContent = (tagFilter.size || (config.isFilterActive && config.isFilterActive()))
+        ? 'No entries match the selected filter(s).'
         : 'No entries yet.';
       list.appendChild(empty);
     } else if (config.customRenderActive) {
@@ -10743,35 +10745,161 @@ const CONTENT_RENDERERS = {
     titlePlaceholder: 'What was researched?',
     bodyPlaceholder: 'Findings, and where they came from — source/link (optional)',
   }),
-  // Characters (P26+P37): CRUD lifecycle + relational view.
-  // P37 adds character relationship edges and the SVG graph via config hooks
-  // so the base makeEntryWorkspace handles list/CRUD and the hooks inject
-  // the relationships section + relational view toggle.
-  'Characters': makeEntryWorkspace({
-    apiName: 'characters',
-    entityKind: 'characters',
-    draftPrefix: 'characters',
-    addLabel: 'Add Character',
-    sectionClass: 'ws-characters',
-    titlePlaceholder: 'Character name',
-    bodyPlaceholder: 'Who they are — role, traits, arc, open threads (optional)',
-    detailExtra(rightCol, item, archivedFlag) {
-      if (!archivedFlag) {
-        mountCharRelationships(rightCol, item.id);
-        mountProposeCanonSection(rightCol, item, 'characters_workspace');
-      }
-      const callbacks = {};
-      if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
-        entityKind: 'characters',
-        workspaceName: 'Characters',
+  // Characters (P26+P37+PCHAR-STATUS): CRUD lifecycle + relational view + status field.
+  // Wrapped in an IIFE so statusFilter state is shared across list filter and detail
+  // panel hooks without leaking into the outer scope (same pattern as Brainstorm).
+  'Characters': (() => {
+    const CHAR_STATUS_OPTIONS = [
+      { value: 'active',    label: 'Active' },
+      { value: 'recurring', label: 'Recurring' },
+      { value: 'departed',  label: 'Departed' },
+      { value: 'deceased',  label: 'Deceased' },
+    ];
+    const CHAR_STATUS_LABEL = Object.fromEntries(
+      CHAR_STATUS_OPTIONS.map((o) => [o.value, o.label])
+    );
+
+    // PCHAR-STATUS: null = show all; a status string = filter to that status.
+    let statusFilter = null;
+    // Ref so showViewTop can trigger a full list+detail reload after a status change.
+    const reloadRef = { fn: null };
+
+    function mountCharStatusMeta(container, item, reload) {
+      const section = document.createElement('div');
+      section.className = 'char-status-section';
+
+      const label = document.createElement('span');
+      label.className = 'char-status-label';
+      label.textContent = 'Status:';
+      section.appendChild(label);
+
+      const btnGroup = document.createElement('div');
+      btnGroup.className = 'char-status-selector';
+
+      const noneBtn = document.createElement('button');
+      noneBtn.type = 'button';
+      noneBtn.className = 'char-status-btn';
+      if (!item.char_status) noneBtn.classList.add('active');
+      noneBtn.textContent = 'None';
+      noneBtn.addEventListener('click', async () => {
+        if (!item.char_status) return;
+        try {
+          await window.revival.characters.setStatus(item.id, null);
+          await reload();
+        } catch { /* non-fatal */ }
       });
-      const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'characters');
-      callbacks.refreshHistory = refresh;
-    },
-    leftColExtra(leftCol, rightCol, ctx) {
-      setupCharRelationalView(leftCol, rightCol, ctx);
-    },
-  }),
+      btnGroup.appendChild(noneBtn);
+
+      for (const opt of CHAR_STATUS_OPTIONS) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `char-status-btn char-status-btn-${opt.value}`;
+        if (item.char_status === opt.value) btn.classList.add('active');
+        btn.textContent = opt.label;
+        btn.addEventListener('click', async () => {
+          if (item.char_status === opt.value) return;
+          try {
+            await window.revival.characters.setStatus(item.id, opt.value);
+            await reload();
+          } catch { /* non-fatal */ }
+        });
+        btnGroup.appendChild(btn);
+      }
+
+      section.appendChild(btnGroup);
+      container.appendChild(section);
+    }
+
+    return makeEntryWorkspace({
+      apiName: 'characters',
+      entityKind: 'characters',
+      draftPrefix: 'characters',
+      addLabel: 'Add Character',
+      sectionClass: 'ws-characters',
+      titlePlaceholder: 'Character name',
+      bodyPlaceholder: 'Who they are — role, traits, arc, open threads (optional)',
+
+      matchesExtra(item) {
+        return statusFilter === null || item.char_status === statusFilter;
+      },
+
+      isFilterActive() {
+        return statusFilter !== null;
+      },
+
+      listItemExtra(btn, item, archivedFlag) {
+        if (archivedFlag || !item.char_status) return;
+        const titleRow = btn.querySelector('.tc-list-title');
+        if (!titleRow) return;
+        const badge = document.createElement('span');
+        badge.className = `tc-list-badge badge-char-${item.char_status}`;
+        badge.textContent = CHAR_STATUS_LABEL[item.char_status] || item.char_status;
+        titleRow.insertBefore(badge, titleRow.lastChild);
+      },
+
+      showViewTop(rightCol, item, archivedFlag) {
+        if (!archivedFlag) {
+          mountCharStatusMeta(rightCol, item, async () => {
+            if (reloadRef.fn) await reloadRef.fn();
+          });
+        }
+      },
+
+      detailExtra(rightCol, item, archivedFlag) {
+        if (!archivedFlag) {
+          mountCharRelationships(rightCol, item.id);
+          mountProposeCanonSection(rightCol, item, 'characters_workspace');
+        }
+        const callbacks = {};
+        if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
+          entityKind: 'characters',
+          workspaceName: 'Characters',
+        });
+        const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'characters');
+        callbacks.refreshHistory = refresh;
+      },
+
+      leftColExtra(leftCol, rightCol, ctx) {
+        reloadRef.fn = ctx.reloadList;
+
+        // Status filter bar — inserted before the + Add button so it's always
+        // above the list without interfering with the PTAG filter above it.
+        const filterBar = document.createElement('div');
+        filterBar.className = 'char-status-filter-bar';
+
+        function renderFilterBar() {
+          filterBar.innerHTML = '';
+          const allBtn = document.createElement('button');
+          allBtn.type = 'button';
+          allBtn.className = 'char-filter-btn' + (statusFilter === null ? ' active' : '');
+          allBtn.textContent = 'All';
+          allBtn.addEventListener('click', () => {
+            statusFilter = null;
+            renderFilterBar();
+            ctx.reloadList();
+          });
+          filterBar.appendChild(allBtn);
+
+          for (const opt of CHAR_STATUS_OPTIONS) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `char-filter-btn char-filter-btn-${opt.value}` + (statusFilter === opt.value ? ' active' : '');
+            btn.textContent = opt.label;
+            btn.addEventListener('click', () => {
+              statusFilter = opt.value;
+              renderFilterBar();
+              ctx.reloadList();
+            });
+            filterBar.appendChild(btn);
+          }
+        }
+        renderFilterBar();
+        leftCol.insertBefore(filterBar, ctx.addBtn);
+
+        setupCharRelationalView(leftCol, rightCol, ctx);
+      },
+    });
+  })(),
   // Episodes (P27+P38): basic create/edit/delete/archive/restore on episode entries
   // (name + outline/scene list/beats/draft notes). P38 adds canon proposal button.
   'Episodes': makeEntryWorkspace({

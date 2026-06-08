@@ -155,6 +155,7 @@ function registerIpc() {
   ipcMain.handle('characters:delete', (_event, id) => { const r = db.characters.delete(id); recordEvent('Characters', 'deleted'); return r; });
   ipcMain.handle('characters:archive', (_event, id) => { const r = db.characters.archive(id); recordEvent('Characters', 'archived'); return r; });
   ipcMain.handle('characters:restore', (_event, id) => db.characters.restore(id));
+  ipcMain.handle('characters:setStatus', (_event, id, status) => db.characters.setStatus(id, status));
 
   // P37 — character relationship edges (workspace-level, not canon)
   ipcMain.handle('characterRelationships:listAll', () =>

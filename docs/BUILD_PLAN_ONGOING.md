@@ -311,12 +311,12 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Status fields
 
-### PCHAR-STATUS — Character status field
+### PCHAR-STATUS — Character status field ✅
 - Add **Active / Recurring / Departed / Deceased** status field to every Character entry
 - Visible as a badge on list items and detail panel
 - Filterable in Characters list
 - Feeds character arc tracker and episode continuity checker
-- **Smoke:** Set status on three characters; filter by Departed, confirm only Departed characters show; confirm badge visible in list and detail panel
+- **Smoke passed.**
 
 ### PEPISODE-STATUS — Episode status field
 - Add **Outline / Draft / Locked** status field to every Episode entry

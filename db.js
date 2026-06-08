@@ -1737,6 +1737,18 @@ const MIGRATIONS = [
       `);
     },
   },
+
+  {
+    name: '049_pchar_status',
+    up(db) {
+      // PCHAR-STATUS — Active / Recurring / Departed / Deceased status field
+      // on every Character entry. Nullable — existing rows get NULL (no status).
+      // Feeds the character arc tracker and episode continuity checker.
+      db.exec(`
+        ALTER TABLE characters_workspace ADD COLUMN char_status TEXT CHECK(char_status IN ('active','recurring','departed','deceased'));
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -2074,6 +2086,13 @@ const research = makeEntryRepo('research_items');
 // need to change for a table rename. (Same pattern PR5 used for brainstorm /
 // research → brainstorm_items / research_items.)
 const characters = makeEntryRepo('characters_workspace');
+// PCHAR-STATUS — set char_status on a character entry.
+characters.setStatus = function(id, status) {
+  getDb()
+    .prepare('UPDATE characters_workspace SET char_status = ?, updated_at = ? WHERE id = ?')
+    .run(status || null, new Date().toISOString(), id);
+  return characters.get(id);
+};
 const episodes = makeEntryRepo('episodes_workspace');
 
 // --- Character relationships repository (P37) ------------------------------

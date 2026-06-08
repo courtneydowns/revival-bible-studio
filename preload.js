@@ -100,6 +100,7 @@ contextBridge.exposeInMainWorld('revival', {
     delete: (id) => ipcRenderer.invoke('characters:delete', id),
     archive: (id) => ipcRenderer.invoke('characters:archive', id),
     restore: (id) => ipcRenderer.invoke('characters:restore', id),
+    setStatus: (id, status) => ipcRenderer.invoke('characters:setStatus', id, status),
   },
   // P37 — directed typed edges between characters (workspace-level)
   characterRelationships: {
