@@ -10355,22 +10355,18 @@ const CONTENT_RENDERERS = {
         link.type = 'button';
         link.className = 'canon-chain-link';
         link.textContent = '…';
-        link.disabled = true;
+        link.title = 'Navigate to source question';
+        // Wire the click handler immediately — navigation works regardless of
+        // whether the title fetch resolves, so the link is never disabled.
+        link.addEventListener('click', () => {
+          route('Open Questions', item.source_question_id);
+        });
         row.appendChild(link);
         rightCol.appendChild(row);
 
         window.revival.openQuestions.get(item.source_question_id)
           .then((oq) => {
-            if (oq) {
-              link.textContent = oq.title;
-              link.disabled = false;
-              link.title = 'Navigate to source question';
-              link.addEventListener('click', () => {
-                route('Open Questions', item.source_question_id);
-              });
-            } else {
-              link.textContent = `#${item.source_question_id} (not found)`;
-            }
+            link.textContent = oq ? oq.title : `#${item.source_question_id} (not found)`;
           })
           .catch(() => {
             link.textContent = `#${item.source_question_id}`;
