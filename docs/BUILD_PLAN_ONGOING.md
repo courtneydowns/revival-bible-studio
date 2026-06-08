@@ -342,7 +342,7 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Fix 2: stop-reason detection — if `stop_reason === 'max_tokens'`, appends "⚠ Response cut short — send a follow-up to continue" in the chat bubble
 - **Smoke passed.**
 
-### PAUDIT-2b — Preview payload sync
+### PAUDIT-2b — Preview payload sync ✅
 **Tool:** VS Code ext
 - `buildPreviewPayload` omitted Canon Bible, Characters, and Episodes attachments that `buildSystemPrompt` included
 - Fix: synced `buildPreviewPayload` to include all attachment types that `buildSystemPrompt` sends
