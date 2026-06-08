@@ -393,6 +393,34 @@
         background: var(--accent); color: var(--bg); border-color: var(--accent);
       }
       .tag-picker-empty { font-size: 12px; color: var(--muted); margin: 4px 0; }
+
+      /* PAUDIT-3 — Canon Bible popout. Mirrors canon-type-badge + canon-chip-*
+         from index.html so the read-only view is styled consistently. */
+      .canon-type-badge {
+        display: inline-block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        background: rgba(214, 161, 79, 0.18);
+        color: #d6a14f;
+        border-radius: 4px;
+        padding: 2px 7px;
+        margin-bottom: 10px;
+      }
+      .canon-chips {
+        display: flex; gap: 6px; flex-wrap: wrap;
+        margin: 8px 0;
+      }
+      .canon-chip {
+        font-size: 11px;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 2px 8px;
+      }
+      .canon-chip-locked { color: #d6a14f; border-color: #d6a14f; }
+      .canon-chip-retired { color: #888; border-color: #888; }
+      .canon-chip-provisional { color: #c79a55; border-color: #c79a55; }
     </style>
   </head>
   <body>
