@@ -24,6 +24,7 @@ Local-first creative/editorial workspace for the **Revival project only**. Not a
 - Never start the next phase without explicit go-ahead.
 - Avoid large rewrites. Preserve simple workflow over feature complexity.
 - **Polish items noticed during smoke tests go in `POLISH_NOTES_ONGOING.md` at repo root.** Do not fix them inline during a feature phase. They are addressed in PPOL-ONGOING (the permanent open-ended polish phase at the end of the build plan).
+- **Post-smoke document update ritual (required before commit/push):** After the user confirms smoke passed, update all touched documents before committing. Always update: `BUILD_PLAN_ONGOING.md` (mark phase ✅, add "Smoke passed.") and `TOOL_ROUTING_ONGOING.md` (mark phase ✅). Update conditionally based on scope: `CLAUDE_ONGOING.md` if the phase changed a UI pattern, workspace rule, or hard rule; `POLISH_NOTES_ONGOING.md` if items were resolved or new items logged; `FEATURE_BACKLOG_ONGOING.md` if a backlog item was completed or modified. Do not commit until document updates are done.
 
 ---
 
@@ -86,7 +87,7 @@ Do not invent new top-level workspaces.
 
 ## Routing / approval
 
-- **Unsorted** = general routing queue for things that don't fit yet.
+- **Unsorted** = general routing queue for things that don't fit yet. Every Unsorted entry has a "Route to…" action button on its detail panel — routes to Brainstorm, Open Questions, Decisions, Conflicts, Research, or Canon Review using the same picker as highlight-extract-route.
 - **Canon Review** = approval space for anything that may affect official Revival truth.
 - Open Questions and Conflicts are separate workspaces.
 - Source Material and Documents are separate.
@@ -186,11 +187,12 @@ Do not invent new top-level workspaces.
 All AI features use Claude only. No provider routing. No OpenAI scaffolding.
 
 ### General AI patterns (apply to all AI phases)
-- **Request preview:** user sees exact payload before sending. Nothing goes to the API without awareness.
+- **Request preview:** user sees exact payload before sending. Nothing goes to the API without awareness. Preview must include all attachment types — Canon Bible, Characters, Episodes, Source Material, Documents — matching exactly what is sent.
 - **AI suggests; human approves.** No AI output writes to any workspace without explicit user action.
 - **Tag suggestions:** Claude proposes tags from the existing library; user confirms, discards, or adds manually. Never auto-applied.
 - **Highlight-extract-route applies to all AI output text** — any analysis or response can be selected and routed to relevant workspaces.
 - **Export to Brainstorm / Research:** one-click on full AI output creates a new entry in the target workspace, pre-filled with content and source attribution. Link-don't-copy discipline.
+- **max_tokens:** set to `32768` for all Claude API calls. Do not lower this without a specific reason. If a response is cut short (`stop_reason === 'max_tokens'`), append a visible "⚠ Response cut short — send a follow-up to continue" notice in the chat bubble. Do not implement a "Continue" auto-flow — the warning is a safety net only.
 
 ### P46 — AI open questions analyst (The Flanagan Filter) — complete
 The Flanagan filter feature applies THE_FLANAGAN_MASTER document as an analytical and generative tool against Open Questions entries.

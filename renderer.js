@@ -12261,9 +12261,18 @@ async function buildPreviewPayload() {
   const keptDocs = activeDocuments;
   const nextDocs = activeChatId != null ? nextDocsFor(activeChatId) : [];
   const allDocs = [...keptDocs, ...nextDocs];
+  const keptCanon = activeCanonEntries;
+  const nextCanon = activeChatId != null ? nextCanonFor(activeChatId) : [];
+  const allCanon = [...keptCanon, ...nextCanon];
+  const keptChars = activeCharEntries;
+  const nextChars = activeChatId != null ? nextCharsFor(activeChatId) : [];
+  const allChars = [...keptChars, ...nextChars];
+  const keptEps = activeEpisodeEntries;
+  const nextEps = activeChatId != null ? nextEpisodesFor(activeChatId) : [];
+  const allEps = [...keptEps, ...nextEps];
 
-  // Build the system prompt the same way the real send does: project rules +
-  // source material + documents. This matches what will actually be sent to Claude.
+  // Build the system prompt the same way the real send does. This matches what
+  // will actually be sent to Claude.
   const systemParts = [];
   if (_cachedProjectRules) systemParts.push(_cachedProjectRules);
   if (allSrcs.length) {
@@ -12279,6 +12288,27 @@ async function buildPreviewPayload() {
       return `### ${d.title}${mode}\n\n${d.body || '(no content)'}`;
     });
     systemParts.push(`## Documents\n\n${sections.join('\n\n---\n\n')}`);
+  }
+  if (allCanon.length) {
+    const sections = allCanon.map((c) => {
+      const mode = nextCanon.includes(c) ? ' (next message only)' : ' (keep active)';
+      return `### ${c.title} [${c.entry_type}${c.locked ? ' · locked' : ''}]${mode}\n\n${c.body || '(no content)'}`;
+    });
+    systemParts.push(`## Canon Bible\n\n${sections.join('\n\n---\n\n')}`);
+  }
+  if (allChars.length) {
+    const sections = allChars.map((c) => {
+      const mode = nextChars.includes(c) ? ' (next message only)' : ' (keep active)';
+      return `### ${c.title}${mode}\n\n${c.body || '(no content)'}`;
+    });
+    systemParts.push(`## Characters\n\n${sections.join('\n\n---\n\n')}`);
+  }
+  if (allEps.length) {
+    const sections = allEps.map((ep) => {
+      const mode = nextEps.includes(ep) ? ' (next message only)' : ' (keep active)';
+      return `### ${ep.title}${mode}\n\n${ep.body || '(no content)'}`;
+    });
+    systemParts.push(`## Episodes\n\n${sections.join('\n\n---\n\n')}`);
   }
   const systemPrompt = systemParts.join('\n\n');
 

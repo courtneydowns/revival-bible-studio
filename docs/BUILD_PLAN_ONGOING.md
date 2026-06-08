@@ -305,7 +305,7 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Same keep-active / next-message-only modes as Source Material
 - Active attachments always visible — same transparency as Source Material
 - Permitted list is fixed — no other workspaces attachable to Chat
-- **Smoke:** Attach a Canon Bible entry to a chat message, confirm it's visible and active; attach a Character entry next-message-only, confirm it clears after send
+- **Smoke passed.**
 
 ---
 
@@ -324,6 +324,92 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Filterable in Episodes list
 - Feeds Needs Attention panel (Outline-stage episodes surface there)
 - **Smoke passed.**
+
+---
+
+## Audit fixes
+
+### PAUDIT-1 — Undo apiName bug ✅
+**Tool:** VS Code ext
+- `apiName` resolves to `undefined` in `makeEntryWorkspace` UndoStack (renderer.js ~L1365 and ~L1477)
+- Fix: replace bare `apiName` shorthand with `config.apiName` in both the archive and delete undo action objects
+- **Smoke passed.**
+
+### PAUDIT-2a — Chat response truncation fix
+**Tool:** VS Code ext
+- `max_tokens` set to `8192` caused Claude to cut responses mid-sentence with no warning
+- Fix 1: raised `max_tokens` to `32768`
+- Fix 2: stop-reason detection — if `stop_reason === 'max_tokens'`, appends "⚠ Response cut short — send a follow-up to continue" in the chat bubble
+- **Smoke passed.**
+
+### PAUDIT-2b — Preview payload sync
+**Tool:** VS Code ext
+- `buildPreviewPayload` omitted Canon Bible, Characters, and Episodes attachments that `buildSystemPrompt` included
+- Fix: synced `buildPreviewPayload` to include all attachment types that `buildSystemPrompt` sends
+- **Smoke passed.**
+
+### PAUDIT-3 — Canon Bible popout + Decisions back-link
+**Tool:** VS Code ext
+Two plain UI omissions, same file, grouped:
+- **Canon Bible popout:** Add "Pop out ↗" button to Canon Bible detail panel. Popout already handles the canon path in popout.js — just needs the trigger button wired in.
+- **Decisions source_question_id back-link:** When a Decision was promoted from an Open Question, `source_question_id` is stored in the DB but never rendered. Display it as a navigable back-link in the Decisions detail panel ("From question: [title]").
+- **Smoke:** Open a Canon Bible entry → confirm Pop out button present → click it → confirm popout opens with correct entry. Promote an OQ to a Decision → open the Decision → confirm back-link renders → click it → confirm navigation to the originating OQ.
+
+### PAUDIT-4 — P46-B analysis lock fix
+**Tool:** VS Code ext
+- Flanagan analyses lock when an OQ is archived, but not when it is resolved via `resolved_by_decision_id`
+- A question promoted to a Decision but not yet archived still shows active re-run buttons on locked-spec analyses
+- Fix: pass `item.resolved_by_decision_id` as a second lock condition alongside `archivedAtStart`
+- **Smoke:** Promote an OQ to a Decision (do not archive it); open its Flanagan history; confirm re-run buttons are disabled. Archive a different OQ; confirm same lock behavior.
+
+### PAUDIT-5 — Omitted UI fields + Brainstorm archived threads
+**Tool:** VS Code ext / CLI (multi-file)
+Plain implementation omissions surfaced by the audit — data exists in the DB, UI never renders it:
+- **Writing Lab word count:** move from action bar to status bar (spec location). Add scene/section count to status bar (currently absent entirely).
+- **Source Material file_kind / file_path:** surface both fields in the Source Material detail panel (display + editable).
+- **Open Questions category field:** add display, editor, and filter for the `category` column (added in migration 031, never exposed in UI).
+- **Unsorted "Route this entry" action:** add a route action button to Unsorted entry detail panels — routes to Brainstorm, Open Questions, Decisions, Conflicts, Research, Canon Review (same picker as highlight-extract-route). Spec describes Unsorted as a routing queue; no action currently exists on entries.
+- **Canon Review source attribution back-link:** render source attribution (e.g. "from Characters #5") as a navigable click-through to the originating entry, not plain text.
+- **Brainstorm archived threads section:** `brainstorm:threads.listArchived` IPC exists but archived threads have no UI section. Add collapsed archived threads section to Brainstorm, matching the archive pattern used across all other workspaces.
+- **Smoke:** (1) Open a Writing Lab draft; confirm word count and section count both appear in status bar. (2) Open a Source Material entry; confirm file_kind and file_path visible and editable. (3) Open an Open Questions entry; confirm category field visible, editable, and filterable in list. (4) Open an Unsorted entry; confirm "Route to…" action button present; route it; confirm entry created in target workspace. (5) Open a Canon Review proposal created from a Characters entry; click source attribution; confirm navigation to the originating Character entry. (6) Archive a Brainstorm thread; confirm it appears in collapsed archived threads section; restore it.
+
+### PAUDIT-6 — Research external_url + Open Questions tier setter
+**Tool:** VS Code ext
+Two DB columns that exist but have no UI — same pattern as PAUDIT-5:
+- **Research external_url:** surface the `external_url` column in the Research detail panel — display and editable. Add to list item preview line if populated.
+- **Open Questions tier setter:** `tier` is shown passively in Flanagan but has no setter anywhere in the OQ entry itself. Add a tier field (Tier 1 / Tier 2) to the OQ create and edit forms. PBLOCK's tier escalation action already works — this fills the gap for initial set and direct edit.
+- **Smoke:** (1) Open a Research entry; confirm external_url field visible and editable; save a URL; confirm it appears in list preview. (2) Create a new OQ; confirm tier field present in create form; set Tier 1; confirm badge visible in list and detail. Edit an existing OQ; confirm tier editable directly.
+
+### PAUDIT-7 — Command palette regression fix
+**Tool:** CLI
+PKEY was marked ✅ complete and the command palette (Cmd+K) previously worked, but the audit found it is currently not implemented — likely a regression from a later phase. Multi-file touches (global event listener, palette component, renderer wiring).
+- Restore Cmd+K command palette to working state matching the original PKEY spec: jump to any workspace, recent entries, actions; full keyboard navigation; tab through list items, Enter to open
+- Do not add new functionality — restore only
+- **Smoke:** Cmd+K opens palette; type a workspace name, confirm it appears; press Enter, confirm navigation; tab through results with keyboard; Escape closes palette.
+
+### PAUDIT-8 — Dead IPC cleanup
+**Tool:** CLI
+Remove dead IPC bridges confirmed by the audit as having no renderer callers. Multi-file (main.js + preload.js). Run after PAUDIT-5 — do not run before archived threads UI exists.
+
+**Remove from both main.js and preload.js:**
+- `canon:count`
+- `characterRelationships:update`
+- `brainstorm:threads.restore`
+- `brainstorm:threads.delete`
+- `brainstorm:threads.listArchived` — remove only after PAUDIT-5 adds the archived threads UI
+
+**Do NOT remove:**
+- `canon:getDetail` — used internally in db.js JS logic, not a dead bridge
+
+**Also:** add a code comment to the migration array documenting the `045`/`046` out-of-order naming. Do not renumber.
+
+**DB columns:** leave all schema-forward columns in place (`category`, `canon_promoted_entry_id`, `external_url`, `canon_character_id`, `canon_episode_id`, `decided_at`). These are planned features; SQLite column drops require table recreation.
+
+- **Smoke:** `npm run dev` — clean launch, zero migration errors. Confirm Brainstorm, Characters, and Canon Bible all load normally after removals.
+
+---
+
+## Status fields (continued)
 
 ### PDECISION-STATUS — Decision status badges
 - Add **Open / Tentative / Final** status field to every Decision entry

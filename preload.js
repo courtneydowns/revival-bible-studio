@@ -257,14 +257,7 @@ contextBridge.exposeInMainWorld('revival', {
     // filterId: entry_type string or canon_entries.id.
     export: (params) => ipcRenderer.invoke('canon:export', params),
   },
-  // PCONFLICT — on-demand conflict scan + route. scan() is read-only and
-  // returns { scannedAt, totalActiveEntries, conflicts: [...] }; each
-  // conflict is { kind, label, detail, entries: [...] }. routeToConflicts()
-  // writes one row to the Conflicts workspace summarizing the flagged group.
   canonConflicts: {
-    scan: () => ipcRenderer.invoke('canonConflicts:scan'),
-    routeToConflicts: (payload) =>
-      ipcRenderer.invoke('canonConflicts:routeToConflicts', payload),
     // PCONFLICT-2 (auto-route) — scan + auto-route + auto-archive in one
     // call. Returns the scan result plus routedNew[]/alreadyTracked[].
     scanAndRoute: () => ipcRenderer.invoke('canonConflicts:scanAndRoute'),

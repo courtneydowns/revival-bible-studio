@@ -2117,16 +2117,6 @@ episodes.setStatus = function(id, status) {
 // Typed edges between characters_workspace entries. Queries join both sides
 // so the renderer gets character names without a second round-trip.
 const characterRelationships = {
-  _rowWithNames: (db) =>
-    db.prepare(`
-      SELECT cr.*,
-             fa.title AS from_name,
-             ta.title AS to_name
-      FROM   character_relationships cr
-      JOIN   characters_workspace fa ON fa.id = cr.from_char_id
-      JOIN   characters_workspace ta ON ta.id = cr.to_char_id
-    `),
-
   listAll() {
     return getDb()
       .prepare(`

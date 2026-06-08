@@ -311,14 +311,6 @@ function registerIpc() {
     db.canon.versionChain(id)
   );
 
-  // PCONFLICT — deterministic conflict scan over canon_entries. Read-only;
-  // routeToConflicts is the only write path and it writes ONE row to the
-  // `conflicts` table summarizing the flagged pair/group. Nothing in canon
-  // mutates here.
-  ipcMain.handle('canonConflicts:scan', () => db.canonConflicts.scan());
-  ipcMain.handle('canonConflicts:routeToConflicts', (_event, payload) =>
-    db.canonConflicts.routeToConflicts(payload)
-  );
   // PCONFLICT-2 (auto-route) — scan + auto-route in one shot, deduping by
   // signature so the same collision never gets two Conflicts rows. The UI
   // calls this from both Canon Bible (scan) and the Conflicts page (rescan).
