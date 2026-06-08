@@ -75,7 +75,7 @@
 | **PSESSION-LOG Session / work log** | **CLI** ✅ | New log module + Settings panel |
 | **PBLOCK Open Questions: blocking + escalation** | **VS Code ext** ✅ | Additions to existing Open Questions entry |
 | **PBRAIN-STRUCT Brainstorm internal structure** | **CLI** ✅ | Thread/cluster + status badges + developed-into links |
-| **PCHAT-ATTACH Chat attachment expansion** | **VS Code ext** | Add permitted types to existing attachment UI |
+| **PCHAT-ATTACH Chat attachment expansion** | **VS Code ext** ✅ | Add permitted types to existing attachment UI |
 | **PCHAR-STATUS Character status field** | **VS Code ext** | New field on existing Character entry component |
 | **PEPISODE-STATUS Episode status field** | **VS Code ext** | New field on existing Episode entry component |
 | **PDECISION-STATUS Decision status badges** | **VS Code ext** | New field on existing Decision entry component |

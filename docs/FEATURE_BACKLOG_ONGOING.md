@@ -502,7 +502,7 @@ Expands the existing linked entries indicator into a full read-only reference pa
 
 ---
 
-## PCHAT-ATTACH — Chat attachment expansion
+## PCHAT-ATTACH — Chat attachment expansion ✅
 
 Expand Chat attachment beyond Source Material to a defined permitted list.
 

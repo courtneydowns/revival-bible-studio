@@ -300,7 +300,7 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Chat attachment expansion
 
-### PCHAT-ATTACH — Chat attachment expansion
+### PCHAT-ATTACH — Chat attachment expansion ✅
 - Expand Chat attachment beyond Source Material to: Canon Bible entries, Characters entries, Episodes entries, Documents entries
 - Same keep-active / next-message-only modes as Source Material
 - Active attachments always visible — same transparency as Source Material
