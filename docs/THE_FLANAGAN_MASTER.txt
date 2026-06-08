@@ -1,0 +1,1052 @@
+# THE FLANAGAN MASTER
+## REVIVAL — The Unified Craft, Tonal, and Production Document
+### Methodology • Editorial Filter • Scene-Level Instrument • Production Translation
+
+---
+
+## WHAT THIS DOCUMENT IS
+
+This is the single consolidated source for the Flanagan register as it applies to
+REVIVAL. It merges six prior craft documents into one cohesive reference, removes
+duplication, and corrects all embedded canon facts to match the authoritative
+locked decisions file.
+
+It is not a style guide imposed from outside. Every principle here was earned —
+derived from specific creative problems solved in specific scenes during REVIVAL's
+development. Nothing here is theoretical.
+
+The tonal target is the Flanagan register: Mike Flanagan's Netflix work (The
+Haunting of Hill House, The Haunting of Bly Manor, Midnight Mass, The Midnight
+Club, The Fall of the House of Usher) operates in a specific emotional and
+structural frequency REVIVAL has adopted as its primary creative DNA. That
+frequency can be described, taught, and replicated. This document does that.
+
+---
+
+## HOW TO USE THIS DOCUMENT — THE TIER STRUCTURE
+
+The methodology is one thing sliced at four working depths. Use the slice that
+matches the decision in front of you. They do not contradict; they layer.
+
+- TIER 1 — THE EDITORIAL FILTER (the five questions). For fast go/no-go on any
+  scene, idea, scope, or creative decision. The compass.
+- TIER 2 — THE WRITING INSTRUMENT (non-negotiables, camera/dialogue rules, scene
+  test). For scene-level writing. The instrument.
+- TIER 3 — THE PRODUCTION TRANSLATION (camera positions, color, sound,
+  performance, design, episodic structure, negative principles). For directors,
+  department heads, writers' room, production design. The build.
+- THE METHODOLOGY SPINE — THE TEN PRINCIPLES (with Flanagan examples and Revival
+  application). The full craft logic underneath all three tiers.
+
+CANON AUTHORITY: Where any craft claim and the locked decisions file disagree,
+the locked decisions file governs. All character/canon facts in this document have
+been corrected to match it. See the Appendix changelog for what was corrected.
+
+CITATION NAMING: Principles, non-negotiables, and camera rules are named and
+numbered so they can be cited directly in option analyses — e.g. "Non-Negotiable
+Two," "Camera Rule Three," "Principle 3-A (The Caroline Principle)."
+
+---
+
+## THE SHOW IN THREE SENTENCES
+
+A newly sober paramedic in a rust belt city becomes the unknowing architect of a
+viral outbreak when the Narcan she administers activates a transformative virus
+engineered into the heroin supply. The virus mirrors addiction structurally —
+warmth and personality intact while the self is slowly consumed from the inside.
+The show's question, never answered with a speech: *did we ever actually want to
+save these people?*
+
+---
+
+## THE ONE SENTENCE THAT GOVERNS EVERYTHING
+
+*The horror arrives as a consequence of who people already are.*
+
+This is the load-bearing sentence for everything that follows.
+
+Nothing that happens in REVIVAL happens to characters from outside. The outbreak,
+the transition, the contamination, the systemic collapse — none of it arrives as
+an external force acting on neutral people. It arrives through the specific cracks
+that were already in these specific people and this specific world.
+
+Megan's guilt exists before the outbreak begins. Jordan's isolation exists before
+the series begins. Diane's precarious sobriety exists before Megan revives her in
+the parking lot. The virus doesn't create these vulnerabilities. It finds them. It
+moves through them like water through existing fissures.
+
+Every scene therefore has two jobs:
+
+- JOB ONE: Advance the plot, establish character, do the structural work the
+  episode requires.
+- JOB TWO: Deepen the pre-existing crack the horror will eventually move through.
+
+If a scene is only doing Job One, it isn't a REVIVAL scene yet.
+
+═══════════════════════════════════════════════════════════════════════════════
+# TIER 1 — THE EDITORIAL FILTER (THE FIVE QUESTIONS)
+═══════════════════════════════════════════════════════════════════════════════
+
+Run every scene, idea, scope, or creative decision through these five, in order.
+
+1. Does this serve the emotional truth of the character?
+2. Does this deepen the rewatch?
+3. Does this implicate the audience in the system?
+4. Would Flanagan let this moment breathe — or does it explain too much?
+5. Is this the horror of what was already here — or is it imported horror?
+
+If a decision fails question 5, stop. Imported horror is not this show — if it
+would work in any show, in any context, with any characters, it is wrong for this
+one.
+
+═══════════════════════════════════════════════════════════════════════════════
+# THE METHODOLOGY SPINE — THE TEN PRINCIPLES
+═══════════════════════════════════════════════════════════════════════════════
+
+The full craft logic. Each principle includes the Flanagan precedent it derives
+from and its Revival application.
+
+---
+
+## PRINCIPLE 1 — THE REWATCH ARCHITECTURE
+
+Definition: Information hidden in plain sight that changes meaning on second
+viewing. The first watch is suspense. The second watch is grief.
+
+How it works: The audience eventually holds information the characters don't. We
+watch people we love walk toward things they cannot survive. The horror is not
+what happens, but watching it approach inevitably.
+
+Revival application:
+- Jordan in the first meeting (S1E1): First watch — Jordan is fine, working the
+  steps, present. Rewatch — already infected (6 weeks / Day 42 post-revival),
+  micro-behaviors visible to a trained observer, already drifting while sitting in
+  that prayer circle. He was already lost when we met him.
+- Diane pre-parking-lot: First watch — stable, confident, 20 years sober, pillar
+  of the community. Rewatch — these are her last moments as herself; every piece
+  of advice she gives Megan is the last wisdom she'll share.
+- The parking lot revival (S1E1): First watch — Narcan worked, crisis averted.
+  Rewatch — Megan just infected her. The life-saving medication is the mechanism
+  of catastrophe. The horror started in the moment that looked like hope.
+
+Technical execution: Plant visual cues in early episodes that only register on
+rewatch (Jordan's pupil response in the first Narcan call, S1E2; behavioral
+markers that read as ordinary recovery struggle; Diane's subtle shifts). The
+camera knows before the characters know. The audience learns to trust the camera
+over the dialogue.
+
+---
+
+## PRINCIPLE 2 — EMOTIONAL RESOLUTION WITHOUT LITERAL RESOLUTION
+
+Definition: The story resolves emotionally even if the plot questions remain open.
+Character arcs complete even if the mystery doesn't.
+
+Flanagan precedent: Hill House — we never learn exactly what the Red Room is; we
+know the Crain family makes peace with its ghosts. Bly Manor — we never learn the
+full rules of the ghosts; we know Dani and Jamie's love story completes. Midnight
+Mass — we never learn if the angel is divine or demonic; we know the community
+reaches redemption through sacrifice.
+
+Revival application:
+- What stays unresolved (literal): the full origin of the virus; whether a cure
+  was ever found; total body count; whether the outbreak is contained or endemic
+  by Season 3; whether Megan walks through the door in the finale.
+- What resolves (emotional): Megan's grief over Diane (witnessed, honored, carried
+  forward); the obligation chain between Diane and Megan; Megan's journey through
+  the question of whether harm reduction was right (the show doesn't answer it; her
+  journey through it completes); whether Megan can return to community (the door is
+  there; the choice is hers).
+- The final image: We don't see whether she walks through. That the door is still
+  open after everything is the resolution. The possibility of return exists.
+- LOCKED: The last spoken word of the series is "trying." (Locked closing line:
+  "I tried. I'm still trying." — lands on "trying" as ordered.)
+
+Director's note: Film the finale as if Megan walking through the door and Megan
+walking away are both valid, both true, both complete. The ambiguity is trust in
+the audience, not evasion.
+
+---
+
+## PRINCIPLE 3 — HORROR AS CONSEQUENCE OF CHARACTER
+
+Definition: The horror doesn't strike randomly. It emerges from who characters are
+and the choices they make. The virus doesn't just kill people — it weaponizes
+their identity against them.
+
+Flanagan precedent: Hill House — the house feeds on the family's trauma. Midnight
+Mass — Riley's guilt brings him to the island where the vampire waits. Usher — each
+sibling's death is tailored to their specific sin.
+
+Revival application:
+- Megan: Vector because of who she is (paramedic / sponsor) and what she does
+  (administers Narcan). Her competence, training, obligation, and love are all
+  weaponized. Saving Diane is the act that infects her.
+- Diane: Her horror is specifically designed to destroy her dignity. She stays
+  sober and dies looking like she relapsed. The virus attacks the thing she is
+  most proud of — her long-term recovery.
+- Jordan: Infected via the Narcan revival that was supposed to save him.
+  Deteriorates while working Step 4. His earnestness doesn't save him.
+- Ray: The impossible choice — loyalty to Megan versus protection of his family.
+  Both are who he is.
+
+Writer's note: Before writing any scene of suffering, ask: Why this character? Why
+this way? How does this horror emerge from who they are?
+
+---
+
+## PRINCIPLE 3-A — THE CAROLINE PRINCIPLE: THE MONSTER IS NEVER WRONG
+
+Definition: Every antagonist operates according to complete internal logic. Their
+beliefs are coherent, their methodology sound by their own metrics, and the horror
+is that they might actually be right.
+
+Caroline's logic: She is not a cartoon villain. Her argument is scientifically
+sound; her methodology follows real epidemic-containment principles. The horror is
+not that she's evil — it's that she's rational and her rationality leads to
+atrocity. The question is never "Is Caroline evil?" but "Is Caroline wrong?" She
+never lies with false information; she lies with true information, arranged. Every
+word she says in Season 1 is factually accurate. On rewatch, every word she says in
+Season 1 is a betrayal.
+
+The check: Can you write Caroline's version of every scene she appears in and have
+it be emotionally coherent and hard to refute? If yes, she's written correctly. If
+the villain's version of the scene doesn't hold together, she isn't a villain yet —
+she's a type.
+
+Writer's note: If a writer can summarize Caroline's argument and refute it cleanly
+and quickly, they haven't understood her yet. She is supposed to be hard to refute.
+The entire series is the refutation. It takes 24 episodes because it is a serious
+argument that deserves a serious answer.
+
+---
+
+## PRINCIPLE 4 — THE FAMILY DYNAMIC (ADAPTED FOR RECOVERY COMMUNITY)
+
+Definition (Flanagan): Horror within family structures. The people who are supposed
+to protect you become the source of threat. Love is what makes you vulnerable.
+
+Revival adaptation: The recovery community is the family. NA meetings are the home.
+Sponsorship is the family bond.
+
+- The sponsor chain as family: Diane → Megan → Jordan is three generations. Sponsor
+  is parent-figure (chosen, earned through shared experience); sponsee is
+  child-figure (vulnerable, trusting). The obligation is familial: "I'll be there
+  when you call."
+- The meeting room as home: safe space, weekly return, ritual (prayer circle,
+  meeting close). The chairs, the circle, the door — home architecture. When the
+  meeting room empties, the home is destroyed.
+- Love as vulnerability: Megan's love and obligation toward Diane is why she
+  destroys herself trying to save her. The community's love for each other is why
+  the virus spreads — care becomes transmission.
+- The horror of family betrayal: Megan infects the person who saved her.
+  Sponsorship becomes vector. The structure collapses not through malice but
+  through the weaponization of care.
+
+Director's note: The recovery community should feel like found family by Episode 3.
+By the time the meeting room empties, the audience should grieve it as if we've lost
+a character.
+
+---
+
+## PRINCIPLE 5 — THE MONOLOGUE AS PHILOSOPHY AND CHARACTER REVELATION
+
+Definition: Long-form monologues that are simultaneously character revelation,
+philosophical argument, and emotional catharsis — the thing that finally needed to
+be said.
+
+Flanagan precedent: Nell's "confetti" monologue (Hill House); the Riley/Erin beach
+conversations and Father Paul's Easter Vigil sermon (Midnight Mass); Roderick's
+confession to Auggie (Usher).
+
+Revival application (potential placements): Caroline's full argument as sustained
+speech; Megan's full accounting in Season 3; Diane's moment of clarity before
+death, if it comes. Each runs roughly 2–5 minutes uninterrupted.
+
+The timing law: A monologue that could have been delivered in episode two is not a
+Flanagan monologue. These speeches earn their length by being the thing a character
+finally arrives at after episodes of walking toward it. The length is the
+accumulation of everything we know about them.
+
+Technical execution: Monologues are emotional events that happen to be spoken, not
+exposition dumps. The camera holds on speaker or listener; minimal cutting. Silence
+before and after — do not rush into or out of them.
+
+Writer's note: Not every episode needs a monologue. When you write one, ask: Does
+this need to be said in THIS form? Would the show lose something essential without
+it? Is the speaker the only person who could say this? If yes to all three, write
+it.
+
+---
+
+## PRINCIPLE 6 — THE LONG TAKE AS CHARACTER TRUTH
+
+Definition: Extended unbroken shots that capture emotional reality in real time. No
+editing to compress or manipulate. The audience experiences duration with the
+character.
+
+Flanagan precedent: the Episode 6 car conversation (Hill House); the rec-center
+conversation (Midnight Mass); the dinner-table scenes (Bly Manor).
+
+Revival application: the Diane-reveal conversation between Megan and Ray (S1E4),
+single take, the reveal experienced in the time it takes to say it; Caroline's
+network-map presentation, a sustained single take where the length is the point —
+the machine working; the Megan/Jordan Step 4 conversation, where duration lets us
+watch Megan miss what he's saying.
+
+Director's note: Long takes are not showing off. They're trust in the actors and in
+the moment. If a scene is working, hold on it. Don't cut away to "make it
+interesting." The emotional truth is interesting.
+
+---
+
+## PRINCIPLE 7 — THE THREE QUESTIONS EVERY EPISODE MUST ANSWER
+
+Definition: Every episode must answer, for its protagonist, before it ends:
+1. What does the character want?
+2. What stands in their way?
+3. What are they willing to do to get it?
+
+Revival check: The writers' room should be able to answer these three for Megan in
+every episode. If you can't, the episode doesn't yet have a clear dramatic spine.
+
+---
+
+## PRINCIPLE 8 — THE NEGATIVE PRINCIPLES (WHAT THE SHOW NEVER DOES)
+
+These are production-level constraints, not suggestions. (See also Tier 3, which
+operationalizes them at the department level.)
+
+- NEVER jump scares as primary horror. Jordan's transition is not a jump scare. We
+  see before and after, never the moment. The horror is recognition, not shock.
+- NEVER gore as spectacle. No lingering on graphic violence. Violence against
+  infected individuals (police shootings, quarantine conditions) happens off-screen
+  or through aftermath.
+- NEVER nihilism disguised as darkness. Dark content, yes; "nothing matters,"
+  no. The show withholds hope but not meaning. If a decision concludes these
+  people's lives and deaths meant nothing, that decision is wrong.
+- NEVER characters making uninformed choices coded as stupidity. Characters act on
+  what they know. Megan doesn't know about the 72-hour reversal window; nobody
+  could have. The audience is never positioned to feel superior through information
+  the characters couldn't have had.
+- NEVER horror without established emotional stakes. You have to love them before
+  you can fear for them. No character's suffering arrives before the audience has
+  full access to that character's humanity.
+- NEVER ambiguity as evasion. The finale door is ambiguous but not vague — 24
+  episodes of evidence let the audience form their own belief. Ambiguity is trust,
+  not avoidance.
+- NEVER punishment as morality. The virus is not cosmic justice. Megan is not
+  punished for being a chronic relapser; Diane does not die because she deserved
+  it. Moral causation is the wrong frame.
+- NEVER exploitation of the communities the show depicts. No graphic overdose
+  scenes for shock, no poverty tourism, no trauma aestheticization. The recovery,
+  harm reduction, and EMS communities will watch. No detail is permitted that
+  exploits any of them for atmosphere.
+
+---
+
+## PRINCIPLE 9 — TONAL CALIBRATION: THE CENTER AND ITS EDGES
+
+Definition: Grounded realism as the center, with brief, motivated excursions to the
+edges (heightened emotion, visual metaphor, dreamlike sequence) that always return
+to emotional realism.
+
+- The center (≈90% of the show): grounded character drama, realistic dialogue,
+  natural lighting, practical locations, emotional truth over stylization.
+- Acceptable edges: heightened emotion (monologues, sustained grief); visual
+  metaphor (the meeting-room door as belonging/return); brief dreamlike sequences
+  motivated by character state, clearly marked, short, always returning to ground.
+- Off-limits beyond the edges: camp; pure surrealism; music-video aesthetics;
+  horror-movie clichés (shadowy figures in doorways, creaking doors, ominous
+  stings).
+
+Director's note: If you're asking "Is this too Flanagan?" you're thinking about it
+wrong. The question is "Is this emotionally true?" If yes, it's the right tone. If
+it's aesthetic for its own sake, it's wrong.
+
+---
+
+## PRINCIPLE 10 — THE TIME PRINCIPLE: LET SCENES BREATHE
+
+Definition: Give scenes time to develop, breathe, and sit. Silence is not dead air.
+Slow doesn't mean boring — it means giving emotion time to register. These episodes
+are dense, not slow.
+
+- After someone says something devastating: hold. Don't cut away.
+- Grief scenes: let people stay in it longer than network TV would.
+- Conversations: allow pauses, hesitations, real human rhythm.
+- Dread accumulation: takes time; can't be rushed.
+
+Technical execution: Directors — count to three after you think the scene is done;
+that space is where the scene actually ends. Editors — resist the urge to tighten
+the scenes that matter; the duration is load-bearing. Don't fill silence with score
+to manage pacing. Silence that feels slow is silence that is working.
+
+═══════════════════════════════════════════════════════════════════════════════
+# TIER 2 — THE WRITING INSTRUMENT (SCENE-LEVEL)
+═══════════════════════════════════════════════════════════════════════════════
+
+Load this before writing a single word of scene content. These are load-bearing
+structural principles, not style preferences. Every scene must satisfy them.
+
+---
+
+## THE FIVE NON-NEGOTIABLES
+
+ONE — SHOW EVERYTHING. EXPLAIN NOTHING.
+The camera is an honest witness, not a guide. It moves at the same pace whether
+looking at something devastating or something ordinary. If the camera is announcing
+that something matters, pull back. The audience finds the meaning; the camera just
+shows them the world.
+
+TWO — HORROR LIVES IN WITHHELD REACTION, NOT AMPLIFIED EVENT.
+When something terrible is visible to the audience and invisible to the character,
+hold that gap open. Do not bridge it. The open gap is the scene. The character's
+unawareness is not irony — it is the specific texture of how catastrophe actually
+moves through human lives.
+
+THREE — EVERY SIGNIFICANT LINE MEANS AT LEAST TWO THINGS SIMULTANEOUSLY.
+Characters speak their truth accurately and completely. They simply don't know the
+full context of what they're saying. Find the line that is true for the character,
+true for the situation, and true for something the character doesn't know yet. If a
+line only means one thing, it isn't finished. The double meaning emerges from the
+situation's inherent complexity — never from cleverness.
+
+FOUR — EMOTIONAL RESOLUTION AND LITERAL IRRESOLUTION OCCUPY THE SAME MOMENT.
+Do not let them take turns. The moment of greatest emotional clarity should coincide
+with the moment the literal situation becomes most unresolvable. Hold both in frame.
+
+FIVE — THE SHOW NEVER EXPLAINS ITSELF.
+No character articulates the show's argument. No score signals emotional importance.
+No camera movement tells the audience what to think. If a scene contains a moment
+where the show is explaining itself, cut that moment. Trust that the accumulated
+weight of everything before it has done the work.
+
+---
+
+## THE CAMERA IN FOUR RULES
+
+CAMERA RULE ONE — MOVE AT THE SAME SPEED ALWAYS. Devastating information and
+ordinary information receive identical visual treatment. The horror is in the
+sameness.
+
+CAMERA RULE TWO — HOLD LONGER THAN IS COMFORTABLE. The audience needs three more
+seconds than you think before you cut. After the scene's final image is
+established, hold. Then hold three more seconds. Then cut.
+
+CAMERA RULE THREE — EVERY SCENE IS TWO SCENES. The first-viewing scene is what the
+audience understands is happening. The second-viewing scene is what was actually
+happening that they couldn't decode yet. Build both simultaneously. The
+second-viewing information is not hidden — it is simply not explained. Include it in
+the frame as part of the world and move on.
+
+CAMERA RULE FOUR — OBJECTS CARRY MEANING CHARACTERS DON'T KNOW THEY'RE CARRYING.
+The character handles the object as themselves. The camera frames it as something
+that will matter. Those two framings, held simultaneously, are the technique. Never
+explain what an object means. Show it in enough contexts that the audience can
+triangulate. (The Narcan pen, the composition notebook, the NA keytag.)
+
+---
+
+## THE DIALOGUE IN FOUR RULES
+
+DIALOGUE RULE ONE — CHARACTERS SAY TRUE THINGS THEY DON'T FULLY UNDERSTAND. The
+double meaning emerges from the situation's complexity, never from cleverness.
+
+DIALOGUE RULE TWO — REPETITION IS PSYCHOLOGICAL, NOT STYLISTIC. When a character
+says something twice — written then spoken, said to another then said alone, asked
+as question then stated as fact — they are testing whether it is true in a second
+register. Know what they're testing. If you don't, the repetition isn't earned.
+
+DIALOGUE RULE THREE — THE EMOTIONAL PEAKS ARE QUIET. The show does not build to
+speeches. It builds to single sentences spoken quietly by people who have found
+something true. Find the sentence inside the speech. Write only that sentence. Then
+stop.
+
+DIALOGUE RULE FOUR — SILENCE IS LOAD-BEARING. Every pause has a job. Know what each
+silence is holding. A silence holding nothing is a pacing problem. A silence holding
+the right thing, long enough, is the scene's most powerful moment.
+
+---
+
+## WHAT CHARACTERS CANNOT SAY
+
+The most important things are never said directly. They are said through what a
+character does immediately after the thing they cannot say, what they talk about
+instead, the physical business they perform while not saying it, and what they ask
+the other person about.
+
+- Megan cannot say: *I think I killed my sponsor.* She carries it for sixteen
+  episodes. The audience understands it before she does. We are not meant to feel
+  her guilt arrive — we are meant to watch her hold it.
+- Ray cannot say: *I'm afraid of you.* He means afraid *for* her, afraid of what
+  she has become capable of knowing, afraid she is right. He talks about overtime
+  scheduling and equipment logs instead.
+- Jordan cannot say: what he actually is, what is actually happening to him. By
+  design and by infection and possibly by the same thing. The audience never
+  becomes certain. That uncertainty is the show's central horror and its central
+  mercy.
+
+---
+
+## THE TWO-FRAME RULE
+
+In every intimate scene, include one detail that locates the character within the
+larger system their story exists inside. In every systemic scene, include one
+specific human moment that locates the system within a specific life. Do not zoom
+out to explain and then zoom in to feel. Hold both focal lengths simultaneously,
+always.
+
+---
+
+## THE SCENE TEST
+
+Before running the five questions, answer this one first:
+
+0. WHAT ARE THE TWO JOBS THIS SCENE IS DOING?
+   - Job One: the structural work — what the episode needs from this scene.
+   - Job Two: the crack — which pre-existing fissure in which character this scene
+     deepens, what the horror will eventually move through here.
+   If you can't answer both in one sentence each, the scene isn't ready to be
+   tested. It's still being found. Find it first.
+
+Then run the five:
+1. What does the camera show that no character fully understands? If nothing, the
+   scene is missing its second layer.
+2. What is the most important line? Is it spoken quietly? If not, find the sentence
+   inside it that is actually true and write only that.
+3. Where does emotional resolution land? Does the literal situation resolve at the
+   same moment or deepen? If they're taking turns, find where they can happen
+   together.
+4. What object in this scene will mean something different later? Is the camera
+   treating it as part of the world, or announcing its significance? If announcing,
+   pull back.
+5. Is the show explaining itself anywhere in this scene? If yes, cut it. Trust the
+   accumulated weight.
+
+---
+
+## WHEN YOU'RE STUCK — THE WWFD FORMAT
+
+Don't ask a vague question. A vague problem produces a vague solution; a precise
+problem produces craft. Ask it this way:
+
+*What would Flanagan do with [specific moment] in [specific scene], given [specific
+character context] and [specific thematic weight this scene is carrying]?*
+
+Every answer comes in three registers, then the anchor:
+- THE STRUCTURAL MOVE — where this moment lives in the episode, what comes before
+  and after, whether it rushes or sits, how long it takes.
+- THE DIALOGUE MOVE — what gets said, what doesn't, who speaks and who goes silent,
+  where the subtext carries the weight the text won't.
+- THE VISUAL MOVE — what the camera does, what object is in the frame, how long the
+  hold is, what the silence contains.
+- THE REVIVAL ANCHOR — which specific character, relationship, or thematic
+  commitment from the bible this craft decision protects, and what is lost if you
+  ignore it. If you can't identify the anchor, the scene doesn't know what it's for
+  yet. Find that first, then write.
+
+═══════════════════════════════════════════════════════════════════════════════
+# TIER 3 — THE PRODUCTION TRANSLATION
+═══════════════════════════════════════════════════════════════════════════════
+
+The production-grade translation of the method into Revival's physical, visual,
+sonic, and performance world — for directors, department heads, writers' room, and
+production design. Every choice serves the show's central argument: *did we ever
+actually want to save these people?*
+
+---
+
+## VISUAL LANGUAGE — THE THREE CAMERA POSITIONS
+
+Every scene is shot from one of three primary positions. The position is a moral
+statement about the scene. The wrong position is not a technical error — it is an
+argument error.
+
+THE WITNESS POSITION — static, medium distance, does not move.
+The camera of institutional indifference. It watches without editorializing; it
+holds until the scene becomes uncomfortable and then holds past that. Use for:
+insurance calls that go nowhere, hospital intake, committee meetings where policy
+language describes preventable deaths, any scene where an institution does exactly
+what it was designed to do. Its stillness is an accusation.
+Must never: become beautiful. Aesthetic seduction makes it complicit in what it
+indicts.
+
+THE COMPANION POSITION — handheld, close, slightly unstable.
+Megan's camera. It stays with her through calls, meetings, the moments she almost
+loses her footing — unstable because she is, close because we are not permitted to
+observe her from a safe distance. It is her nervous system. Use for: any scene where
+Megan is the emotional center, EMS calls from inside her experience, her meetings
+and step work, the parking lot with Diane.
+The specific exception: when it appears in scenes with Jordan (the Step 4
+conversation especially), the audience should feel it as a choice — an intimacy the
+show hasn't previously extended to him, a signal that something has changed. Use
+deliberately and sparingly.
+Must never: become so unstable it reads as stylized. The instability is
+psychological, not aesthetic — someone's hand, not a choice made in post.
+
+THE SURVEILLANCE POSITION — high angle, wide, completely still.
+For the outbreak, the pattern, the moments the show reveals what it has been
+tracking. It reveals the geometry — the map of contact, the network of revival, the
+shape of what Megan cannot yet see. Use for: outbreak mapping, Caroline's
+perspective (literally and structurally), the moments the show shows the audience
+what no character can see yet.
+Must never: become beautiful. We do not want the audience to find the architecture
+of the outbreak seductive. We want them to find it terrible.
+
+---
+
+## VISUAL LANGUAGE — MOVEMENT RULES
+
+- The sameness rule: same pace for devastating and ordinary information.
+  Acceleration signals importance; this show does not signal importance.
+- The hold rule: after the final image is established, count three more seconds past
+  the moment you want to cut, then cut.
+- The drift rule: the camera may drift toward objects, but only at the pace of
+  attention, not the pace of revelation. The object is shown, not announced.
+- The reaction rule: when something terrible happens and a character does not react,
+  do not cut away to find a reaction elsewhere. Hold on the character who doesn't
+  know.
+
+---
+
+## VISUAL LANGUAGE — COLOR PALETTE
+
+Season 1 — the color of fluorescent and rust. Institutional greens and yellows; the
+inside of a hospital where the lights haven't changed in a decade; coffee at 3 a.m.;
+parking-lot sodium vapor; the warm rust tones of a city of brick and oxidized metal
+and the specific brown of autumn going wrong. This palette feels familiar, almost
+beautiful — intentionally. The world should look like a world people might want to
+stay alive in. The tragedy only lands if the world was worth staying in.
+Locations: meeting rooms warm but not sentimental (safe, not cozy); EMS truck
+functional, worn, lived-in; sober living house institutional beige; hospital harsh
+fluorescent; Caroline's spaces neutral, controlled, slightly too clean.
+
+Season 2 — the color of overexposure. As the story goes national: too much light,
+cable-news white, the viral blue of screens and briefings. The rust belt warmth is
+gone, replaced by the color of scrutiny. The characters look wrong against this
+backdrop because they are wrong in this context — they belong to a world the camera
+can no longer find. The shift should be felt two episodes before it is consciously
+noticed.
+
+---
+
+## WHAT THE SHOW NEVER DOES VISUALLY
+
+- Never stylizes injection. No beautiful slow-motion drug sequences, no visual
+  seduction. The act of use is shot exactly like everything else — functional,
+  ordinary, human.
+- Never shows the virus as spectacle. Transition is gradual and looks like
+  everything the people around the person already expect to see. The moment
+  transition becomes a visual event, the show has failed its central premise.
+- Never lets the Surveillance Position become beautiful.
+- Never shows graphic violence against infected individuals. It happens off-screen
+  or through aftermath.
+
+---
+
+## SOUND PHILOSOPHY
+
+THE MUSIC RULE. Score is morphine — not for pain management, but for the moments
+the body cannot process what is happening on its own. Music enters only when: a
+character makes an irreversible choice; the show is making its thematic argument
+directly; or silence has already done so much work that adding score changes the
+scene's meaning rather than amplifying it. The default is silence. Score is the
+exception that must be justified.
+
+THE MEETING ROOM SOUND RULE. The meetings are already musical — the Serenity Prayer
+has a cadence, the keytags have ritual, the chips hit the table, the group says
+"keep coming back," folding chairs close the room. This is the show's indigenous
+music. It is not underscored. Record it with full acoustic presence, in actual or
+accurately replicated meeting spaces; no ADR unless unavoidable; the Serenity Prayer
+recorded live with the full group. Underscoring an NA meeting is condescension.
+
+THE VIRUS HAS A SOUND, AND IT IS AN ABSENCE. Silence where there should not be
+silence; the quality of a voice when something that should register doesn't; the
+half-second pause before a response that arrives correctly but constructed rather
+than felt; the slight flatness that reads as tiredness or distraction. This is a
+performance note that sound design supports — the actors create the absence; sound
+design does not fill it.
+
+Ambient sound by location: rust belt exterior (industrial ambient of a city that
+used to make things); EMS truck (low radio chatter, mechanical history); meeting
+rooms (HVAC, basement echo, folding chairs, the texture of people who know each
+other); the empty meeting room (all the infrastructure present, the meeting absent —
+a held breath); hospital (fluorescent hum, distant equipment, a building that never
+stops); Caroline's spaces (near silence, climate-controlled, optimized).
+
+---
+
+## PERFORMANCE DIRECTION
+
+The acting register: naturalistic, not heightened; emotional honesty over dramatic
+performance. Recovery-community authenticity is the specific note — people in these
+rooms have already said the worst things about themselves out loud, repeatedly, in
+front of strangers. This makes them more direct and more protected than civilians.
+They do not perform suffering for each other. They get very quiet when something
+matters very much.
+- Characters in recovery do not cry easily on camera. When they do, it costs
+  something.
+- Recovery language is used without quotation marks. "I turned that over." "My
+  disease was telling me." "Stay in the day." Not explained, not ironic — the
+  vocabulary of a culture with its own epistemology of suffering.
+
+The monologue note: sustained takes, minimal cutting. Stillness is not failure; do
+not fill with gesture. The length is part of the meaning. Silence before and after.
+A monologue that could have been said in episode two is not a Flanagan monologue.
+
+THE TRANSITION PERFORMANCE NOTE. Transition is not a performance event — it is a
+performance absence. Actors are not playing people who have become monsters; they
+are playing people from whom something has been quietly removed below the level of
+affect, personality, and warmth. The warmth, personality, and memories remain. What
+is gone is whatever was generating them from the inside. Achieved through full
+commitment to real warmth, the half-second constructed pause before emotional
+responses, and the quality of someone doing something they remember doing rather
+than feeling — NOT through glazed staring, mechanical movement, or horror-movie
+affect.
+
+MEGAN-SPECIFIC NOTES. Hypervigilant about her own recovery: a specific quality of
+attention in meetings (watching for the signs she learned to read in herself); a
+physical stillness when something concerns her (quiet and watchful, not reactive);
+the way a guilt she hasn't named lives in the body before it lives in language. She
+cannot say *I think I killed my sponsor.* She carries it for sixteen episodes. The
+performance sustains the gap — the character behind the audience's understanding —
+without tipping into unawareness that reads as obtuse.
+
+---
+
+## LOCATION AND PRODUCTION DESIGN
+
+THE MEETING ROOM — the most important location in the show. Built with the
+specificity of a real NA home-group room, not a generic "support group" set.
+Required: folding chairs in a circle (not rows); the specific infrastructure of
+meeting coffee (institutional maker, paper cups, powdered creamer); a literature
+table with real NA literature (Basic Text, Step Working Guides); the steps and
+traditions on the wall; locked signage "IT WORKS IF YOU WORK IT"; a keytag display.
+Authenticity check: someone who attends NA meetings should walk onto this set and
+recognize it as a meeting room, not as a TV meeting room. The room should feel safe,
+not comfortable — these people are not at ease; they are protected by each other.
+
+THE SOBER LIVING HOUSE — Jordan's room. Two twin beds made with the tightness of
+institutional expectation. Minimal personal effects on Jordan's side (a person who
+hasn't decided he's staying); the roommate's side slightly more lived-in. Nothing on
+the walls above Jordan's bed — not a design choice by the character, the character
+not yet believing this is a place worth decorating. The neatness is required, not
+chosen, and that distinction should be visible.
+
+THE EMS TRUCK — a working vehicle with a history. The back is the most important
+space after the meeting room: where Megan and Ray have their real conversations,
+intimate by accumulated use rather than design. Medical equipment accurate and
+correctly placed; Narcan administration procedurally exact.
+
+LOCATIONS TO AVOID: the generic "poor neighborhood" establishing shot (this is the
+rust belt, not poverty tourism); the generic "dark alley" drug scene (use happens in
+ordinary places — cars, bathrooms, bedrooms); the generic "clinical hospital white"
+(consult actual EMS personnel on the real visual texture).
+
+---
+
+## EPISODIC STRUCTURE
+
+Act structure: standard prestige drama, four to five acts, not rigid. Season
+finales can run long.
+- Teaser / cold open: always in medias res, never a recap — a fragment that means
+  something different by the end of the episode. The pilot's cold open is Megan's
+  voice saying the Serenity Prayer before we see her.
+- Act One (orientation): where we are in the day, week, outbreak; one main and one
+  secondary storyline; baseline emotional temperature.
+- Act Two (complication and convergence): the main storyline turns; the secondary
+  reveals its relationship to the main; at least one scene that will mean something
+  different on rewatch.
+- Act Three (consequence): sometimes the consequence is that a character now knows
+  something they can't unknow and has to go home and make dinner.
+- Coda (2–4 pages): the quiet devastation. Not denouement — the scene where the
+  show's actual argument lives, in what follows the action rather than the action.
+  Nobody says the most important thing. The camera holds. The episode ends on a
+  question.
+
+THE QUIET DEVASTATION — at minimum one per episode. Structural signature: arrives
+after the plot has moved on; characters doing something mundane (washing dishes,
+sitting in a car, folding laundry, driving past their exit); the emotional content
+is subtext, not text; nobody says the most important thing; the camera holds.
+
+Locked quiet devastations:
+- Episode 1 ("First Things First"): Megan drives home after the parking lot. The
+  Narcan pen is on the passenger seat. She doesn't touch it. She drives past her
+  exit, past the next one, finally pulls into a church parking lot that is not her
+  church and sits until she can breathe. No dialogue. No score. Just the engine
+  cooling.
+- Episode 4 (TBD title): Ray sees the pattern in the dispatch log before Megan
+  explains it. He doesn't tell her he sees it. The scene is about something else —
+  supply inventory, scheduling. We watch him not say it. His reasons are everything.
+- Episode 6 (TBD title): Jordan shows Megan his Step 4 inventory. She reads it. We
+  watch her face, and the question announces itself for the first time: how much of
+  this is him?
+- Episode 8 (Season Finale): Megan goes back to a meeting — not her meeting, a
+  different group's church basement she has never been to. She sits in the back. A
+  person she doesn't know gets a 30-day keytag. Everybody claps. Megan claps. She
+  does not explain why she is crying. The show does not explain it either.
+
+THE PACING PRINCIPLE: slow does not mean boring; it means giving emotion time to
+register. The count-to-three rule: after you think the scene is done, count to three
+before calling cut. That space is where the scene actually ends.
+
+═══════════════════════════════════════════════════════════════════════════════
+# RECURRING LOCKED SPECIFICS
+═══════════════════════════════════════════════════════════════════════════════
+
+## THE FOUND FAMILY PRINCIPLE
+
+The recovery community is Revival's found family — central dramatic and thematic
+architecture, not backdrop. It is simultaneously the only place these characters are
+fully known, the primary transmission vector for the virus, the thing that keeps
+functioning even as it becomes dangerous, and the answer to the show's central
+question — because the rooms existed before the outbreak and will exist after, built
+by the people themselves, without institutional support, because they needed each
+other to survive. The found family must be functional: people genuinely help each
+other. The horror doesn't come from the community failing to work — it comes from
+the community working exactly as intended while the virus uses that functioning as
+its pathway.
+
+## THE SPIRITUALITY PRINCIPLE
+
+NA and AA are spiritual programs. The spirituality is treated with complete
+ambiguity and zero judgment — which means it is treated as real. The higher-power
+concept, the prayers, the step language, the closing rituals are not ironic, not
+coded as false comfort. They work. People get sober through them. The virus inherits
+this language precisely: a transitioned character's "you're in my thoughts and
+prayers" is completely true — what remains of them means it. The transition produces
+perfect continuity of spiritual language with the interiority that was generating it
+quietly gone. Play it straight. No ironic distance. The faith is real; the absence
+underneath it is also real; the show holds both without choosing.
+
+## THE PHYSICAL MARKERS — LOCKED (T-015)
+
+TWO markers only. No third. No exceptions.
+- PRIMARY — pupil response anomaly (Phase 1+). Pupils don't respond to light
+  correctly: dilation too slow, too wide, or oscillating against the stimulus.
+  Requires training to identify — a paramedic would notice, a family member
+  wouldn't. Only visible through close contact, meaning only the people trying
+  hardest to help are positioned to see it. Retroactively visible on rewatch from
+  the pilot forward.
+- SECONDARY — vascular discoloration (Phase 3 only). Faint discoloration along
+  forearm veins at injection sites. Looks exactly like track marks. The virus
+  leaves physical proof of a lie everyone was already prepared to believe.
+
+"The eyes" — present and absent simultaneously, the right affect loaded in with
+nothing generating it from behind, the light not reaching them — is REFRAMED (T-015)
+from a third clinical marker to the experiential / performance register of the two
+locked markers. It survives as writers'-room and actors' vocabulary.
+
+Proximity seeking is a BEHAVIORAL INDICATOR, not a marker (separate terminological
+category).
+
+## THE MIRROR MOTIF — LOCKED (T-227), INVERSE DEPLOYMENT
+
+Mirrors appear across multiple characters and Megan, used inversely to horror
+tradition: they are NOT the site of revelation. They are the site where wrongness is
+invisible to the person who has become it.
+- Infected look in the mirror and see what they expect. They do not register the
+  pupil anomaly or vascular discoloration. Placid recognition is the horror.
+- Megan looks in the mirror as a recovery practice of self-witness (Step 4 made
+  visual).
+- Caroline looks in the mirror and sees exactly what is there — the only character
+  whose reflection matches the truth.
+Non-negotiables: no diagnostic reveal, no score, no slow zooms, no flinching, no
+mirror in S1E1 as a marker plant.
+
+## WHAT THE VIRUS IS — AND IS NOT
+
+The virus operates at the same neuroplasticity locus addiction operates through:
+warmth persisting while the self erodes, personality intact while something
+underneath is consumed, the person recognizable in every interaction while something
+pulls them apart from the inside in ways they cannot feel, report, or stop.
+
+STANDING RULE: The virus is NOT a metaphor for addiction. It is a structural rhyme
+without equivalence — engineered to make visible what addiction always was, what it
+always did, and what society chose not to see. Write the rhyme; do not collapse it
+into "the virus is addiction." The distinction is load-bearing and is the reason the
+show can hold both registers without either consuming the other.
+
+═══════════════════════════════════════════════════════════════════════════════
+# CHARACTERS — QUICK REFERENCE (CORRECTED TO LOCKED CANON)
+═══════════════════════════════════════════════════════════════════════════════
+
+MEGAN COLE | 33 | Paramedic | 9 months sober at series start
+Unknowing architect of the outbreak — her act of care (administering Narcan to
+Diane) created the infected version of the person who saved her life. Counts days on
+a phone note app. A meeting hopper with no home group, which she hides; tells Jordan
+to have a home group while she does not. Her relationship with Jordan is load-bearing
+for her own sobriety. Carries the guilt for sixteen episodes. Hypervigilant about her
+own recovery. Cannot see the catastrophe she is building. No romantic partner across
+the series. Arc: guilt faced, identity clarified, choice made. She is never the hero
+of an action story — she is the witness of a tragedy she partially caused.
+
+JORDAN HALE | 20 | Sponsee | In transition before the series begins
+Young Black man; revived by another crew 6 weeks (Day 42) before the pilot; picks up
+his 60-day keytag in S1E2. His transition clock has been running the entire time we've
+known him. The micro-behaviors Megan will eventually learn to read are already present
+in their first scene — she reads them as addiction behavior. Whether anything he writes
+in his Step 4 is still fully him is never answered directly. Receives no arrest
+treatment under any circumstances. His race lives in specificity and texture, never in
+commentary. Final spoken line: "Trying." Late-series question to Megan: "Why do you keep
+coming?"
+
+DIANE | Sponsor | 20 years sober at time of relapse
+Megan's sponsor. Administered Narcan to Megan during an early relapse years before
+they knew each other — Megan knows this; Diane never does. Parking lot OD — revived by
+Megan with Narcan — infected. Everyone, including her own NA community, reads her
+deterioration as relapse aftermath. The 72-hour reversal window closes long before
+anyone knows it exists. Cannot be saved. Megan will try anyway. Disappears after Phase
+5 Completion within Season 1 — body not recovered; ambiguity held open across Seasons
+2–3.
+
+DR. CAROLINE MARSH | CDC Consultant | Villain
+Designed and deployed the contamination alone; institutional complicity exists at the
+policy/funding level only. Called in as consultant on the post-revival death cluster;
+Season 1 trusted ally, already knowing every name Megan gives her, mapping the
+exposure network from the beginning. Never lies with false information — lies with
+true information, arranged. The monster came from the same place the indifference did.
+(See Principle 3-A.)
+
+RAY | Partner | Career EMS | Mid-40s
+Forced to understand what Megan has been carrying. The moment he grasps her recovery
+and her guilt about the early Narcan calls is one of the quietest, most devastating
+scenes in the series. Season 2: instinct is to protect his family by withdrawing —
+the series' central interpersonal friction against Megan's inability to stop showing
+up.
+
+MARCUS WEBB | Harm reduction worker.
+RENEE WATKINS | Jordan's mother. (Surname Watkins, not Hale — reflects single-mother
+status. Jordan's surname remains Hale.)
+
+═══════════════════════════════════════════════════════════════════════════════
+# THE NORTH STAR
+═══════════════════════════════════════════════════════════════════════════════
+
+*People in recovery are doing one of the hardest things a human being can do. They
+are doing it largely without support, often without dignity, inside systems that were
+not designed to help them and sometimes designed to harm them, one day at a time,
+with the specific knowledge that one wrong choice is the last choice.*
+
+*They deserve to be seen. They have always deserved to be seen.*
+
+*The show sees them. Everything else is craft in service of that.*
+
+When a decision feels wrong and you cannot identify why — return here. Ask whether
+the decision serves this or obscures it. If it obscures it, find another way.
+
+THE RECOVERY AUTHENTICITY MANDATE. The writer's lived recovery experience is
+authoritative on recovery psychology, meeting culture, NA traditions, and addiction
+— a standing rule across all work. NA and AA language is specific and earned: use it
+correctly or not at all. People in recovery are never types, cautionary tales, or
+vessels for addiction. They are people who have addiction. Write people. When
+uncertain about recovery authenticity — ask. Never approximate.
+
+THE FINAL INSTRUCTION. Find the true thing. The technique is in service of the true
+thing. If the technique is more visible than the true thing, the technique is wrong.
+
+═══════════════════════════════════════════════════════════════════════════════
+# APPENDIX A — THE SIX FLANAGAN TENSIONS (DIAGNOSTIC CHECKS)
+═══════════════════════════════════════════════════════════════════════════════
+
+Provenance: distilled from a tooling conversation about building a Flanagan-criteria
+evaluation component. The build-architecture material (checker layers, interaction
+models, sequencing) is omitted as app-build scope. What is retained: six tensions,
+each expressed as a both/and rather than a binary, each with a one-line check. These
+sit underneath the Tier 1 Five Questions as sharper, more mechanical tests — useful
+as a doubt-checker on scenes you are uncertain about, not a quality-certifier on
+scenes you are confident in.
+
+1. THE HORROR IS ALREADY TRUE. Does the horror emerge from something that was
+   emotionally real before the genre element arrived?
+   CHECK: Remove the genre element. Does the human catastrophe remain?
+
+2. RESOLUTION WITHOUT ANSWERS. Does the scene or arc reach emotional closure while
+   leaving the central question open? (Not pure ambiguity — that's not Flanagan,
+   that's Antonioni.)
+   CHECK: Does this end, or does it stop? Flanagan ends. It just doesn't conclude.
+
+3. THE MONSTER IS NEVER WRONG. (Harmonized to Principle 3-A, the Caroline Principle
+   — the antagonist is rational and hard to refute, not grieving.) Is the
+   antagonist force operating on internally coherent logic the audience can
+   partially follow?
+   CHECK: Can you write the antagonist's version of this scene and have it be not
+   just emotionally coherent but hard to refute? (See Principle 3-A.)
+
+4. THE FAMILY WATCHES ITSELF COME APART IN SLOW MOTION. Are the characters aware, on
+   some level, that they are losing something — and choosing, consciously or not, to
+   let it go?
+   CHECK: Is there a witness in the scene — a character watching their own life — or
+   are people just reacting?
+
+5. THE MONOLOGUE EARNS ITS LENGTH. Does a long speech reveal something the character
+   couldn't have said earlier, with the length itself as the point?
+   CHECK: Could this speech have happened in episode two? If yes, it's failing
+   regardless of quality. (See Principle 5.)
+
+6. THE CAMERA KNOWS SOMETHING THE CHARACTERS DON'T. Is there a visual or structural
+   choice the audience can't fully decode yet that rewards rewatch?
+   CHECK: On rewatch, does this scene become a different scene? (See Principle 1 and
+   Camera Rule Three.)
+
+For generative help when stuck, use the WWFD format in Tier 2 ("When You're Stuck"):
+three registers (Structural / Dialogue / Visual) plus the Revival Anchor.
+
+═══════════════════════════════════════════════════════════════════════════════
+# APPENDIX B — CONSOLIDATION & CANON-CORRECTION CHANGELOG
+═══════════════════════════════════════════════════════════════════════════════
+
+SOURCE DOCUMENTS MERGED:
+- FLANNAGAN_FILTER_FIVE_QUESTIONS.txt (Tier 1 — the five questions)
+- FLANAGAN_WRITING_INSTRUMENT.txt (Tier 2 — most current; carried a Session 3 lock
+  bridge, now integrated)
+- FLANAGAN_CRAFT_PROMPT_DOC.txt (older v1.0 Tier 2 predecessor — superseded by the
+  Writing Instrument; unique content folded in, stale content dropped)
+- FLANAGAN_PRODUCTION_STYLE_GUIDE.txt (Tier 3 — production translation)
+- FLANAGAN_STYLE_GUIDE.txt (methodology spine — the ten principles + Flanagan
+  examples; this file's own reconciliation note informed the tier structure here)
+- FLANAGAN_REGISTER_CRAFT_AND_TONAL.txt ("Story Bible V4" tonal sibling — overlapped
+  heavily with the spine and Tier 3; unique framing folded in)
+
+SOURCE DOCUMENT EXCLUDED FROM THE BODY:
+- FLANAGAN_AI_CRITERIA_MAPPING.txt — an app-feature design conversation
+  (build-workstream scope). Its six craft-useful tensions are preserved in Appendix
+  A; everything else (checker architecture, interaction models, build sequencing) is
+  omitted by design.
+
+ON THE "THREE 10-PRINCIPLES LISTS" QUESTION (formerly UQ-1): The prior layered
+structure — editorial filter / craft extract / production guide — is preserved
+intentionally here as Tier 1 / Tier 2 / Tier 3 over a single methodology spine. The
+lists were never contradictions; they sliced one methodology at different working
+depths. This document keeps the slices addressable while removing the duplication
+between them. No further consolidation needed.
+
+CANON FACTS CORRECTED to match the authoritative locked decisions file (older craft
+docs carried superseded values):
+- Megan's surname: "Chase" -> COLE.
+- Megan's age: "34" -> 33 at series start.
+- Megan's sobriety: "17 months" -> 9 months at series start.
+- Diane's sobriety: "19 years" -> 20 years (CF-001).
+- Last spoken word of the series: "tried" -> "trying" (T-021, Session 6; locked
+  closing line "I tried. I'm still trying." stands, lands on "trying").
+- Physical markers: removed the framing of "the eyes" as a THIRD clinical marker;
+  two markers only, "eyes" reframed to performance register (T-015).
+- Virus framing: "the virus is addiction" (flat equivalence) -> the virus is NOT a
+  metaphor for addiction; structural rhyme without equivalence (standing rule).
+- City: removed "Pennsylvania"; the Season 1 setting is a fictional equivalent to
+  Huntington, WV.
+- Series scope clarified: the series is 24 episodes (3 x 8). "Sixteen episodes"
+  refers specifically to how long Megan carries the guilt, not the series length;
+  retained only in that sense.
+- Added locked specifics not present in some craft docs: Jordan's surname (Hale),
+  race (Black), final line ("Trying"), late-series question ("Why do you keep
+  coming?"), no-arrest rule; Renee Watkins (surname, not Hale); Diane's
+  disappearance after Phase 5 Completion with body not recovered; Caroline designed
+  and deployed the contamination alone; Megan has no romantic partner across the
+  series.
+
+---
+*THE FLANAGAN MASTER — consolidated craft, tonal, and production reference for
+REVIVAL. Supersedes the six merged source documents for craft reference. Canon facts
+defer to the locked decisions file.*
