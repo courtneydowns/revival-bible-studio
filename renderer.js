@@ -12320,7 +12320,7 @@ async function buildPreviewPayload() {
 
   const payload = {
     model: chatModelSelect.value,
-    max_tokens: 8192,
+    max_tokens: 32768,
     tools: ['propose_canon_entry (P41 — see main.js for full schema)'],
     ...(systemPrompt ? { system: systemPrompt } : {}),
     messages,

@@ -569,7 +569,7 @@ function registerIpc() {
     const fullSystem = (systemPrompt || '') + PROPOSE_TOOL_INSTRUCTION;
     const baseBody = {
       model: safeModel,
-      max_tokens: 8192,
+      max_tokens: 32768,
       messages,
       tools: [PROPOSE_TOOL],
       system: fullSystem,
@@ -580,11 +580,14 @@ function registerIpc() {
     // Collect any tool_use blocks from the first response.
     const toolUseBlocks = (data.content || []).filter((b) => b.type === 'tool_use');
     const textBlock = (data.content || []).find((b) => b.type === 'text');
+    const truncationWarning = data.stop_reason === 'max_tokens'
+      ? '\n\n⚠ Response cut short — send a follow-up to continue'
+      : '';
 
     if (toolUseBlocks.length === 0) {
       // No tool call — plain text response (common path).
       if (!textBlock) throw new Error('Unexpected response shape from Claude API.');
-      return { text: textBlock.text, proposalsCreated: [] };
+      return { text: textBlock.text + truncationWarning, proposalsCreated: [] };
     }
 
     // Tool use path: create proposals in DB, then get Claude's acknowledgement.

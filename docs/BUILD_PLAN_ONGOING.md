@@ -335,7 +335,7 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Fix: replace bare `apiName` shorthand with `config.apiName` in both the archive and delete undo action objects
 - **Smoke passed.**
 
-### PAUDIT-2a — Chat response truncation fix
+### PAUDIT-2a — Chat response truncation fix ✅
 **Tool:** VS Code ext
 - `max_tokens` set to `8192` caused Claude to cut responses mid-sentence with no warning
 - Fix 1: raised `max_tokens` to `32768`
