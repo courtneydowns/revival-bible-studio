@@ -3763,6 +3763,128 @@
         font-style: italic;
         margin-top: 6px;
       }
+
+      /* ── PBLOCK — Question Status panel ─────────────────────────────── */
+      .pblock-panel {
+        margin-top: 20px;
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-left: 3px solid #4a9a6e;
+        border-radius: 6px;
+        background: rgba(74, 154, 110, 0.04);
+      }
+      .pblock-head {
+        font-size: 11px;
+        font-weight: 600;
+        color: #4a9a6e;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin-bottom: 10px;
+      }
+      .pblock-row {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .pblock-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .pblock-none {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .pblock-blocking-detail {
+        font-size: 12px;
+        color: #c0654a;
+        font-weight: 500;
+      }
+      .pblock-resolved-note {
+        font-size: 12px;
+        color: #4a9a6e;
+        font-style: italic;
+      }
+      .pblock-history-note {
+        font-size: 12px;
+        color: var(--muted);
+        font-style: italic;
+      }
+      .pblock-btn {
+        font-size: 12px;
+        padding: 3px 10px;
+      }
+      .pblock-confirm-row {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 6px;
+      }
+      .pblock-confirm-text {
+        font-size: 12px;
+        color: var(--text);
+      }
+      .pblock-blocking-form,
+      .pblock-promote-form {
+        margin-top: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .pblock-blocking-form[hidden],
+      .pblock-promote-form[hidden] { display: none; }
+      .pblock-input {
+        font: inherit;
+        font-size: 13px;
+        padding: 5px 8px;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .pblock-input:focus { outline: none; border-color: #4a9a6e; }
+      .pblock-select {
+        font: inherit;
+        font-size: 12px;
+        padding: 4px 8px;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+      }
+      .pblock-select:focus { outline: none; border-color: #4a9a6e; }
+      .pblock-textarea {
+        font: inherit;
+        font-size: 13px;
+        padding: 6px 8px;
+        background: var(--bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        resize: vertical;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .pblock-textarea:focus { outline: none; border-color: #4a9a6e; }
+      .pblock-btn-row {
+        display: flex;
+        gap: 6px;
+      }
+      .pblock-form-hint {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .badge-blocking {
+        background: rgba(192, 101, 74, 0.12);
+        color: #c0654a;
+        border: 1px solid rgba(192, 101, 74, 0.3);
+      }
     </style>
   </head>
   <body>

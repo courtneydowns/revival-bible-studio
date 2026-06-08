@@ -38,6 +38,8 @@ contextBridge.exposeInMainWorld('revival', {
     delete: (id) => ipcRenderer.invoke('openQuestions:delete', id),
     archive: (id) => ipcRenderer.invoke('openQuestions:archive', id),
     restore: (id) => ipcRenderer.invoke('openQuestions:restore', id),
+    escalateTier: (id) => ipcRenderer.invoke('openQuestions:escalateTier', id),
+    setBlocking: (id, opts) => ipcRenderer.invoke('openQuestions:setBlocking', id, opts),
   },
   conflicts: {
     list: () => ipcRenderer.invoke('conflicts:list'),
@@ -56,6 +58,7 @@ contextBridge.exposeInMainWorld('revival', {
     delete: (id) => ipcRenderer.invoke('decisions:delete', id),
     archive: (id) => ipcRenderer.invoke('decisions:archive', id),
     restore: (id) => ipcRenderer.invoke('decisions:restore', id),
+    createFromQuestion: (questionId, entry) => ipcRenderer.invoke('decisions:createFromQuestion', questionId, entry),
   },
   brainstorm: {
     list: () => ipcRenderer.invoke('brainstorm:list'),

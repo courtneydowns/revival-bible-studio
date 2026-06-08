@@ -1695,6 +1695,21 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '047_pblock',
+    up(db) {
+      // PBLOCK — blocking flag, tier escalation, promote-to-decision.
+      db.exec(`
+        ALTER TABLE open_questions ADD COLUMN is_blocking       INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE open_questions ADD COLUMN blocking_target   TEXT;
+        ALTER TABLE open_questions ADD COLUMN blocking_type     TEXT CHECK(blocking_type IN ('episode','character','arc'));
+        ALTER TABLE open_questions ADD COLUMN tier_escalated_at TEXT;
+        ALTER TABLE open_questions ADD COLUMN tier_escalated_from INTEGER;
+
+        ALTER TABLE decisions ADD COLUMN source_question_id INTEGER REFERENCES open_questions(id) ON DELETE SET NULL;
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -1886,8 +1901,57 @@ function makeEntryRepo(table) {
 const sourceMaterial = makeEntryRepo('source_material');
 const documents = makeEntryRepo('documents');
 const openQuestions = makeEntryRepo('open_questions');
+
+// PBLOCK — escalate tier and set blocking flag.
+openQuestions.escalateTier = (id) => {
+  const db = getDb();
+  const q = db.prepare('SELECT * FROM open_questions WHERE id = ?').get(id);
+  if (!q) throw new Error('Entry not found.');
+  if (!q.tier || q.tier === 1) throw new Error('Already Tier 1 or tier not set.');
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE open_questions
+        SET tier = 1, tier_escalated_at = ?, tier_escalated_from = ?, updated_at = ?
+      WHERE id = ?`
+  ).run(now, q.tier, now, id);
+  return db.prepare('SELECT * FROM open_questions WHERE id = ?').get(id);
+};
+
+openQuestions.setBlocking = (id, { is_blocking = false, blocking_target = null, blocking_type = null } = {}) => {
+  const db = getDb();
+  if (!db.prepare('SELECT 1 FROM open_questions WHERE id = ?').get(id)) throw new Error('Entry not found.');
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE open_questions
+        SET is_blocking = ?, blocking_target = ?, blocking_type = ?, updated_at = ?
+      WHERE id = ?`
+  ).run(is_blocking ? 1 : 0, is_blocking ? (blocking_target || null) : null, is_blocking ? (blocking_type || null) : null, now, id);
+  return db.prepare('SELECT * FROM open_questions WHERE id = ?').get(id);
+};
+
 const conflicts = makeEntryRepo('conflicts');
 const decisions = makeEntryRepo('decisions');
+
+// PBLOCK — create a Decision from an Open Question (promote-to-decision).
+decisions.createFromQuestion = (questionId, { title, body } = {}) => {
+  const db = getDb();
+  const q = db.prepare('SELECT * FROM open_questions WHERE id = ?').get(questionId);
+  if (!q) throw new Error('Question not found.');
+  const cleanTitle = (title || q.title || '').trim();
+  if (!cleanTitle) throw new Error('Title is required.');
+  const now = new Date().toISOString();
+  const info = db
+    .prepare(
+      `INSERT INTO decisions (title, body, created_at, updated_at, source_question_id)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+    .run(cleanTitle, (body || q.body || '').trim(), now, now, questionId);
+  const decision = db.prepare('SELECT * FROM decisions WHERE id = ?').get(info.lastInsertRowid);
+  db.prepare(
+    `UPDATE open_questions SET resolved_by_decision_id = ?, updated_at = ? WHERE id = ?`
+  ).run(decision.id, now, questionId);
+  return decision;
+};
 const brainstorm = makeEntryRepo('brainstorm_items');
 const research = makeEntryRepo('research_items');
 // Backed by `characters_workspace` / `episodes_workspace` (renamed from
@@ -2672,7 +2736,16 @@ const dashboard = {
       )
       .all(cutoff(canonReviewDays));
 
-    return { tier1Questions, stalledConflicts, pendingProposals };
+    // PBLOCK: blocking questions always surface regardless of staleness.
+    const blockingQuestions = db
+      .prepare(
+        `SELECT id, title, updated_at, blocking_target, blocking_type FROM open_questions
+          WHERE archived_at IS NULL AND is_blocking = 1
+          ORDER BY updated_at ASC`
+      )
+      .all();
+
+    return { tier1Questions, stalledConflicts, pendingProposals, blockingQuestions };
   },
   // PHOME: the three nav badge counts. Unsorted = total active items; Canon
   // Review = proposals still awaiting a decision (pending); Open Questions =

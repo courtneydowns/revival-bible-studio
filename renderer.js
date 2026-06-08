@@ -948,6 +948,12 @@ function makeEntryWorkspace(config) {
       badge.textContent = 'Draft';
       titleRow.appendChild(badge);
     }
+    if (!archivedFlag && item.is_blocking) {
+      const badge = document.createElement('span');
+      badge.className = 'tc-list-badge badge-blocking';
+      badge.textContent = 'Blocking';
+      titleRow.appendChild(badge);
+    }
     titleRow.appendChild(document.createTextNode(item.title));
     btn.appendChild(titleRow);
 
@@ -5429,8 +5435,8 @@ function buildNeedsAttentionPanel(container) {
     head.appendChild(refreshBtn);
     wrap.appendChild(head);
 
-    const { tier1Questions, stalledConflicts, pendingProposals } = data;
-    const total = tier1Questions.length + stalledConflicts.length + pendingProposals.length;
+    const { tier1Questions, stalledConflicts, pendingProposals, blockingQuestions = [] } = data;
+    const total = tier1Questions.length + stalledConflicts.length + pendingProposals.length + blockingQuestions.length;
 
     if (total === 0) {
       const empty = document.createElement('p');
@@ -5484,6 +5490,43 @@ function buildNeedsAttentionPanel(container) {
         grid.appendChild(btn);
       }
 
+      cat.appendChild(grid);
+      wrap.appendChild(cat);
+    }
+
+    // PBLOCK: blocking questions always appear regardless of staleness threshold.
+    if (blockingQuestions.length > 0) {
+      const cat = document.createElement('div');
+      cat.className = 'na-category';
+      const catHead = document.createElement('div');
+      catHead.className = 'na-category-head';
+      const catLabel = document.createElement('span');
+      catLabel.className = 'na-category-label';
+      catLabel.textContent = 'Blocking questions';
+      const badge = document.createElement('span');
+      badge.className = 'na-count-badge';
+      badge.textContent = String(blockingQuestions.length);
+      catHead.append(catLabel, badge);
+      cat.appendChild(catHead);
+      const grid = document.createElement('div');
+      grid.className = 'na-items';
+      for (const item of blockingQuestions) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'na-item';
+        btn.title = 'Go to Open Questions';
+        btn.addEventListener('click', () => route('Open Questions'));
+        const titleEl = document.createElement('div');
+        titleEl.className = 'na-item-title';
+        titleEl.textContent = item.title || '(untitled)';
+        const subEl = document.createElement('div');
+        subEl.className = 'na-item-age';
+        const k = item.blocking_type || 'item';
+        const t = item.blocking_target;
+        subEl.textContent = t ? `Blocking ${k}: "${t}"` : 'Marked as blocking';
+        btn.append(titleEl, subEl);
+        grid.appendChild(btn);
+      }
       cat.appendChild(grid);
       wrap.appendChild(cat);
     }
@@ -9761,6 +9804,306 @@ function mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, entityKin
 }
 // ── End P46-B ──────────────────────────────────────────────────────────────
 
+// ── PBLOCK — Open Questions: blocking flag, tier escalation, promote to Decision ──
+// Appended to rightCol in Open Questions detailExtra. Manages its own async state.
+function mountPBlockPanel(rightCol, item, archivedFlag) {
+  const panel = document.createElement('div');
+  panel.className = 'pblock-panel';
+
+  const head = document.createElement('div');
+  head.className = 'pblock-head';
+  head.textContent = 'Question Status';
+  panel.appendChild(head);
+
+  // --- Blocking flag section ---
+  const blockWrap = document.createElement('div');
+  panel.appendChild(blockWrap);
+  renderBlockingUI(blockWrap);
+
+  // --- Tier escalation section (tier 2/3 only, or show history if already escalated) ---
+  if (!archivedFlag && item.tier && item.tier > 1) {
+    const tierWrap = document.createElement('div');
+    panel.appendChild(tierWrap);
+    renderTierUI(tierWrap);
+  } else if (item.tier_escalated_at) {
+    const tierWrap = document.createElement('div');
+    tierWrap.className = 'pblock-history-note';
+    tierWrap.textContent =
+      `Escalated from Tier ${item.tier_escalated_from} on ${new Date(item.tier_escalated_at).toLocaleDateString()}`;
+    panel.appendChild(tierWrap);
+  }
+
+  // --- Promote to Decision section (active questions only) ---
+  if (!archivedFlag) {
+    const promoteWrap = document.createElement('div');
+    panel.appendChild(promoteWrap);
+    renderPromoteUI(promoteWrap);
+  } else if (item.resolved_by_decision_id) {
+    const resolvedNote = document.createElement('div');
+    resolvedNote.className = 'pblock-resolved-note';
+    resolvedNote.textContent = `Promoted to Decision #${item.resolved_by_decision_id}`;
+    panel.appendChild(resolvedNote);
+  }
+
+  // Insert immediately after the actions row (same pattern as mountFlanaganFilter)
+  // so the panel is visible without heavy scrolling even on entries with long bodies.
+  const actionsRow = rightCol.querySelector('.tc-detail-actions');
+  if (actionsRow && actionsRow.nextSibling) {
+    rightCol.insertBefore(panel, actionsRow.nextSibling);
+  } else {
+    rightCol.appendChild(panel);
+  }
+
+  // ── Inner render functions ─────────────────────────────────────────────────
+
+  function renderBlockingUI(wrap) {
+    wrap.innerHTML = '';
+    const row = document.createElement('div');
+    row.className = 'pblock-row';
+
+    const label = document.createElement('span');
+    label.className = 'pblock-label';
+    label.textContent = 'Blocking:';
+    row.appendChild(label);
+
+    if (item.is_blocking) {
+      const detail = document.createElement('span');
+      detail.className = 'pblock-blocking-detail';
+      const t = item.blocking_target;
+      const k = item.blocking_type || 'item';
+      detail.textContent = t ? `${k}: "${t}"` : 'flagged';
+      row.appendChild(detail);
+
+      if (!archivedFlag) {
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn-secondary pblock-btn';
+        removeBtn.textContent = 'Remove flag';
+        removeBtn.addEventListener('click', async () => {
+          removeBtn.disabled = true;
+          try {
+            const updated = await window.revival.openQuestions.setBlocking(item.id, { is_blocking: false });
+            Object.assign(item, updated);
+            renderBlockingUI(wrap);
+          } catch { removeBtn.disabled = false; }
+        });
+        row.appendChild(removeBtn);
+      }
+      wrap.appendChild(row);
+    } else {
+      const noneLabel = document.createElement('span');
+      noneLabel.className = 'pblock-none';
+      noneLabel.textContent = 'Not blocking';
+      row.appendChild(noneLabel);
+
+      if (!archivedFlag) {
+        const setBtn = document.createElement('button');
+        setBtn.type = 'button';
+        setBtn.className = 'btn-secondary pblock-btn';
+        setBtn.textContent = 'Mark as blocking';
+        row.appendChild(setBtn);
+        wrap.appendChild(row);
+
+        const form = document.createElement('div');
+        form.className = 'pblock-blocking-form';
+        form.hidden = true;
+
+        const targetInput = document.createElement('input');
+        targetInput.type = 'text';
+        targetInput.className = 'pblock-input';
+        targetInput.placeholder = 'What is being blocked? (e.g. "Episode 3")';
+
+        const typeSelect = document.createElement('select');
+        typeSelect.className = 'pblock-select';
+        for (const [v, l] of [['episode', 'Episode'], ['character', 'Character'], ['arc', 'Arc']]) {
+          const opt = document.createElement('option');
+          opt.value = v; opt.textContent = l;
+          typeSelect.appendChild(opt);
+        }
+
+        const formBtnRow = document.createElement('div');
+        formBtnRow.className = 'pblock-btn-row';
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.className = 'btn-primary pblock-btn';
+        saveBtn.textContent = 'Set blocking flag';
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'btn-secondary pblock-btn';
+        cancelBtn.textContent = 'Cancel';
+        formBtnRow.append(saveBtn, cancelBtn);
+        form.append(targetInput, typeSelect, formBtnRow);
+        wrap.appendChild(form);
+
+        setBtn.addEventListener('click', () => { form.hidden = false; setBtn.hidden = true; targetInput.focus(); });
+        cancelBtn.addEventListener('click', () => { form.hidden = true; setBtn.hidden = false; });
+        saveBtn.addEventListener('click', async () => {
+          saveBtn.disabled = true;
+          try {
+            const updated = await window.revival.openQuestions.setBlocking(item.id, {
+              is_blocking: true,
+              blocking_target: targetInput.value.trim(),
+              blocking_type: typeSelect.value,
+            });
+            Object.assign(item, updated);
+            renderBlockingUI(wrap);
+          } catch { saveBtn.disabled = false; }
+        });
+      } else {
+        wrap.appendChild(row);
+      }
+    }
+  }
+
+  function renderTierUI(wrap) {
+    wrap.innerHTML = '';
+    const row = document.createElement('div');
+    row.className = 'pblock-row';
+
+    const label = document.createElement('span');
+    label.className = 'pblock-label';
+    label.textContent = `Tier ${item.tier}:`;
+    row.appendChild(label);
+
+    if (item.tier_escalated_at) {
+      const note = document.createElement('span');
+      note.className = 'pblock-history-note';
+      note.textContent =
+        `Escalated from Tier ${item.tier_escalated_from} on ${new Date(item.tier_escalated_at).toLocaleDateString()}`;
+      row.appendChild(note);
+      wrap.appendChild(row);
+    } else {
+      const escalateBtn = document.createElement('button');
+      escalateBtn.type = 'button';
+      escalateBtn.className = 'btn-secondary pblock-btn';
+      escalateBtn.textContent = 'Escalate to Tier 1';
+      escalateBtn.title = 'Promote this question to Tier 1. This will be logged.';
+      row.appendChild(escalateBtn);
+      wrap.appendChild(row);
+
+      escalateBtn.addEventListener('click', () => {
+        escalateBtn.hidden = true;
+        const confirmRow = document.createElement('div');
+        confirmRow.className = 'pblock-confirm-row';
+        const msg = document.createElement('span');
+        msg.className = 'pblock-confirm-text';
+        msg.textContent = 'Promote to Tier 1? This will be logged and cannot be undone.';
+        const yesBtn = document.createElement('button');
+        yesBtn.type = 'button';
+        yesBtn.className = 'btn-primary pblock-btn';
+        yesBtn.textContent = 'Escalate';
+        const noBtn = document.createElement('button');
+        noBtn.type = 'button';
+        noBtn.className = 'btn-secondary pblock-btn';
+        noBtn.textContent = 'Cancel';
+        confirmRow.append(msg, yesBtn, noBtn);
+        wrap.appendChild(confirmRow);
+
+        noBtn.addEventListener('click', () => { confirmRow.remove(); escalateBtn.hidden = false; });
+        yesBtn.addEventListener('click', async () => {
+          yesBtn.disabled = true;
+          try {
+            const updated = await window.revival.openQuestions.escalateTier(item.id);
+            Object.assign(item, updated);
+            renderTierUI(wrap);
+          } catch (e) {
+            msg.textContent = e.message || 'Could not escalate.';
+            yesBtn.disabled = false;
+          }
+        });
+      });
+    }
+  }
+
+  function renderPromoteUI(wrap) {
+    wrap.innerHTML = '';
+    if (item.resolved_by_decision_id) {
+      const row = document.createElement('div');
+      row.className = 'pblock-row';
+      const note = document.createElement('span');
+      note.className = 'pblock-resolved-note';
+      note.textContent = `Promoted to Decision #${item.resolved_by_decision_id}`;
+      const jumpBtn = document.createElement('button');
+      jumpBtn.type = 'button';
+      jumpBtn.className = 'btn-secondary pblock-btn';
+      jumpBtn.textContent = 'Open →';
+      jumpBtn.addEventListener('click', () => route('Decisions'));
+      row.append(note, jumpBtn);
+      wrap.appendChild(row);
+      return;
+    }
+
+    const row = document.createElement('div');
+    row.className = 'pblock-row';
+    const promoteBtn = document.createElement('button');
+    promoteBtn.type = 'button';
+    promoteBtn.className = 'btn-secondary pblock-btn';
+    promoteBtn.textContent = 'Promote to Decision';
+    promoteBtn.title = 'Create a linked Decision entry pre-filled with this question\'s content';
+    row.appendChild(promoteBtn);
+    wrap.appendChild(row);
+
+    const form = document.createElement('div');
+    form.className = 'pblock-promote-form';
+    form.hidden = true;
+
+    const formHint = document.createElement('div');
+    formHint.className = 'pblock-form-hint';
+    formHint.textContent = 'Creates a new Decision linked to this question:';
+
+    const titleInput = document.createElement('input');
+    titleInput.type = 'text';
+    titleInput.className = 'pblock-input';
+    titleInput.placeholder = 'Decision title…';
+    titleInput.value = item.title || '';
+
+    const bodyInput = document.createElement('textarea');
+    bodyInput.className = 'pblock-textarea';
+    bodyInput.placeholder = 'Resolution details (optional)…';
+    bodyInput.rows = 3;
+    bodyInput.value = item.body || '';
+
+    const formBtnRow = document.createElement('div');
+    formBtnRow.className = 'pblock-btn-row';
+    const createBtn = document.createElement('button');
+    createBtn.type = 'button';
+    createBtn.className = 'btn-primary pblock-btn';
+    createBtn.textContent = 'Create Decision';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'btn-secondary pblock-btn';
+    cancelBtn.textContent = 'Cancel';
+    formBtnRow.append(createBtn, cancelBtn);
+    form.append(formHint, titleInput, bodyInput, formBtnRow);
+    wrap.appendChild(form);
+
+    promoteBtn.addEventListener('click', () => {
+      form.hidden = false;
+      promoteBtn.hidden = true;
+      titleInput.focus();
+      titleInput.select();
+    });
+    cancelBtn.addEventListener('click', () => { form.hidden = true; promoteBtn.hidden = false; });
+    createBtn.addEventListener('click', async () => {
+      const title = titleInput.value.trim();
+      if (!title) { titleInput.focus(); return; }
+      createBtn.disabled = true;
+      try {
+        const decision = await window.revival.decisions.createFromQuestion(
+          item.id, { title, body: bodyInput.value.trim() }
+        );
+        Object.assign(item, { resolved_by_decision_id: decision.id });
+        renderPromoteUI(wrap);
+        showUndoToast(`Decision "${decision.title}" created — linked to this question.`);
+      } catch (e) {
+        formHint.textContent = e.message || 'Could not create decision.';
+        createBtn.disabled = false;
+      }
+    });
+  }
+}
+// ── End PBLOCK ─────────────────────────────────────────────────────────────
+
 const CONTENT_RENDERERS = {
   'Home': renderHomePage,
   'Writing Lab': renderWritingLabPage,
@@ -9809,6 +10152,8 @@ const CONTENT_RENDERERS = {
     draftPrefix: 'open_questions',
     addLabel: 'Add Question',
     detailExtra(rightCol, item, archivedFlag) {
+      // PBLOCK panel first — must be reachable without heavy scrolling.
+      mountPBlockPanel(rightCol, item, archivedFlag);
       const callbacks = {};
       if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
         entityKind: 'open_questions',

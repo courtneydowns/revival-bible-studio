@@ -100,6 +100,8 @@ function registerIpc() {
   ipcMain.handle('openQuestions:delete', (_event, id) => { const r = db.openQuestions.delete(id); recordEvent('Open Questions', 'deleted'); return r; });
   ipcMain.handle('openQuestions:archive', (_event, id) => { const r = db.openQuestions.archive(id); recordEvent('Open Questions', 'archived'); return r; });
   ipcMain.handle('openQuestions:restore', (_event, id) => db.openQuestions.restore(id));
+  ipcMain.handle('openQuestions:escalateTier', (_event, id) => { const r = db.openQuestions.escalateTier(id); recordEvent('Open Questions', 'tier-escalated'); return r; });
+  ipcMain.handle('openQuestions:setBlocking', (_event, id, opts) => db.openQuestions.setBlocking(id, opts));
 
   ipcMain.handle('conflicts:list', () => db.conflicts.list());
   ipcMain.handle('conflicts:listArchived', () => db.conflicts.listArchived());
@@ -116,6 +118,7 @@ function registerIpc() {
   ipcMain.handle('decisions:delete', (_event, id) => { const r = db.decisions.delete(id); recordEvent('Decisions', 'deleted'); return r; });
   ipcMain.handle('decisions:archive', (_event, id) => { const r = db.decisions.archive(id); recordEvent('Decisions', 'archived'); return r; });
   ipcMain.handle('decisions:restore', (_event, id) => db.decisions.restore(id));
+  ipcMain.handle('decisions:createFromQuestion', (_event, questionId, entry) => { const r = db.decisions.createFromQuestion(questionId, entry); recordEvent('Decisions', 'created'); return r; });
 
   ipcMain.handle('brainstorm:list', () => db.brainstorm.list());
   ipcMain.handle('brainstorm:listArchived', () => db.brainstorm.listArchived());

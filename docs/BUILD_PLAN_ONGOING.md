@@ -569,10 +569,11 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 
 ## Open Questions enhancements
 
-### PBLOCK — Open Questions: blocking flag + escalation
+### PBLOCK — Open Questions: blocking flag + escalation ✅
 - **Blocking flag:** mark a question as blocking a named episode/character/arc. Surfaces in Needs Attention panel.
 - **Tier escalation:** promote Tier-2 → Tier-1 with confirmation. Escalation logged in question history.
 - **Promote to Decision:** when resolved, one-click creates a linked Decision entry pre-filled with the resolution and source question. Link-don't-copy.
+- Migration 047 adds: `is_blocking`, `blocking_target`, `blocking_type`, `tier_escalated_at`, `tier_escalated_from` on `open_questions`; `source_question_id` on `decisions`.
 - **Smoke:** Flag a question as blocking an episode, confirm it surfaces in Needs Attention; escalate a Tier-2 question, confirm tier badge updates and escalation is logged; resolve a question, promote to Decision, confirm linked Decision entry exists
 
 ---
