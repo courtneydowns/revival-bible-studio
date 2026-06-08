@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('revival', {
     restore: (id) => ipcRenderer.invoke('openQuestions:restore', id),
     escalateTier: (id) => ipcRenderer.invoke('openQuestions:escalateTier', id),
     setBlocking: (id, opts) => ipcRenderer.invoke('openQuestions:setBlocking', id, opts),
+    get: (id) => ipcRenderer.invoke('openQuestions:get', id),
   },
   conflicts: {
     list: () => ipcRenderer.invoke('conflicts:list'),

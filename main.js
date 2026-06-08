@@ -102,6 +102,7 @@ function registerIpc() {
   ipcMain.handle('openQuestions:restore', (_event, id) => db.openQuestions.restore(id));
   ipcMain.handle('openQuestions:escalateTier', (_event, id) => { const r = db.openQuestions.escalateTier(id); recordEvent('Open Questions', 'tier-escalated'); return r; });
   ipcMain.handle('openQuestions:setBlocking', (_event, id, opts) => db.openQuestions.setBlocking(id, opts));
+  ipcMain.handle('openQuestions:get', (_event, id) => db.openQuestions.get(id));
 
   ipcMain.handle('conflicts:list', () => db.conflicts.list());
   ipcMain.handle('conflicts:listArchived', () => db.conflicts.listArchived());

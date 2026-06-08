@@ -2556,6 +2556,20 @@ function buildCanonCard(
   if (typeof actionsBuilder === 'function') {
     const actions = actionsBuilder(e, card);
     if (actions) card.appendChild(actions);
+  } else {
+    // PAUDIT-3 — Reference Mode: no edit actions, but still expose the popout trigger.
+    const actions = document.createElement('div');
+    actions.className = 'tc-detail-actions';
+    const popoutBtn = document.createElement('button');
+    popoutBtn.type = 'button';
+    popoutBtn.className = 'btn-secondary';
+    popoutBtn.textContent = 'Pop out ↗';
+    popoutBtn.title = 'Open this entry in its own window';
+    popoutBtn.addEventListener('click', () => {
+      window.revival.popout.open('Canon Bible', e.id);
+    });
+    actions.appendChild(popoutBtn);
+    card.appendChild(actions);
   }
 
   // PTAG — tag bar on canon cards. Available even on retired entries so the
@@ -3304,6 +3318,16 @@ function renderCanonBiblePage(section) {
     });
     actions.appendChild(deleteBtn);
 
+    const popoutBtn = document.createElement('button');
+    popoutBtn.type = 'button';
+    popoutBtn.className = 'btn-secondary';
+    popoutBtn.textContent = 'Pop out ↗';
+    popoutBtn.title = 'Open this entry in its own window';
+    popoutBtn.addEventListener('click', () => {
+      window.revival.popout.open('Canon Bible', e.id);
+    });
+    actions.appendChild(popoutBtn);
+
     addHistoryAffordance(actions, e);
 
     return actions;
@@ -3338,6 +3362,16 @@ function renderCanonBiblePage(section) {
       showCanonDeleteConfirm(actions, e);
     });
     actions.appendChild(deleteBtn);
+
+    const retiredPopoutBtn = document.createElement('button');
+    retiredPopoutBtn.type = 'button';
+    retiredPopoutBtn.className = 'btn-secondary';
+    retiredPopoutBtn.textContent = 'Pop out ↗';
+    retiredPopoutBtn.title = 'Open this entry in its own window';
+    retiredPopoutBtn.addEventListener('click', () => {
+      window.revival.popout.open('Canon Bible', e.id);
+    });
+    actions.appendChild(retiredPopoutBtn);
 
     addHistoryAffordance(actions, e);
 
@@ -10306,6 +10340,40 @@ const CONTENT_RENDERERS = {
     titlePlaceholder: 'What was decided?',
     bodyPlaceholder: 'The decision, and why it was settled this way (optional)',
     detailExtra(rightCol, item, archivedFlag) {
+      // PAUDIT-3 — back-link to the Open Question this Decision was promoted from.
+      if (item.source_question_id) {
+        const row = document.createElement('div');
+        row.className = 'canon-chain';
+        const label = document.createElement('span');
+        label.className = 'canon-chain-label';
+        label.textContent = 'From question: ';
+        row.appendChild(label);
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.className = 'canon-chain-link';
+        link.textContent = '…';
+        link.disabled = true;
+        row.appendChild(link);
+        rightCol.appendChild(row);
+
+        window.revival.openQuestions.get(item.source_question_id)
+          .then((oq) => {
+            if (oq) {
+              link.textContent = oq.title;
+              link.disabled = false;
+              link.title = 'Navigate to source question';
+              link.addEventListener('click', () => {
+                route('Open Questions', item.source_question_id);
+              });
+            } else {
+              link.textContent = `#${item.source_question_id} (not found)`;
+            }
+          })
+          .catch(() => {
+            link.textContent = `#${item.source_question_id}`;
+          });
+      }
+
       const callbacks = {};
       if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
         entityKind: 'decisions',

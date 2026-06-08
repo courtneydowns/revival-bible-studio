@@ -121,7 +121,8 @@ const params = new URLSearchParams(location.search);
 const workspaceName = params.get('workspace');
 const entryId = Number(params.get('id'));
 const isCanonReview = workspaceName === 'Canon Review';
-const config = isCanonReview ? null : WORKSPACE_CONFIGS[workspaceName];
+const isCanonBible = workspaceName === 'Canon Bible';
+const config = (isCanonReview || isCanonBible) ? null : WORKSPACE_CONFIGS[workspaceName];
 const api = config ? window.revival[config.apiName] : null;
 
 const root = document.getElementById('popout-root');
@@ -521,10 +522,8 @@ async function refresh() {
 }
 
 window.revival.popout.onChanged((ws) => {
-  // Canon Review's own onChanged is wired by mountCanonReviewPopout below —
-  // returning early here keeps the generic refresh() from running with a
-  // null api.
-  if (isCanonReview) return;
+  // Canon Review and Canon Bible have their own onChanged wired below.
+  if (isCanonReview || isCanonBible) return;
   if (ws === workspaceName && !isEditing) refresh();
 });
 
@@ -536,6 +535,14 @@ if (isCanonReview) {
     renderMissing(shell.card, shell.mode);
   } else {
     mountCanonReviewPopout();
+  }
+} else if (isCanonBible) {
+  // PAUDIT-3 — Canon Bible entries have a custom read-only popout path.
+  if (!Number.isFinite(entryId)) {
+    shell = mountShell();
+    renderMissing(shell.card, shell.mode);
+  } else {
+    mountCanonBiblePopout();
   }
 } else if (!config || !api || !Number.isFinite(entryId)) {
   shell = mountShell();
@@ -865,4 +872,97 @@ function showVerbConfirm(card, actions, { verb, danger, prompt, run }) {
   row.append(promptEl, noteInput, yes, no);
   actions.replaceWith(row);
   noteInput.focus();
+}
+
+// --- Canon Bible popout (PAUDIT-3) -----------------------------------------
+// Read-only view of a single canon entry. Fetches from the active + retired
+// lists, renders title / body / type badge / status chips / timestamps.
+
+function mountCanonBiblePopout() {
+  if (!shell) shell = mountShell();
+  refreshCanonBible();
+  window.revival.popout.onChanged((ws) => {
+    if (ws === 'Canon Bible') refreshCanonBible();
+  });
+}
+
+async function refreshCanonBible() {
+  if (!shell) shell = mountShell();
+  let entry;
+  try {
+    const [active, retired] = await Promise.all([
+      window.revival.canon.list(),
+      window.revival.canon.listRetired(),
+    ]);
+    entry = [...active, ...retired].find((e) => e.id === entryId) || null;
+  } catch (err) {
+    shell.card.innerHTML = '';
+    const p = document.createElement('p');
+    p.className = 'form-error';
+    p.textContent = `Could not load entry: ${err.message || err}`;
+    shell.card.appendChild(p);
+    return;
+  }
+  if (!entry) {
+    renderMissing(shell.card, shell.mode);
+    return;
+  }
+  renderCanonBibleView(shell.card, shell.mode, entry);
+}
+
+function renderCanonBibleView(card, mode, e) {
+  card.innerHTML = '';
+  setStatus(mode, e.locked ? 'Locked — read only' : 'Reference Mode');
+  document.title = `${e.title} — Canon Bible`;
+
+  // Update frame bar type label to reflect entry_type.
+  const bar = root.querySelector('.po-frame-bar');
+  if (bar) {
+    const spans = bar.querySelectorAll('span:not(.po-frame-dot):not(.po-frame-mode)');
+    if (spans[1]) spans[1].textContent = e.entry_type || 'Canon entry';
+  }
+
+  const typeBadge = document.createElement('span');
+  typeBadge.className = 'canon-type-badge';
+  typeBadge.textContent = e.entry_type || 'Canon entry';
+  card.appendChild(typeBadge);
+
+  const h = document.createElement('h2');
+  h.className = 'tc-detail-header';
+  h.textContent = e.title;
+  card.appendChild(h);
+
+  if (e.body) {
+    const body = document.createElement('div');
+    body.className = 'tc-detail-body';
+    body.textContent = e.body;
+    card.appendChild(body);
+  }
+
+  // Status chips (lock / retired / provisional).
+  const chips = document.createElement('div');
+  chips.className = 'canon-chips';
+  const addChip = (label, cls) => {
+    if (!label) return;
+    const c = document.createElement('span');
+    c.className = `canon-chip ${cls || ''}`.trim();
+    c.textContent = label;
+    chips.appendChild(c);
+  };
+  if (e.locked) {
+    addChip(e.locked_label ? `🔒 locked · ${e.locked_label}` : '🔒 locked', 'canon-chip-locked');
+  }
+  if (e.retired) addChip('retired', 'canon-chip-retired');
+  if (e.provisional) addChip('provisional', 'canon-chip-provisional');
+  if (chips.children.length) card.appendChild(chips);
+
+  const meta = document.createElement('div');
+  meta.className = 'tc-detail-meta';
+  const created = new Date(e.created_at).toLocaleString();
+  if (e.retired && e.retired_at) {
+    meta.textContent = `created ${created} · retired ${new Date(e.retired_at).toLocaleString()}`;
+  } else {
+    meta.textContent = `created ${created} · updated ${new Date(e.updated_at).toLocaleString()}`;
+  }
+  card.appendChild(meta);
 }

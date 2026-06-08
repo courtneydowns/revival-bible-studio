@@ -348,12 +348,12 @@ One concept per phase. Each phase = one Claude Code session, ideally short.
 - Fix: synced `buildPreviewPayload` to include all attachment types that `buildSystemPrompt` sends
 - **Smoke passed.**
 
-### PAUDIT-3 — Canon Bible popout + Decisions back-link
+### PAUDIT-3 — Canon Bible popout + Decisions back-link ✅
 **Tool:** VS Code ext
 Two plain UI omissions, same file, grouped:
 - **Canon Bible popout:** Add "Pop out ↗" button to Canon Bible detail panel. Popout already handles the canon path in popout.js — just needs the trigger button wired in.
 - **Decisions source_question_id back-link:** When a Decision was promoted from an Open Question, `source_question_id` is stored in the DB but never rendered. Display it as a navigable back-link in the Decisions detail panel ("From question: [title]").
-- **Smoke:** Open a Canon Bible entry → confirm Pop out button present → click it → confirm popout opens with correct entry. Promote an OQ to a Decision → open the Decision → confirm back-link renders → click it → confirm navigation to the originating OQ.
+- **Smoke passed.**
 
 ### PAUDIT-4 — P46-B analysis lock fix
 **Tool:** VS Code ext
