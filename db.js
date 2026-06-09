@@ -1764,6 +1764,27 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '051_pdecision_status',
+    up(db) {
+      // PDECISION-STATUS — Open / Tentative / Final status badge on every
+      // Decision entry. Nullable — existing rows get NULL (no status set).
+      db.exec(`
+        ALTER TABLE decisions ADD COLUMN decision_status TEXT CHECK(decision_status IN ('open','tentative','final'));
+      `);
+    },
+  },
+  {
+    name: '052_pdecision_promote',
+    up(db) {
+      // PDECISION-PROMOTE — track the Canon Review proposal created from this
+      // Decision so the detail panel can show a passive "proposal submitted"
+      // indicator. ON DELETE SET NULL so deleting the proposal doesn't cascade.
+      db.exec(`
+        ALTER TABLE decisions ADD COLUMN canon_proposal_id INTEGER REFERENCES canon_proposals(id) ON DELETE SET NULL;
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -2018,6 +2039,48 @@ openQuestions.setBlocking = (id, { is_blocking = false, blocking_target = null, 
 
 const conflicts = makeEntryRepo('conflicts');
 const decisions = makeEntryRepo('decisions');
+
+// PDECISION-STATUS — set decision_status on a decision entry.
+decisions.setStatus = function(id, status) {
+  getDb()
+    .prepare('UPDATE decisions SET decision_status = ?, updated_at = ? WHERE id = ?')
+    .run(status || null, new Date().toISOString(), id);
+  return decisions.get(id);
+};
+
+// PDECISION-PROMOTE — create a Canon Review proposal from a Decision.
+// Link-don't-copy: title + body pre-fill the proposal's proposed_fields_json,
+// and canon_proposal_id is written back onto the decision row so the UI can
+// show a passive "proposal submitted" indicator.
+decisions.promoteToCanonReview = (decisionId, { proposer_note } = {}) => {
+  const db = getDb();
+  const decision = db.prepare('SELECT * FROM decisions WHERE id = ?').get(decisionId);
+  if (!decision) throw new Error('Decision not found.');
+  if (decision.canon_proposal_id) throw new Error('A Canon Review proposal already exists for this decision.');
+  const now = new Date().toISOString();
+  const proposedFields = JSON.stringify({
+    title: (decision.title || '').trim(),
+    body: (decision.body || '').trim(),
+  });
+  const info = db
+    .prepare(
+      `INSERT INTO canon_proposals
+         (created_at, updated_at, proposal_intent, proposed_fields_json,
+          source_kind, source_entry_id, proposer_note, status)
+       VALUES (?, ?, 'new_entry', ?, 'decisions_workspace', ?, ?, 'pending')`
+    )
+    .run(
+      now,
+      now,
+      proposedFields,
+      decisionId,
+      (proposer_note || '').trim() || null
+    );
+  const proposal = db.prepare('SELECT * FROM canon_proposals WHERE id = ?').get(info.lastInsertRowid);
+  db.prepare('UPDATE decisions SET canon_proposal_id = ?, updated_at = ? WHERE id = ?')
+    .run(proposal.id, now, decisionId);
+  return parseProposalRow(proposal);
+};
 
 // PBLOCK — create a Decision from an Open Question (promote-to-decision).
 decisions.createFromQuestion = (questionId, { title, body } = {}) => {

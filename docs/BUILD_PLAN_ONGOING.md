@@ -432,7 +432,7 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ## Status fields (continued)
 
-### PDECISION-STATUS — Decision status badges
+### PDECISION-STATUS — Decision status badges ✅ DONE
 - Add **Open / Tentative / Final** status field to every Decision entry
 - Visible as a badge on list items and detail panel
 - Filterable in Decisions list
@@ -442,12 +442,12 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ## Decisions → Canon Review
 
-### PDECISION-PROMOTE — Decisions: promote to Canon Review
+### PDECISION-PROMOTE — Decisions: promote to Canon Review ✅
 - "Promote to Canon Review" action on any Decision entry
 - Creates a Canon Review proposal pre-filled with the decision content and a back-link to the source Decision
 - Source Decision shows a passive indicator that a proposal exists
 - Link-don't-copy — same discipline as all other Canon Review paths
-- **Smoke:** Promote a Decision to Canon Review; confirm proposal appears in Canon Review with source attribution; confirm back-link indicator on source Decision; approve proposal, confirm it lands in Canon Bible
+- **Smoke passed 2026-06-09.**
 
 ---
 

@@ -4365,6 +4365,7 @@ const SOURCE_KIND_LABELS = {
   writing_lab: 'Writing Lab',
   characters_workspace: 'Characters',
   episodes_workspace: 'Episodes',
+  decisions_workspace: 'Decisions',
   highlight_extract: 'Highlight extract',
   worldbuilding_import: 'Worldbuilding import',
   characters: 'Characters',
@@ -4878,7 +4879,8 @@ function renderCanonReviewPage(section, workspaceName) {
     // PAUDIT-5 — source attribution: clickable back-link when source is a navigable entry.
     const CR_SOURCE_KIND_TO_WORKSPACE = {
       writing_lab: 'Writing Lab', characters_workspace: 'Characters', characters: 'Characters',
-      episodes_workspace: 'Episodes', episodes: 'Episodes', open_questions: 'Open Questions',
+      episodes_workspace: 'Episodes', episodes: 'Episodes', decisions_workspace: 'Decisions',
+      open_questions: 'Open Questions',
       decisions: 'Decisions', conflicts: 'Conflicts', brainstorm_items: 'Brainstorm',
       brainstorm: 'Brainstorm', research_items: 'Research', research: 'Research',
       unsorted: 'Unsorted', source_material: 'Source Material', documents: 'Documents',
@@ -10742,55 +10744,266 @@ const CONTENT_RENDERERS = {
       callbacks.refreshHistory = refresh;
     },
   }),
-  // Decisions: lightweight filter (Editorial Filter + North Star only).
-  'Decisions': makeEntryWorkspace({
-    apiName: 'decisions',
-    entityKind: 'decisions',
-    draftPrefix: 'decisions',
-    addLabel: 'Record Decision',
-    titlePlaceholder: 'What was decided?',
-    bodyPlaceholder: 'The decision, and why it was settled this way (optional)',
-    detailExtra(rightCol, item, archivedFlag) {
-      // PAUDIT-3 — back-link to the Open Question this Decision was promoted from.
-      if (item.source_question_id) {
-        const row = document.createElement('div');
-        row.className = 'canon-chain';
-        const label = document.createElement('span');
-        label.className = 'canon-chain-label';
-        label.textContent = 'From question: ';
-        row.appendChild(label);
-        const link = document.createElement('button');
-        link.type = 'button';
-        link.className = 'canon-chain-link';
-        link.textContent = '…';
-        link.title = 'Navigate to source question';
-        // Wire the click handler immediately — navigation works regardless of
-        // whether the title fetch resolves, so the link is never disabled.
-        link.addEventListener('click', () => {
-          route('Open Questions', item.source_question_id);
-        });
-        row.appendChild(link);
-        rightCol.appendChild(row);
+  // Decisions (PDECISION-STATUS): lightweight filter + Open/Tentative/Final status badges.
+  // Wrapped in an IIFE so statusFilter state is shared across list filter and detail
+  // panel hooks without leaking into the outer scope (same pattern as Characters/Episodes).
+  'Decisions': (() => {
+    const DECISION_STATUS_OPTIONS = [
+      { value: 'open',      label: 'Open' },
+      { value: 'tentative', label: 'Tentative' },
+      { value: 'final',     label: 'Final' },
+    ];
+    const DECISION_STATUS_LABEL = Object.fromEntries(
+      DECISION_STATUS_OPTIONS.map((o) => [o.value, o.label])
+    );
 
-        window.revival.openQuestions.get(item.source_question_id)
-          .then((oq) => {
-            link.textContent = oq ? oq.title : `#${item.source_question_id} (not found)`;
-          })
-          .catch(() => {
-            link.textContent = `#${item.source_question_id}`;
-          });
+    // null = show all; a status string = filter to that status.
+    let statusFilter = null;
+    const reloadRef = { fn: null };
+
+    function mountDecisionStatusMeta(container, item, reload) {
+      const section = document.createElement('div');
+      section.className = 'decision-status-section';
+
+      const label = document.createElement('span');
+      label.className = 'decision-status-label';
+      label.textContent = 'Status:';
+      section.appendChild(label);
+
+      const btnGroup = document.createElement('div');
+      btnGroup.className = 'decision-status-selector';
+
+      const noneBtn = document.createElement('button');
+      noneBtn.type = 'button';
+      noneBtn.className = 'decision-status-btn';
+      if (!item.decision_status) noneBtn.classList.add('active');
+      noneBtn.textContent = 'None';
+      noneBtn.addEventListener('click', async () => {
+        if (!item.decision_status) return;
+        try {
+          await window.revival.decisions.setStatus(item.id, null);
+          await reload();
+        } catch { /* non-fatal */ }
+      });
+      btnGroup.appendChild(noneBtn);
+
+      for (const opt of DECISION_STATUS_OPTIONS) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `decision-status-btn decision-status-btn-${opt.value}`;
+        if (item.decision_status === opt.value) btn.classList.add('active');
+        btn.textContent = opt.label;
+        btn.addEventListener('click', async () => {
+          if (item.decision_status === opt.value) return;
+          try {
+            await window.revival.decisions.setStatus(item.id, opt.value);
+            await reload();
+          } catch { /* non-fatal */ }
+        });
+        btnGroup.appendChild(btn);
       }
 
-      const callbacks = {};
-      if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
-        entityKind: 'decisions',
-        workspaceName: 'Decisions',
-        lightweight: true,
-      });
-      const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'decisions');
-      callbacks.refreshHistory = refresh;
-    },
-  }),
+      section.appendChild(btnGroup);
+      container.appendChild(section);
+    }
+
+    return makeEntryWorkspace({
+      apiName: 'decisions',
+      entityKind: 'decisions',
+      draftPrefix: 'decisions',
+      addLabel: 'Record Decision',
+      titlePlaceholder: 'What was decided?',
+      bodyPlaceholder: 'The decision, and why it was settled this way (optional)',
+
+      matchesExtra(item) {
+        return statusFilter === null || item.decision_status === statusFilter;
+      },
+
+      isFilterActive() {
+        return statusFilter !== null;
+      },
+
+      listItemExtra(btn, item, archivedFlag) {
+        if (archivedFlag || !item.decision_status) return;
+        const titleRow = btn.querySelector('.tc-list-title');
+        if (!titleRow) return;
+        const badge = document.createElement('span');
+        badge.className = `tc-list-badge badge-decision-${item.decision_status}`;
+        badge.textContent = DECISION_STATUS_LABEL[item.decision_status] || item.decision_status;
+        titleRow.insertBefore(badge, titleRow.lastChild);
+      },
+
+      showViewTop(rightCol, item, archivedFlag) {
+        if (!archivedFlag) {
+          mountDecisionStatusMeta(rightCol, item, async () => {
+            if (reloadRef.fn) await reloadRef.fn();
+          });
+        }
+      },
+
+      detailExtra(rightCol, item, archivedFlag) {
+        // PAUDIT-3 — back-link to the Open Question this Decision was promoted from.
+        if (item.source_question_id) {
+          const row = document.createElement('div');
+          row.className = 'canon-chain';
+          const label = document.createElement('span');
+          label.className = 'canon-chain-label';
+          label.textContent = 'From question: ';
+          row.appendChild(label);
+          const link = document.createElement('button');
+          link.type = 'button';
+          link.className = 'canon-chain-link';
+          link.textContent = '…';
+          link.title = 'Navigate to source question';
+          link.addEventListener('click', () => {
+            route('Open Questions', item.source_question_id);
+          });
+          row.appendChild(link);
+          rightCol.appendChild(row);
+
+          window.revival.openQuestions.get(item.source_question_id)
+            .then((oq) => {
+              link.textContent = oq ? oq.title : `#${item.source_question_id} (not found)`;
+            })
+            .catch(() => {
+              link.textContent = `#${item.source_question_id}`;
+            });
+        }
+
+        // PDECISION-PROMOTE — promote this decision to a Canon Review proposal.
+        if (!archivedFlag) {
+          const promoteWrap = document.createElement('div');
+          promoteWrap.className = 'pblock-section';
+          rightCol.appendChild(promoteWrap);
+          renderDecisionPromoteUI(promoteWrap);
+
+          function renderDecisionPromoteUI(wrap) {
+            wrap.innerHTML = '';
+
+            if (item.canon_proposal_id) {
+              // Passive indicator: a proposal already exists.
+              const row = document.createElement('div');
+              row.className = 'pblock-row';
+              const note = document.createElement('span');
+              note.className = 'pblock-resolved-note';
+              note.textContent = 'Canon Review proposal submitted';
+              const goBtn = document.createElement('button');
+              goBtn.type = 'button';
+              goBtn.className = 'btn-secondary pblock-btn';
+              goBtn.textContent = 'Open Canon Review →';
+              goBtn.addEventListener('click', () => route('Canon Review'));
+              row.append(note, goBtn);
+              wrap.appendChild(row);
+              return;
+            }
+
+            const row = document.createElement('div');
+            row.className = 'pblock-row';
+            const promoteBtn = document.createElement('button');
+            promoteBtn.type = 'button';
+            promoteBtn.className = 'btn-secondary pblock-btn';
+            promoteBtn.textContent = 'Promote to Canon Review';
+            promoteBtn.title = 'Create a linked Canon Review proposal pre-filled with this decision\'s content';
+            row.appendChild(promoteBtn);
+            wrap.appendChild(row);
+
+            const form = document.createElement('div');
+            form.className = 'pblock-promote-form';
+            form.hidden = true;
+
+            const formHint = document.createElement('div');
+            formHint.className = 'pblock-form-hint';
+            formHint.textContent = `Creates a Canon Review proposal for: "${item.title || 'this decision'}"`;
+
+            const noteInput = document.createElement('textarea');
+            noteInput.className = 'pblock-textarea';
+            noteInput.placeholder = 'Proposer note (optional) — context for the Canon Review queue…';
+            noteInput.rows = 3;
+
+            const formBtnRow = document.createElement('div');
+            formBtnRow.className = 'pblock-btn-row';
+            const createBtn = document.createElement('button');
+            createBtn.type = 'button';
+            createBtn.className = 'btn-primary pblock-btn';
+            createBtn.textContent = 'Submit Proposal';
+            const cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'btn-secondary pblock-btn';
+            cancelBtn.textContent = 'Cancel';
+            formBtnRow.append(createBtn, cancelBtn);
+            form.append(formHint, noteInput, formBtnRow);
+            wrap.appendChild(form);
+
+            promoteBtn.addEventListener('click', () => {
+              form.hidden = false;
+              promoteBtn.hidden = true;
+              noteInput.focus();
+            });
+            cancelBtn.addEventListener('click', () => { form.hidden = true; promoteBtn.hidden = false; });
+            createBtn.addEventListener('click', async () => {
+              createBtn.disabled = true;
+              try {
+                await window.revival.decisions.promoteToCanonReview(
+                  item.id, { proposer_note: noteInput.value.trim() }
+                );
+                Object.assign(item, { canon_proposal_id: true });
+                renderDecisionPromoteUI(wrap);
+                showUndoToast('Canon Review proposal submitted.');
+              } catch (e) {
+                formHint.textContent = e.message || 'Could not submit proposal.';
+                createBtn.disabled = false;
+              }
+            });
+          }
+        }
+
+        const callbacks = {};
+        if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
+          entityKind: 'decisions',
+          workspaceName: 'Decisions',
+          lightweight: true,
+        });
+        const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'decisions');
+        callbacks.refreshHistory = refresh;
+      },
+
+      leftColExtra(leftCol, rightCol, ctx) {
+        reloadRef.fn = ctx.reloadList;
+
+        const filterBar = document.createElement('div');
+        filterBar.className = 'decision-status-filter-bar';
+
+        function renderFilterBar() {
+          filterBar.innerHTML = '';
+          const allBtn = document.createElement('button');
+          allBtn.type = 'button';
+          allBtn.className = 'decision-filter-btn' + (statusFilter === null ? ' active' : '');
+          allBtn.textContent = 'All';
+          allBtn.addEventListener('click', () => {
+            statusFilter = null;
+            renderFilterBar();
+            ctx.reloadList();
+          });
+          filterBar.appendChild(allBtn);
+
+          for (const opt of DECISION_STATUS_OPTIONS) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `decision-filter-btn decision-filter-btn-${opt.value}` + (statusFilter === opt.value ? ' active' : '');
+            btn.textContent = opt.label;
+            btn.addEventListener('click', () => {
+              statusFilter = opt.value;
+              renderFilterBar();
+              ctx.reloadList();
+            });
+            filterBar.appendChild(btn);
+          }
+        }
+        renderFilterBar();
+        leftCol.insertBefore(filterBar, ctx.addBtn);
+      },
+    });
+  })(),
   // Brainstorm: full five-mode filter + PBRAIN-STRUCT internal structure.
   // Wrapped in an IIFE so `threads` and `reloadRef` are shared across all hooks
   // without leaking into the outer workspace-config scope.

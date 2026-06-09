@@ -30,3 +30,6 @@ npm-debug.log*
 # Editor
 .vscode/
 .idea/
+
+# Claude Code — local permission allowlist (machine-specific paths)
+.claude/settings.local.json

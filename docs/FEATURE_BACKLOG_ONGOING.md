@@ -518,6 +518,20 @@ Active attachments visible at all times. Same "what Claude is using" transparenc
 
 ---
 
+## PAI-TAGS — AI tag suggestions: app-wide
+
+Extend the AI tag suggestion pattern established in P46-C to all workspaces and Canon Review proposals.
+
+- On any entry in any workspace, Claude proposes relevant tags from the existing tag library
+- Also available on Canon Review proposals
+- User can accept, remove, or add tags manually before anything is applied — never auto-applied
+- Tag suggestions are triggered on demand (e.g. "Suggest tags" button on the entry), not automatic
+- Proposed tags draw from the existing seeded tag library only — no new tags created without user action
+- Consistent with the approval discipline used everywhere: AI suggests, human confirms
+- **Workspaces covered:** Unsorted, Source Material, Documents, Characters, Episodes, Writing Lab, Open Questions, Conflicts, Decisions, Brainstorm, Research, Canon Bible entries, Canon Review proposals
+
+---
+
 ## Chat search + export (deferred)
 
 - Chat search: search across all chat history by keyword

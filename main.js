@@ -123,6 +123,8 @@ function registerIpc() {
   ipcMain.handle('decisions:archive', (_event, id) => { const r = db.decisions.archive(id); recordEvent('Decisions', 'archived'); return r; });
   ipcMain.handle('decisions:restore', (_event, id) => db.decisions.restore(id));
   ipcMain.handle('decisions:createFromQuestion', (_event, questionId, entry) => { const r = db.decisions.createFromQuestion(questionId, entry); recordEvent('Decisions', 'created'); return r; });
+  ipcMain.handle('decisions:setStatus', (_event, id, status) => db.decisions.setStatus(id, status));
+  ipcMain.handle('decisions:promoteToCanonReview', (_event, id, payload) => db.decisions.promoteToCanonReview(id, payload));
 
   ipcMain.handle('brainstorm:list', () => db.brainstorm.list());
   ipcMain.handle('brainstorm:listArchived', () => db.brainstorm.listArchived());

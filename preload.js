@@ -63,6 +63,8 @@ contextBridge.exposeInMainWorld('revival', {
     archive: (id) => ipcRenderer.invoke('decisions:archive', id),
     restore: (id) => ipcRenderer.invoke('decisions:restore', id),
     createFromQuestion: (questionId, entry) => ipcRenderer.invoke('decisions:createFromQuestion', questionId, entry),
+    setStatus: (id, status) => ipcRenderer.invoke('decisions:setStatus', id, status),
+    promoteToCanonReview: (id, payload) => ipcRenderer.invoke('decisions:promoteToCanonReview', id, payload),
   },
   brainstorm: {
     list: () => ipcRenderer.invoke('brainstorm:list'),
