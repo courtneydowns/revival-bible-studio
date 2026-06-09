@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld('revival', {
     escalateTier: (id) => ipcRenderer.invoke('openQuestions:escalateTier', id),
     setBlocking: (id, opts) => ipcRenderer.invoke('openQuestions:setBlocking', id, opts),
     setCategory: (id, cat) => ipcRenderer.invoke('openQuestions:setCategory', id, cat),
+    setTier: (id, tier) => ipcRenderer.invoke('openQuestions:setTier', id, tier),
     get: (id) => ipcRenderer.invoke('openQuestions:get', id),
   },
   conflicts: {
@@ -94,6 +95,7 @@ contextBridge.exposeInMainWorld('revival', {
     delete: (id) => ipcRenderer.invoke('research:delete', id),
     archive: (id) => ipcRenderer.invoke('research:archive', id),
     restore: (id) => ipcRenderer.invoke('research:restore', id),
+    setExternalUrl: (id, url) => ipcRenderer.invoke('research:setExternalUrl', id, url),
   },
   characters: {
     list: () => ipcRenderer.invoke('characters:list'),

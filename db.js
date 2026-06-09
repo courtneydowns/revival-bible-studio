@@ -1980,6 +1980,16 @@ openQuestions.escalateTier = (id) => {
   return db.prepare('SELECT * FROM open_questions WHERE id = ?').get(id);
 };
 
+// PAUDIT-6 — directly set the tier on an Open Question (initial set or edit).
+openQuestions.setTier = (id, tier) => {
+  const db = getDb();
+  if (!db.prepare('SELECT 1 FROM open_questions WHERE id = ?').get(id)) throw new Error('Entry not found.');
+  const t = tier === 1 || tier === '1' ? 1 : tier === 2 || tier === '2' ? 2 : tier === 3 || tier === '3' ? 3 : null;
+  db.prepare(`UPDATE open_questions SET tier = ?, updated_at = ? WHERE id = ?`)
+    .run(t, new Date().toISOString(), id);
+  return db.prepare('SELECT * FROM open_questions WHERE id = ?').get(id);
+};
+
 // PAUDIT-5 — set the free-text category on an Open Question.
 openQuestions.setCategory = (id, category) => {
   const db = getDb();
@@ -2113,6 +2123,17 @@ brainstorm.devIntoBackRefs = (kind, targetId) => {
 };
 
 const research = makeEntryRepo('research_items');
+
+// PAUDIT-6 — set the external_url on a Research entry.
+research.setExternalUrl = (id, url) => {
+  const db = getDb();
+  if (!db.prepare('SELECT 1 FROM research_items WHERE id = ?').get(id)) throw new Error('Entry not found.');
+  const u = (url || '').trim() || null;
+  db.prepare(`UPDATE research_items SET external_url = ?, updated_at = ? WHERE id = ?`)
+    .run(u, new Date().toISOString(), id);
+  return db.prepare('SELECT * FROM research_items WHERE id = ?').get(id);
+};
+
 // Backed by `characters_workspace` / `episodes_workspace` (renamed from
 // `characters` / `episodes` in migration 033 to match the FINAL canon schema).
 // Repo variable names — and the IPC channel prefixes that consume them — are

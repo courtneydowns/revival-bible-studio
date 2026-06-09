@@ -1248,7 +1248,11 @@ function makeEntryWorkspace(config) {
       form.appendChild(uploadRow);
     }
 
-    form.append(titleInput, bodyInput, actionRow, formStatus, error);
+    form.append(titleInput, bodyInput);
+    // PAUDIT-6 — workspace-specific extra create form fields (e.g. OQ tier selector).
+    let createExtras = null;
+    if (config.createFormExtra) createExtras = config.createFormExtra(form);
+    form.append(actionRow, formStatus, error);
     rightCol.appendChild(form);
 
     cancelBtn.addEventListener('click', () => {
@@ -1267,6 +1271,7 @@ function makeEntryWorkspace(config) {
           title: titleInput.value,
           body: bodyInput.value,
         });
+        if (createExtras && createExtras.postCreate) await createExtras.postCreate(created.id);
         Drafts.clear('new');
         selectedId = created && created.id != null ? created.id : null;
         await loadList();
@@ -1549,6 +1554,10 @@ function makeEntryWorkspace(config) {
     });
     bodyEdit.addEventListener('input', saveEditDraft);
 
+    // PAUDIT-6 — workspace-specific extra edit form fields (e.g. OQ tier selector).
+    let editExtras = null;
+    if (config.editFormExtra) editExtras = config.editFormExtra(item);
+
     saveBtn.addEventListener('click', async () => {
       if (titleEdit.value.trim() === '') return;
       saveBtn.disabled = true;
@@ -1557,6 +1566,7 @@ function makeEntryWorkspace(config) {
           title: titleEdit.value,
           body: bodyEdit.value,
         });
+        if (editExtras && editExtras.postSave) await editExtras.postSave(item.id);
         Drafts.clear(item.id);
         await loadList();
       } catch (e) {
@@ -1572,7 +1582,9 @@ function makeEntryWorkspace(config) {
       renderDetail();
     });
 
-    rightCol.append(titleEdit, bodyEdit, status, err, actions);
+    rightCol.append(titleEdit, bodyEdit);
+    if (editExtras && editExtras.element) rightCol.appendChild(editExtras.element);
+    rightCol.append(status, err, actions);
 
     // Global reference links: full attachment picker available in edit mode
     // so the user can manage links without saving and switching back to detail.
@@ -10516,6 +10528,77 @@ const CONTENT_RENDERERS = {
         return (item.category || '').toLowerCase().includes(categoryFilter.toLowerCase());
       },
 
+      createFormExtra(form) {
+        // PAUDIT-6 — tier radio buttons on the create form (Tier 1 / Tier 2 only).
+        const tierGroup = document.createElement('div');
+        tierGroup.className = 'oq-tier-field';
+        const tierLabel = document.createElement('span');
+        tierLabel.className = 'oq-tier-field-label';
+        tierLabel.textContent = 'Tier:';
+        tierGroup.appendChild(tierLabel);
+        const radios = [];
+        [['1', 'Tier 1'], ['2', 'Tier 2'], ['3', 'Tier 3']].forEach(([val, text]) => {
+          const lbl = document.createElement('label');
+          lbl.className = 'oq-tier-radio-label';
+          const radio = document.createElement('input');
+          radio.type = 'radio';
+          radio.name = 'oq-tier-create';
+          radio.value = val;
+          radio.className = 'oq-tier-radio';
+          lbl.append(radio, document.createTextNode(text));
+          tierGroup.appendChild(lbl);
+          radios.push(radio);
+        });
+        form.appendChild(tierGroup);
+        return {
+          postCreate: async (id) => {
+            const checked = radios.find((r) => r.checked);
+            if (checked) await window.revival.openQuestions.setTier(id, parseInt(checked.value, 10));
+          },
+        };
+      },
+
+      editFormExtra(item) {
+        // PAUDIT-6 — tier radio buttons on the edit form, pre-seeded with current tier.
+        // "Clear" button allows unsetting the tier without implying a third tier value.
+        const tierGroup = document.createElement('div');
+        tierGroup.className = 'oq-tier-field';
+        const tierLabel = document.createElement('span');
+        tierLabel.className = 'oq-tier-field-label';
+        tierLabel.textContent = 'Tier:';
+        tierGroup.appendChild(tierLabel);
+        const radios = [];
+        [['1', 'Tier 1'], ['2', 'Tier 2'], ['3', 'Tier 3']].forEach(([val, text]) => {
+          const lbl = document.createElement('label');
+          lbl.className = 'oq-tier-radio-label';
+          const radio = document.createElement('input');
+          radio.type = 'radio';
+          radio.name = 'oq-tier-edit';
+          radio.value = val;
+          radio.className = 'oq-tier-radio';
+          if (item.tier && String(item.tier) === val) radio.checked = true;
+          lbl.append(radio, document.createTextNode(text));
+          tierGroup.appendChild(lbl);
+          radios.push(radio);
+        });
+        const clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.className = 'btn-secondary oq-tier-clear-btn';
+        clearBtn.textContent = 'Clear';
+        clearBtn.addEventListener('click', () => radios.forEach((r) => { r.checked = false; }));
+        tierGroup.appendChild(clearBtn);
+        return {
+          element: tierGroup,
+          postSave: async (id) => {
+            const checked = radios.find((r) => r.checked);
+            const newTier = checked ? parseInt(checked.value, 10) : null;
+            if (newTier !== (item.tier || null)) {
+              await window.revival.openQuestions.setTier(id, newTier);
+            }
+          },
+        };
+      },
+
       isFilterActive() {
         return categoryFilter !== '';
       },
@@ -11209,15 +11292,109 @@ const CONTENT_RENDERERS = {
   })(),
   // Research shares the lifecycle but is styled distinctly (blue source accent +
   // tailored labels) so it never reads like Brainstorm's open ideation.
-  'Research': makeEntryWorkspace({
-    apiName: 'research',
-    entityKind: 'research',
-    draftPrefix: 'research',
-    addLabel: 'Add Research',
-    sectionClass: 'ws-research',
-    titlePlaceholder: 'What was researched?',
-    bodyPlaceholder: 'Findings, and where they came from — source/link (optional)',
-  }),
+  // PAUDIT-6: wrapped in IIFE to hold reloadRef for external_url inline edit.
+  'Research': (() => {
+    const reloadRef = { fn: null };
+    return makeEntryWorkspace({
+      apiName: 'research',
+      entityKind: 'research',
+      draftPrefix: 'research',
+      addLabel: 'Add Research',
+      sectionClass: 'ws-research',
+      titlePlaceholder: 'What was researched?',
+      bodyPlaceholder: 'Findings, and where they came from — source/link (optional)',
+
+      leftColExtra(leftCol, rightCol, ctx) {
+        reloadRef.fn = ctx.reloadList;
+      },
+
+      listItemExtra(btn, item) {
+        if (!item.external_url) return;
+        const urlLine = document.createElement('div');
+        urlLine.className = 'tc-list-preview research-url-preview';
+        const display = item.external_url.length > 60
+          ? `${item.external_url.slice(0, 60)}…`
+          : item.external_url;
+        urlLine.textContent = display;
+        btn.appendChild(urlLine);
+      },
+
+      detailExtra(rightCol, item, archivedFlag) {
+        // PAUDIT-6 — external_url field (inline edit, saves via setExternalUrl).
+        const urlSection = document.createElement('div');
+        urlSection.className = 'research-url-section';
+        function renderUrlUI() {
+          urlSection.innerHTML = '';
+          const row = document.createElement('div');
+          row.className = 'research-url-row';
+          const label = document.createElement('span');
+          label.className = 'research-url-label';
+          label.textContent = 'External URL:';
+          row.appendChild(label);
+          if (item.external_url) {
+            const link = document.createElement('a');
+            link.href = item.external_url;
+            link.className = 'research-url-link';
+            link.textContent = item.external_url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            row.appendChild(link);
+          } else {
+            const val = document.createElement('span');
+            val.className = 'research-url-value';
+            val.textContent = '—';
+            row.appendChild(val);
+          }
+          if (!archivedFlag) {
+            const editBtn = document.createElement('button');
+            editBtn.type = 'button';
+            editBtn.className = 'btn-secondary research-url-btn';
+            editBtn.textContent = 'Edit';
+            editBtn.addEventListener('click', () => {
+              row.innerHTML = '';
+              const inp = document.createElement('input');
+              inp.type = 'url';
+              inp.className = 'research-url-input';
+              inp.placeholder = 'https://… (optional)';
+              inp.value = item.external_url || '';
+              const saveBtn = document.createElement('button');
+              saveBtn.type = 'button';
+              saveBtn.className = 'btn-primary research-url-btn';
+              saveBtn.textContent = 'Save';
+              const cancelBtn = document.createElement('button');
+              cancelBtn.type = 'button';
+              cancelBtn.className = 'btn-secondary research-url-btn';
+              cancelBtn.textContent = 'Cancel';
+              const commit = async () => {
+                try {
+                  const updated = await window.revival.research.setExternalUrl(item.id, inp.value);
+                  Object.assign(item, updated);
+                  if (reloadRef.fn) await reloadRef.fn();
+                  renderUrlUI();
+                } catch { renderUrlUI(); }
+              };
+              saveBtn.addEventListener('click', commit);
+              cancelBtn.addEventListener('click', renderUrlUI);
+              inp.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+                if (ev.key === 'Escape') renderUrlUI();
+              });
+              row.append(inp, saveBtn, cancelBtn);
+            });
+            row.appendChild(editBtn);
+          }
+          urlSection.appendChild(row);
+        }
+        renderUrlUI();
+        const actionsRow = rightCol.querySelector('.tc-detail-actions');
+        if (actionsRow && actionsRow.nextSibling) {
+          rightCol.insertBefore(urlSection, actionsRow.nextSibling);
+        } else {
+          rightCol.appendChild(urlSection);
+        }
+      },
+    });
+  })(),
   // Characters (P26+P37+PCHAR-STATUS): CRUD lifecycle + relational view + status field.
   // Wrapped in an IIFE so statusFilter state is shared across list filter and detail
   // panel hooks without leaking into the outer scope (same pattern as Brainstorm).

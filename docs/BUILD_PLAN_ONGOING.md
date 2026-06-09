@@ -376,12 +376,12 @@ Plain implementation omissions surfaced by the audit — data exists in the DB, 
 - **Smoke:** (1) Open a Writing Lab draft; confirm word count and section count both appear in status bar. (2) Open a Source Material entry; confirm file_kind and file_path visible and editable. (3) Open an Open Questions entry; confirm category field visible, editable, and filterable in list. (4) Open an Unsorted entry; confirm "Route to…" action button present; route it; confirm entry created in target workspace. (5) Open a Canon Review proposal created from a Characters entry; click source attribution; confirm navigation to the originating Character entry. (6) Archive a Brainstorm thread; confirm it appears in collapsed archived threads section; restore it.
 - Smoke passed 2026-06-08. Also fixed Canon Review approve FK constraint error (invalid season/episode/character IDs now silently nulled instead of blocking with cryptic SQLite error).
 
-### PAUDIT-6 — Research external_url + Open Questions tier setter
+### PAUDIT-6 — Research external_url + Open Questions tier setter ✅
 **Tool:** VS Code ext
 Two DB columns that exist but have no UI — same pattern as PAUDIT-5:
 - **Research external_url:** surface the `external_url` column in the Research detail panel — display and editable. Add to list item preview line if populated.
-- **Open Questions tier setter:** `tier` is shown passively in Flanagan but has no setter anywhere in the OQ entry itself. Add a tier field (Tier 1 / Tier 2) to the OQ create and edit forms. PBLOCK's tier escalation action already works — this fills the gap for initial set and direct edit.
-- **Smoke:** (1) Open a Research entry; confirm external_url field visible and editable; save a URL; confirm it appears in list preview. (2) Create a new OQ; confirm tier field present in create form; set Tier 1; confirm badge visible in list and detail. Edit an existing OQ; confirm tier editable directly.
+- **Open Questions tier setter:** `tier` is shown passively in Flanagan but has no setter anywhere in the OQ entry itself. Add a tier field (Tier 1 / Tier 2 / Tier 3) to the OQ create and edit forms. PBLOCK's tier escalation action already works — this fills the gap for initial set and direct edit.
+- **Smoke passed 2026-06-08.**
 
 ### PAUDIT-7 — Command palette regression fix
 **Tool:** CLI

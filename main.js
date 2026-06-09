@@ -104,6 +104,7 @@ function registerIpc() {
   ipcMain.handle('openQuestions:escalateTier', (_event, id) => { const r = db.openQuestions.escalateTier(id); recordEvent('Open Questions', 'tier-escalated'); return r; });
   ipcMain.handle('openQuestions:setBlocking', (_event, id, opts) => db.openQuestions.setBlocking(id, opts));
   ipcMain.handle('openQuestions:setCategory', (_event, id, cat) => db.openQuestions.setCategory(id, cat));
+  ipcMain.handle('openQuestions:setTier', (_event, id, tier) => db.openQuestions.setTier(id, tier));
   ipcMain.handle('openQuestions:get', (_event, id) => db.openQuestions.get(id));
 
   ipcMain.handle('conflicts:list', () => db.conflicts.list());
@@ -150,6 +151,7 @@ function registerIpc() {
   ipcMain.handle('research:delete', (_event, id) => { const r = db.research.delete(id); recordEvent('Research', 'deleted'); return r; });
   ipcMain.handle('research:archive', (_event, id) => { const r = db.research.archive(id); recordEvent('Research', 'archived'); return r; });
   ipcMain.handle('research:restore', (_event, id) => db.research.restore(id));
+  ipcMain.handle('research:setExternalUrl', (_event, id, url) => db.research.setExternalUrl(id, url));
 
   ipcMain.handle('characters:list', () => db.characters.list());
   ipcMain.handle('characters:listArchived', () => db.characters.listArchived());
