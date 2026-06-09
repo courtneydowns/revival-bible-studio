@@ -44,6 +44,9 @@ contextBridge.exposeInMainWorld('revival', {
     setCategory: (id, cat) => ipcRenderer.invoke('openQuestions:setCategory', id, cat),
     setTier: (id, tier) => ipcRenderer.invoke('openQuestions:setTier', id, tier),
     get: (id) => ipcRenderer.invoke('openQuestions:get', id),
+    addDependency: (dependentId, blockerId) => ipcRenderer.invoke('openQuestions:addDependency', dependentId, blockerId),
+    removeDependency: (dependentId, blockerId) => ipcRenderer.invoke('openQuestions:removeDependency', dependentId, blockerId),
+    getDependencies: (id) => ipcRenderer.invoke('openQuestions:getDependencies', id),
   },
   conflicts: {
     list: () => ipcRenderer.invoke('conflicts:list'),

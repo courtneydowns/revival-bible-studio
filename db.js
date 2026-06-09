@@ -1807,6 +1807,28 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '055_poq_depends',
+    up(db) {
+      // POQ-DEPENDS — Open Question dependency links.
+      // dependent_id: the question that is waiting on another.
+      // blocker_id: the question that must be resolved first.
+      // A blocker is "resolved" when its archived_at IS NOT NULL or
+      // resolved_by_decision_id IS NOT NULL.
+      db.exec(`
+        CREATE TABLE oq_dependencies (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          dependent_id INTEGER NOT NULL REFERENCES open_questions(id) ON DELETE CASCADE,
+          blocker_id   INTEGER NOT NULL REFERENCES open_questions(id) ON DELETE CASCADE,
+          created_at   TEXT NOT NULL,
+          UNIQUE(dependent_id, blocker_id),
+          CHECK(dependent_id != blocker_id)
+        );
+        CREATE INDEX oq_dep_dependent ON oq_dependencies(dependent_id);
+        CREATE INDEX oq_dep_blocker   ON oq_dependencies(blocker_id);
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -2057,6 +2079,51 @@ openQuestions.setBlocking = (id, { is_blocking = false, blocking_target = null, 
       WHERE id = ?`
   ).run(is_blocking ? 1 : 0, is_blocking ? (blocking_target || null) : null, is_blocking ? (blocking_type || null) : null, now, id);
   return db.prepare('SELECT * FROM open_questions WHERE id = ?').get(id);
+};
+
+// POQ-DEPENDS — override list() to include has_unresolved_blockers flag.
+openQuestions.list = () => {
+  return getDb().prepare(`
+    SELECT oq.*,
+      CASE WHEN EXISTS (
+        SELECT 1 FROM oq_dependencies d
+        JOIN open_questions b ON b.id = d.blocker_id
+        WHERE d.dependent_id = oq.id
+          AND b.archived_at IS NULL
+          AND b.resolved_by_decision_id IS NULL
+      ) THEN 1 ELSE 0 END AS has_unresolved_blockers
+    FROM open_questions oq
+    WHERE oq.archived_at IS NULL
+    ORDER BY oq.created_at DESC, oq.id DESC
+  `).all();
+};
+
+// POQ-DEPENDS — add a dependency link (dependent waits on blocker).
+openQuestions.addDependency = (dependentId, blockerId) => {
+  const db = getDb();
+  if (!db.prepare('SELECT 1 FROM open_questions WHERE id = ?').get(dependentId)) throw new Error('Dependent question not found.');
+  if (!db.prepare('SELECT 1 FROM open_questions WHERE id = ?').get(blockerId)) throw new Error('Blocker question not found.');
+  if (dependentId === blockerId) throw new Error('A question cannot depend on itself.');
+  db.prepare(
+    'INSERT OR IGNORE INTO oq_dependencies (dependent_id, blocker_id, created_at) VALUES (?, ?, ?)'
+  ).run(dependentId, blockerId, new Date().toISOString());
+};
+
+// POQ-DEPENDS — remove a dependency link.
+openQuestions.removeDependency = (dependentId, blockerId) => {
+  getDb().prepare('DELETE FROM oq_dependencies WHERE dependent_id = ? AND blocker_id = ?').run(dependentId, blockerId);
+};
+
+// POQ-DEPENDS — list all blockers for a given dependent question.
+// Returns {id, title, archived_at, resolved_by_decision_id} for each blocker.
+openQuestions.getDependencies = (dependentId) => {
+  return getDb().prepare(`
+    SELECT b.id, b.title, b.archived_at, b.resolved_by_decision_id
+    FROM oq_dependencies d
+    JOIN open_questions b ON b.id = d.blocker_id
+    WHERE d.dependent_id = ?
+    ORDER BY d.created_at ASC
+  `).all(dependentId);
 };
 
 const conflicts = makeEntryRepo('conflicts');

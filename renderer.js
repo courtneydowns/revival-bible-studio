@@ -10620,6 +10620,158 @@ function mountPBlockPanel(rightCol, item, archivedFlag) {
 }
 // ── End PBLOCK ─────────────────────────────────────────────────────────────
 
+// ── POQ-DEPENDS — dependency panel on Open Question detail ─────────────────
+async function mountOqDependsPanel(container, item, archivedFlag, onListReload) {
+  const section = document.createElement('div');
+  section.className = 'oq-depends-section';
+  container.appendChild(section);
+
+  async function render() {
+    section.innerHTML = '';
+
+    const head = document.createElement('div');
+    head.className = 'oq-depends-head';
+    const headLabel = document.createElement('span');
+    headLabel.textContent = 'Depends on';
+    head.appendChild(headLabel);
+    section.appendChild(head);
+
+    let blockers = [];
+    try {
+      blockers = await window.revival.openQuestions.getDependencies(item.id);
+    } catch { /* non-fatal */ }
+
+    const listEl = document.createElement('div');
+    listEl.className = 'oq-depends-list';
+
+    if (blockers.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'oq-depends-empty';
+      empty.textContent = 'No dependencies.';
+      listEl.appendChild(empty);
+    } else {
+      for (const blocker of blockers) {
+        const row = document.createElement('div');
+        row.className = 'oq-depends-row';
+
+        const titleEl = document.createElement('span');
+        titleEl.className = 'oq-depends-title';
+        titleEl.textContent = blocker.title;
+        row.appendChild(titleEl);
+
+        const resolved = !!(blocker.archived_at || blocker.resolved_by_decision_id);
+        const statusEl = document.createElement('span');
+        statusEl.className = resolved ? 'oq-depends-resolved' : 'oq-depends-unresolved';
+        statusEl.textContent = resolved ? 'resolved' : 'unresolved';
+        row.appendChild(statusEl);
+
+        if (!archivedFlag) {
+          const removeBtn = document.createElement('button');
+          removeBtn.type = 'button';
+          removeBtn.className = 'btn-secondary oq-depends-remove-btn';
+          removeBtn.textContent = 'Remove';
+
+          removeBtn.addEventListener('click', () => {
+            // Replace row with inline confirm.
+            const confirm = document.createElement('div');
+            confirm.className = 'oq-depends-confirm';
+            confirm.textContent = `Remove dependency on "${blocker.title}"?`;
+            const yesBtn = document.createElement('button');
+            yesBtn.type = 'button';
+            yesBtn.className = 'btn-primary oq-depends-remove-btn';
+            yesBtn.textContent = 'Remove';
+            const noBtn = document.createElement('button');
+            noBtn.type = 'button';
+            noBtn.className = 'btn-secondary oq-depends-remove-btn';
+            noBtn.textContent = 'Cancel';
+            confirm.appendChild(yesBtn);
+            confirm.appendChild(noBtn);
+            row.replaceWith(confirm);
+
+            yesBtn.addEventListener('click', async () => {
+              try {
+                await window.revival.openQuestions.removeDependency(item.id, blocker.id);
+                if (onListReload) await onListReload();
+                await render();
+              } catch { await render(); }
+            });
+            noBtn.addEventListener('click', () => render());
+          });
+
+          row.appendChild(removeBtn);
+        }
+
+        listEl.appendChild(row);
+      }
+    }
+
+    section.appendChild(listEl);
+
+    // "Add dependency" picker — not shown for archived entries.
+    if (!archivedFlag) {
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'btn-secondary oq-depends-add-btn';
+      addBtn.style.marginTop = '6px';
+      addBtn.textContent = '+ Add dependency';
+      head.appendChild(addBtn);
+
+      let pickerEl = null;
+
+      addBtn.addEventListener('click', async () => {
+        if (pickerEl) { pickerEl.remove(); pickerEl = null; return; }
+
+        let allOqs = [];
+        try { allOqs = await window.revival.openQuestions.list(); } catch { return; }
+
+        const existingIds = new Set(blockers.map((b) => b.id));
+        const candidates = allOqs.filter((q) => q.id !== item.id && !existingIds.has(q.id));
+
+        pickerEl = document.createElement('div');
+        pickerEl.className = 'oq-depends-picker';
+
+        if (candidates.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'oq-depends-picker-empty';
+          empty.textContent = 'No other open questions available.';
+          pickerEl.appendChild(empty);
+        } else {
+          for (const candidate of candidates) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'oq-depends-picker-item';
+            btn.textContent = candidate.title;
+            btn.addEventListener('click', async () => {
+              try {
+                await window.revival.openQuestions.addDependency(item.id, candidate.id);
+                if (onListReload) await onListReload();
+                pickerEl.remove();
+                pickerEl = null;
+                await render();
+              } catch { /* non-fatal */ }
+            });
+            pickerEl.appendChild(btn);
+          }
+        }
+
+        section.appendChild(pickerEl);
+
+        const closePickerOnOutside = (e) => {
+          if (!section.contains(e.target)) {
+            pickerEl && pickerEl.remove();
+            pickerEl = null;
+            document.removeEventListener('click', closePickerOnOutside);
+          }
+        };
+        setTimeout(() => document.addEventListener('click', closePickerOnOutside), 0);
+      });
+    }
+  }
+
+  await render();
+}
+// ── End POQ-DEPENDS ─────────────────────────────────────────────────────────
+
 const CONTENT_RENDERERS = {
   'Home': renderHomePage,
   'Writing Lab': renderWritingLabPage,
@@ -10920,9 +11072,19 @@ const CONTENT_RENDERERS = {
       },
 
       listItemExtra(btn, item, archivedFlag) {
-        if (archivedFlag || !item.category) return;
+        if (archivedFlag) return;
         const titleRow = btn.querySelector('.tc-list-title');
         if (!titleRow) return;
+        // POQ-DEPENDS — soft block indicator when unresolved blockers exist.
+        if (item.has_unresolved_blockers) {
+          btn.classList.add('oq-blocked');
+          const blockedBadge = document.createElement('span');
+          blockedBadge.className = 'tc-list-badge badge-oq-blocked';
+          blockedBadge.textContent = 'Blocked';
+          blockedBadge.title = 'This question depends on one or more unresolved questions';
+          titleRow.insertBefore(blockedBadge, titleRow.firstChild);
+        }
+        if (!item.category) return;
         const badge = document.createElement('span');
         badge.className = 'tc-list-badge badge-oq-category';
         badge.textContent = item.category;
@@ -11024,6 +11186,9 @@ const CONTENT_RENDERERS = {
         } else {
           rightCol.appendChild(catSection);
         }
+
+        // POQ-DEPENDS panel — dependency list and add-dependency picker.
+        mountOqDependsPanel(rightCol, item, archivedFlag, reloadRef.fn);
 
         // PBLOCK panel — must be reachable without heavy scrolling.
         mountPBlockPanel(rightCol, item, archivedFlag);

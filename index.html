@@ -4515,6 +4515,27 @@
       .oq-category-filter-clear { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0 2px; font-size: 1em; }
       .oq-category-filter-clear:hover { color: var(--text); }
 
+      /* POQ-DEPENDS — blocked badge + reduced-priority list item */
+      .badge-oq-blocked { background: rgba(120,120,160,0.12); color: #7878a0; border-color: rgba(120,120,160,0.35); }
+      .tc-list-item.oq-blocked { opacity: 0.72; }
+      /* POQ-DEPENDS — depends-on detail panel */
+      .oq-depends-section { margin: 8px 0; padding: 6px 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 0.85em; }
+      .oq-depends-head { color: var(--muted); font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; }
+      .oq-depends-add-btn { font-size: 0.82em; padding: 2px 8px; }
+      .oq-depends-list { display: flex; flex-direction: column; gap: 4px; }
+      .oq-depends-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+      .oq-depends-title { flex: 1; color: var(--text); }
+      .oq-depends-resolved { font-size: 0.78em; color: #4caf82; font-style: italic; }
+      .oq-depends-unresolved { font-size: 0.78em; color: #c09a2a; font-style: italic; }
+      .oq-depends-remove-btn { font-size: 0.78em; padding: 1px 6px; color: var(--muted); }
+      .oq-depends-remove-btn:hover { color: var(--text); }
+      .oq-depends-confirm { display: flex; align-items: center; gap: 6px; font-size: 0.82em; color: var(--text); flex-wrap: wrap; }
+      .oq-depends-empty { color: var(--muted); font-style: italic; }
+      .oq-depends-picker { display: flex; flex-direction: column; gap: 2px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 4px; margin-top: 6px; max-height: 180px; overflow-y: auto; }
+      .oq-depends-picker-item { background: none; border: none; text-align: left; padding: 5px 10px; border-radius: 4px; cursor: pointer; color: var(--text); font-size: 0.9em; }
+      .oq-depends-picker-item:hover { background: var(--hover); }
+      .oq-depends-picker-empty { padding: 6px 10px; color: var(--muted); font-style: italic; font-size: 0.9em; }
+
       /* PAUDIT-5 — Unsorted route action */
       .unsorted-route-section { margin: 8px 0; display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
       .unsorted-route-btn { }

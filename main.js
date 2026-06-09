@@ -106,6 +106,9 @@ function registerIpc() {
   ipcMain.handle('openQuestions:setCategory', (_event, id, cat) => db.openQuestions.setCategory(id, cat));
   ipcMain.handle('openQuestions:setTier', (_event, id, tier) => db.openQuestions.setTier(id, tier));
   ipcMain.handle('openQuestions:get', (_event, id) => db.openQuestions.get(id));
+  ipcMain.handle('openQuestions:addDependency', (_event, dependentId, blockerId) => db.openQuestions.addDependency(dependentId, blockerId));
+  ipcMain.handle('openQuestions:removeDependency', (_event, dependentId, blockerId) => db.openQuestions.removeDependency(dependentId, blockerId));
+  ipcMain.handle('openQuestions:getDependencies', (_event, id) => db.openQuestions.getDependencies(id));
 
   ipcMain.handle('conflicts:list', () => db.conflicts.list());
   ipcMain.handle('conflicts:listArchived', () => db.conflicts.listArchived());
