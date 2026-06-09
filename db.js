@@ -6280,6 +6280,166 @@ const sessionLogs = {
   },
 };
 
+// --- App health (PHEALTH) ----------------------------------------------------
+// Migration count + last run, SQLite file size, active record counts per
+// workspace, and orphan detection across polymorphic join tables.
+const health = {
+  getStats(dbPath) {
+    const database = getDb();
+    const migrations = database
+      .prepare('SELECT name, applied_at FROM schema_migrations ORDER BY applied_at ASC')
+      .all();
+    const { size } = require('fs').statSync(dbPath);
+
+    const n = (table, where = 'archived_at IS NULL') =>
+      database.prepare(`SELECT COUNT(*) AS c FROM ${table} WHERE ${where}`).get().c;
+
+    const counts = {
+      'Unsorted':        n('unsorted_items'),
+      'Source Material': n('source_material'),
+      'Documents':       n('documents'),
+      'Open Questions':  n('open_questions'),
+      'Conflicts':       n('conflicts'),
+      'Decisions':       n('decisions'),
+      'Brainstorm':      n('brainstorm_items'),
+      'Research':        n('research_items'),
+      'Characters':      n('characters_workspace'),
+      'Episodes':        n('episodes_workspace'),
+      'Writing Lab':     n('writing_lab_drafts'),
+      'Canon Entries':   n('canon_entries', 'retired_at IS NULL'),
+      'Canon Review':    n('canon_proposals', "status = 'pending'"),
+    };
+
+    const orphans = health._detectOrphans(database);
+    return {
+      migrationCount: migrations.length,
+      lastMigration: migrations[migrations.length - 1] || null,
+      dbFileSizeBytes: size,
+      counts,
+      orphans,
+    };
+  },
+
+  _detectOrphans(database) {
+    // Maps entity_kind strings used in polymorphic columns to actual table names.
+    const KIND_TABLE = {
+      characters:     'characters_workspace',
+      episodes:       'episodes_workspace',
+      decisions:      'decisions',
+      open_questions: 'open_questions',
+      conflicts:      'conflicts',
+      brainstorm:     'brainstorm_items',
+      research:       'research_items',
+      source_material:'source_material',
+      documents:      'documents',
+      writing_lab:    'writing_lab_drafts',
+      canon_entries:  'canon_entries',
+      unsorted:       'unsorted_items',
+    };
+
+    const results = [];
+
+    const orphanRows = (sql, kind) => {
+      try { return database.prepare(sql).all(kind); }
+      catch { return []; }
+    };
+
+    // cross_workspace_attachments — host side
+    for (const { host_kind } of database.prepare(
+      'SELECT DISTINCT host_kind FROM cross_workspace_attachments'
+    ).all()) {
+      const tbl = KIND_TABLE[host_kind];
+      if (!tbl) continue;
+      const rows = orphanRows(
+        `SELECT cwa.id FROM cross_workspace_attachments cwa
+         LEFT JOIN ${tbl} t ON t.id = cwa.host_id
+         WHERE cwa.host_kind = ? AND t.id IS NULL`,
+        host_kind
+      );
+      if (rows.length) results.push({
+        table: 'cross_workspace_attachments',
+        reason: `${rows.length} row(s) with missing host (kind: ${host_kind})`,
+        ids: rows.map((r) => r.id),
+      });
+    }
+
+    // cross_workspace_attachments — source side
+    for (const { source_kind } of database.prepare(
+      'SELECT DISTINCT source_kind FROM cross_workspace_attachments'
+    ).all()) {
+      const tbl = KIND_TABLE[source_kind];
+      if (!tbl) continue;
+      const rows = orphanRows(
+        `SELECT cwa.id FROM cross_workspace_attachments cwa
+         LEFT JOIN ${tbl} t ON t.id = cwa.source_id
+         WHERE cwa.source_kind = ? AND t.id IS NULL`,
+        source_kind
+      );
+      if (rows.length) results.push({
+        table: 'cross_workspace_attachments',
+        reason: `${rows.length} row(s) with missing source (kind: ${source_kind})`,
+        ids: rows.map((r) => r.id),
+      });
+    }
+
+    // taggable_tags
+    for (const { entity_kind } of database.prepare(
+      'SELECT DISTINCT entity_kind FROM taggable_tags'
+    ).all()) {
+      const tbl = KIND_TABLE[entity_kind];
+      if (!tbl) continue;
+      const rows = orphanRows(
+        `SELECT tt.id FROM taggable_tags tt
+         LEFT JOIN ${tbl} t ON t.id = tt.entity_id
+         WHERE tt.entity_kind = ? AND t.id IS NULL`,
+        entity_kind
+      );
+      if (rows.length) results.push({
+        table: 'taggable_tags',
+        reason: `${rows.length} row(s) with missing entity (kind: ${entity_kind})`,
+        ids: rows.map((r) => r.id),
+      });
+    }
+
+    // flanagan_analyses
+    for (const { entity_kind } of database.prepare(
+      'SELECT DISTINCT entity_kind FROM flanagan_analyses'
+    ).all()) {
+      const tbl = KIND_TABLE[entity_kind];
+      if (!tbl) continue;
+      const rows = orphanRows(
+        `SELECT fa.id FROM flanagan_analyses fa
+         LEFT JOIN ${tbl} t ON t.id = fa.entity_id
+         WHERE fa.entity_kind = ? AND t.id IS NULL`,
+        entity_kind
+      );
+      if (rows.length) results.push({
+        table: 'flanagan_analyses',
+        reason: `${rows.length} row(s) with missing entity (kind: ${entity_kind})`,
+        ids: rows.map((r) => r.id),
+      });
+    }
+
+    return results;
+  },
+
+  cleanupOrphans() {
+    const database = getDb();
+    const orphans = health._detectOrphans(database);
+    const doClean = database.transaction(() => {
+      let total = 0;
+      for (const o of orphans) {
+        if (!o.ids.length) continue;
+        const ph = o.ids.map(() => '?').join(',');
+        database.prepare(`DELETE FROM ${o.table} WHERE id IN (${ph})`).run(...o.ids);
+        total += o.ids.length;
+      }
+      return total;
+    });
+    return { deleted: doClean(), orphans };
+  },
+};
+
 module.exports = {
   initDatabase,
   getDb,
@@ -6329,4 +6489,5 @@ module.exports = {
   restoreUnsorted,
   canonImport,
   sessionLogs,
+  health,
 };

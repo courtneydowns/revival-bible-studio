@@ -738,10 +738,11 @@ Extends the existing episode continuity checker. Do not remove or alter existing
 
 ## App health
 
-### PHEALTH — App health indicator
+### PHEALTH — App health indicator ✅
 - In Settings: migration count + last migration run, SQLite file size, record counts by workspace (read-only)
 - Orphan detection: flag any orphaned records (linked entries whose parent no longer exists)
 - One-click orphan cleanup with confirmation + preview of what will be removed
+- **Implementation:** `db.health.getStats(dbPath)` queries schema_migrations + fs.statSync for file size + COUNT per workspace table + `_detectOrphans()` scanning cross_workspace_attachments (host + source), taggable_tags, flanagan_analyses via LEFT JOIN. `db.health.cleanupOrphans()` deletes in a transaction. IPC: `health:getStats`, `health:cleanupOrphans`. Preload: `window.revival.health`. Renderer: `renderAppHealth(section)` in Settings — "Check Health" button, migration/size/counts table, orphan list with row-count confirm dialog and "Remove N orphan row(s)…" danger button. Auto-reruns check after cleanup.
 - **Smoke:** Confirm health panel shows correct migration count and file size; manually create an orphan in dev; confirm detection flags it; run cleanup with confirmation, confirm orphan removed
 
 ---

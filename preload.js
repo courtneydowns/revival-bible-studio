@@ -389,6 +389,11 @@ contextBridge.exposeInMainWorld('revival', {
   panic: {
     export: () => ipcRenderer.invoke('panic:export'),
   },
+  // PHEALTH — app health stats and orphan cleanup.
+  health: {
+    getStats:       () => ipcRenderer.invoke('health:getStats'),
+    cleanupOrphans: () => ipcRenderer.invoke('health:cleanupOrphans'),
+  },
   // PSESSION-LOG — audit trail. finalize() saves the current session and
   // starts a fresh one; list() returns all past logs; export(id) writes a
   // plain-text file and reveals the folder.

@@ -6755,6 +6755,7 @@ function renderSettingsPage(section) {
   renderPanicExport(section);
   renderCanonExport(section);
   renderSessionLog(section);
+  renderAppHealth(section);
 }
 
 // --- Settings: Session Log (PSESSION-LOG) ------------------------------------
@@ -7199,6 +7200,158 @@ function renderManageTags(section) {
   }
 
   reload();
+}
+
+// --- App Health (PHEALTH) ---------------------------------------------------
+// Read-only health panel in Settings: migration count, SQLite file size, active
+// record counts by workspace, and orphan detection with one-click cleanup.
+function renderAppHealth(section) {
+  const block = document.createElement('div');
+  block.className = 'entry-form settings-block';
+
+  const heading = document.createElement('h2');
+  heading.className = 'settings-heading';
+  heading.textContent = 'App Health';
+
+  const desc = document.createElement('p');
+  desc.className = 'settings-desc';
+  desc.textContent =
+    'Migration count, database file size, active record counts by workspace, and orphan ' +
+    'detection. Orphans are linked entries whose parent no longer exists — safe to remove.';
+
+  const statsEl = document.createElement('div');
+  statsEl.style.cssText = 'font-size:13px;';
+
+  const status = document.createElement('p');
+  status.className = 'draft-status';
+
+  const loadBtn = document.createElement('button');
+  loadBtn.type = 'button';
+  loadBtn.className = 'btn-secondary';
+  loadBtn.textContent = 'Check Health';
+
+  let lastOrphans = [];
+
+  function fmt(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(2) + ' MB';
+  }
+
+  function renderStats(data) {
+    statsEl.innerHTML = '';
+
+    // Migration info
+    const migRow = document.createElement('p');
+    migRow.style.margin = '8px 0 4px';
+    const lastAt = data.lastMigration
+      ? new Date(data.lastMigration.applied_at).toLocaleDateString('en-US', {
+          year: 'numeric', month: 'short', day: 'numeric',
+        })
+      : '—';
+    migRow.textContent =
+      `Migrations applied: ${data.migrationCount}  ·  Last: ${data.lastMigration ? data.lastMigration.name : '—'} (${lastAt})`;
+    migRow.style.cssText = 'margin:8px 0 4px;color:var(--muted);font-size:12px;';
+
+    // File size
+    const sizeRow = document.createElement('p');
+    sizeRow.style.cssText = 'margin:0 0 10px;color:var(--muted);font-size:12px;';
+    sizeRow.textContent = `SQLite file size: ${fmt(data.dbFileSizeBytes)}`;
+
+    // Record counts table
+    const table = document.createElement('table');
+    table.style.cssText =
+      'width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px;';
+    const headerRow = document.createElement('tr');
+    ['Workspace', 'Active records'].forEach((h) => {
+      const th = document.createElement('th');
+      th.textContent = h;
+      th.style.cssText =
+        'text-align:left;padding:3px 8px 3px 0;border-bottom:1px solid var(--border);' +
+        'font-weight:600;color:var(--muted);';
+      headerRow.appendChild(th);
+    });
+    table.appendChild(headerRow);
+    for (const [ws, count] of Object.entries(data.counts)) {
+      const tr = document.createElement('tr');
+      [ws, count].forEach((val, i) => {
+        const td = document.createElement('td');
+        td.textContent = val;
+        td.style.cssText =
+          'padding:3px 8px 3px 0;border-bottom:1px solid var(--border);' +
+          (i === 1 ? 'font-variant-numeric:tabular-nums;' : '');
+        tr.appendChild(td);
+      });
+      table.appendChild(tr);
+    }
+
+    // Orphan section
+    const orphanHeading = document.createElement('p');
+    orphanHeading.style.cssText = 'font-weight:600;font-size:13px;margin:4px 0 4px;';
+
+    lastOrphans = data.orphans;
+
+    if (!data.orphans.length) {
+      orphanHeading.textContent = 'Orphan check: no orphans found';
+      statsEl.append(migRow, sizeRow, table, orphanHeading);
+      return;
+    }
+
+    orphanHeading.textContent = `Orphan check: ${data.orphans.length} issue(s) found`;
+    const orphanList = document.createElement('ul');
+    orphanList.style.cssText = 'margin:0 0 8px;padding-left:18px;font-size:12px;color:var(--muted);';
+    for (const o of data.orphans) {
+      const li = document.createElement('li');
+      li.textContent = `${o.table}: ${o.reason}`;
+      orphanList.appendChild(li);
+    }
+
+    const totalOrphans = data.orphans.reduce((s, o) => s + o.ids.length, 0);
+    const cleanBtn = document.createElement('button');
+    cleanBtn.type = 'button';
+    cleanBtn.className = 'btn-danger';
+    cleanBtn.textContent = `Remove ${totalOrphans} orphan row(s)…`;
+
+    cleanBtn.addEventListener('click', async () => {
+      if (!confirm(
+        `This will permanently delete ${totalOrphans} orphaned row(s) from the database.\n\n` +
+        data.orphans.map((o) => `• ${o.table}: ${o.reason}`).join('\n') +
+        '\n\nContinue?'
+      )) return;
+
+      cleanBtn.disabled = true;
+      setStatus(status, 'Removing orphans…');
+      try {
+        const res = await window.revival.health.cleanupOrphans();
+        setStatus(status, `Done — removed ${res.deleted} orphan row(s). Re-running check…`);
+        await runCheck();
+      } catch (err) {
+        setStatus(status, `Cleanup failed: ${err.message || err}`);
+        cleanBtn.disabled = false;
+      }
+    });
+
+    statsEl.append(migRow, sizeRow, table, orphanHeading, orphanList, cleanBtn);
+  }
+
+  async function runCheck() {
+    loadBtn.disabled = true;
+    setStatus(status, 'Checking…');
+    statsEl.innerHTML = '';
+    try {
+      const data = await window.revival.health.getStats();
+      renderStats(data);
+      setStatus(status, 'Health check complete.');
+    } catch (err) {
+      setStatus(status, `Health check failed: ${err.message || err}`);
+    }
+    loadBtn.disabled = false;
+  }
+
+  loadBtn.addEventListener('click', runCheck);
+
+  block.append(heading, desc, loadBtn, statsEl, status);
+  section.appendChild(block);
 }
 
 // --- Panic Export (P21 / P20v2) --------------------------------------------

@@ -1958,6 +1958,13 @@ function registerIpc() {
     return { ok: true, saved: hadEvents };
   });
   ipcMain.handle('sessionLog:list', () => db.sessionLogs.list());
+  // PHEALTH — health stats (migration count, file size, record counts, orphans)
+  // and orphan cleanup. dbPath is derived from userData so no module-level var needed.
+  ipcMain.handle('health:getStats', () => {
+    const dbPath = path.join(app.getPath('userData'), db.DB_FILENAME);
+    return db.health.getStats(dbPath);
+  });
+  ipcMain.handle('health:cleanupOrphans', () => db.health.cleanupOrphans());
   ipcMain.handle('sessionLog:export', (_e, id) => {
     const log = db.sessionLogs.get(id);
     if (!log) throw new Error('Session log not found.');
