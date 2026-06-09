@@ -235,8 +235,9 @@ contextBridge.exposeInMainWorld('revival', {
     episodeStructEval: (episodeId, model) =>
       ipcRenderer.invoke('claude:episodeStructEval', episodeId, model),
     // PEPISODE-CONT — AI episode continuity checker.
-    episodeContinuityCheck: (episodeId, model) =>
-      ipcRenderer.invoke('claude:episodeContinuityCheck', episodeId, model),
+    // PEPISODE-CONT-2A — compareEpisodeId is optional; null = no comparison.
+    episodeContinuityCheck: (episodeId, model, compareEpisodeId) =>
+      ipcRenderer.invoke('claude:episodeContinuityCheck', episodeId, model, compareEpisodeId),
     // P45 — AI import assistant: type suggestions + duplicate flags.
     importAssist: (entries, model) =>
       ipcRenderer.invoke('claude:importAssist', entries, model),

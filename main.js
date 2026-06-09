@@ -1485,7 +1485,8 @@ function registerIpc() {
   // Reads the episode entry + linked characters (with status) + prior episodes +
   // relevant locked canon, then flags timeline contradictions, character state
   // inconsistencies, and arc breaks. Never runs automatically; never touches canon.
-  ipcMain.handle('claude:episodeContinuityCheck', async (_e, episodeId, model) => {
+  // PEPISODE-CONT-2A — compareEpisodeId is an optional additional episode for context.
+  ipcMain.handle('claude:episodeContinuityCheck', async (_e, episodeId, model, compareEpisodeId) => {
     const apiKey = db.settings.getClaudeApiKey();
     if (!apiKey) throw new Error('No Claude API key configured. Add one in Settings.');
     const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
@@ -1525,7 +1526,15 @@ function registerIpc() {
        ORDER BY ce.entry_type ASC, ce.title ASC
     `).all();
 
-    const checkedCount = lockedCanon.length + priorEps.length + linkedCharRows.length;
+    // Optional comparison episode (PEPISODE-CONT-2A).
+    let compareEp = null;
+    if (compareEpisodeId && typeof compareEpisodeId === 'number' && compareEpisodeId !== episodeId) {
+      compareEp = dbHandle.prepare(
+        `SELECT id, title, body, ep_status FROM episodes_workspace WHERE id = ? AND archived_at IS NULL`
+      ).get(compareEpisodeId);
+    }
+
+    const checkedCount = lockedCanon.length + priorEps.length + linkedCharRows.length + (compareEp ? 1 : 0);
 
     // Build context sections for the prompt.
     const charSection = linkedCharRows.length === 0
@@ -1547,11 +1556,16 @@ function registerIpc() {
           `Canon [${ce.entry_type}] #${ce.id}: ${ce.title}\n${ce.body || '(no body)'}`
         ).join('\n\n---\n\n');
 
+    const compareSection = compareEp
+      ? `Episode #${compareEp.id}: ${compareEp.title} [${compareEp.ep_status || 'no status'}]\n${compareEp.body || '(no notes)'}`
+      : null;
+
     const systemPrompt =
       'You are a continuity analyst for a TV writers\' room. ' +
       'Your job is to flag issues in an episode entry when compared against ' +
       '(1) linked character entries and their current status, ' +
-      '(2) prior episode entries, and (3) locked canon facts.\n\n' +
+      '(2) prior episode entries, (3) locked canon facts' +
+      (compareSection ? ', and (4) a user-selected comparison episode' : '') + '.\n\n' +
       'Flag ONLY clear, specific issues in one of these three categories:\n' +
       '  - "timeline": a date, sequence, or timing contradiction\n' +
       '  - "character_state": a character\'s status, arc, location, or known facts are inconsistent\n' +
@@ -1581,7 +1595,8 @@ function registerIpc() {
       'If there are no issues, return { "flags": [] }.\n\n' +
       '## Linked Characters\n\n' + charSection + '\n\n' +
       '## Prior Episodes (most recent first)\n\n' + priorSection + '\n\n' +
-      '## Locked Canon\n\n' + canonSection;
+      '## Locked Canon\n\n' + canonSection +
+      (compareSection ? '\n\n## Additional Comparison Episode\n\n' + compareSection : '');
 
     const userMessage =
       `## Current Episode: ${ep.title || 'Untitled'} [${ep.ep_status || 'no status'}]\n\n${ep.body}`;
@@ -1615,8 +1630,9 @@ function registerIpc() {
         location:    f.location    || '',
       })),
       checkedCount,
-      priorEpisodesCount: priorEps.length,
-      characterCount:     linkedCharRows.length,
+      priorEpisodesCount:   priorEps.length,
+      characterCount:       linkedCharRows.length,
+      compareEpisodeTitle:  compareEp ? compareEp.title : null,
     };
   });
 

@@ -5433,6 +5433,12 @@ function renderCanonReviewPage(section, workspaceName) {
     // PLOCKED-SPECIFICS — all locked specifics on Canon Review proposals.
     mountLockedSpecificsPanel(rightCol);
 
+    // PEPISODE-CONT-2A — continuity check panel when proposal originated from an episode entry.
+    const EP_PROPOSAL_SOURCE_KINDS = new Set(['episodes_workspace', 'episodes']);
+    if (EP_PROPOSAL_SOURCE_KINDS.has(p.source_kind) && p.source_entry_id) {
+      mountEpisodeContinuityPanel(rightCol, { id: p.source_entry_id, title: p.title || 'Untitled' });
+    }
+
     conflictCheckBtn.addEventListener('click', async () => {
       conflictCheckBtn.disabled = true;
       conflictArea.innerHTML = '';
@@ -12513,6 +12519,8 @@ function mountPreviouslyOnPanel(rightCol, item) {
 // On-demand: reads this episode + linked characters + prior episodes + locked
 // canon; flags timeline contradictions, character state issues, arc breaks.
 // Each flag is dismissable or routable to Conflicts / Open Questions.
+// PEPISODE-CONT-2A — item can be a full episode object or {id, title} synthetic
+// (used when mounting from Canon Review for a proposal sourced from an episode).
 function mountEpisodeContinuityPanel(rightCol, item) {
   const section = document.createElement('details');
   section.className = 'ep-cont-section';
@@ -12526,38 +12534,66 @@ function mountEpisodeContinuityPanel(rightCol, item) {
   panelBody.className = 'ep-cont-body';
   section.appendChild(panelBody);
 
-  let hasRun = false;
+  // Picker row — persists across run/re-run cycles.
+  const pickerRow = document.createElement('div');
+  pickerRow.className = 'ep-cont-picker-row';
+  const pickerLabel = document.createElement('label');
+  pickerLabel.className = 'ep-cont-picker-label';
+  pickerLabel.textContent = 'Compare against episode (optional):';
+  const pickerSelect = document.createElement('select');
+  pickerSelect.className = 'ep-cont-picker-select';
+  const noneOpt = document.createElement('option');
+  noneOpt.value = '';
+  noneOpt.textContent = '— none —';
+  pickerSelect.appendChild(noneOpt);
+  pickerRow.append(pickerLabel, pickerSelect);
+  panelBody.appendChild(pickerRow);
+
+  window.revival.episodes.list().then((eps) => {
+    for (const ep of eps) {
+      if (ep.id === item.id) continue;
+      const opt = document.createElement('option');
+      opt.value = ep.id;
+      opt.textContent = ep.title || `Episode #${ep.id}`;
+      pickerSelect.appendChild(opt);
+    }
+  }).catch(() => {});
+
+  // Content area — only this zone is cleared between states.
+  const contentArea = document.createElement('div');
+  panelBody.appendChild(contentArea);
 
   function renderIdle() {
-    panelBody.innerHTML = '';
+    contentArea.innerHTML = '';
     const runBtn = document.createElement('button');
     runBtn.type = 'button';
     runBtn.className = 'btn-secondary ep-cont-run-btn';
     runBtn.textContent = 'Run continuity check';
-    runBtn.addEventListener('click', () => runCheck(runBtn));
-    panelBody.appendChild(runBtn);
+    runBtn.addEventListener('click', () => runCheck());
+    contentArea.appendChild(runBtn);
   }
 
-  async function runCheck(triggerBtn) {
-    panelBody.innerHTML = '';
+  async function runCheck() {
+    contentArea.innerHTML = '';
     const checking = document.createElement('p');
     checking.className = 'ep-cont-status';
     checking.textContent = 'Checking continuity…';
-    panelBody.appendChild(checking);
+    contentArea.appendChild(checking);
 
     const model = (typeof chatModelSelect !== 'undefined' && chatModelSelect.value)
       ? chatModelSelect.value : 'claude-sonnet-4-6';
+    const rawVal = pickerSelect.value;
+    const compareEpisodeId = rawVal ? parseInt(rawVal, 10) : null;
 
     try {
-      const res = await window.revival.claude.episodeContinuityCheck(item.id, model);
-      panelBody.innerHTML = '';
-      hasRun = true;
+      const res = await window.revival.claude.episodeContinuityCheck(item.id, model, compareEpisodeId);
+      contentArea.innerHTML = '';
 
       if (res.skipped) {
         const msg = document.createElement('p');
         msg.className = 'ep-cont-status';
         msg.textContent = 'Add episode body text before running the continuity check.';
-        panelBody.appendChild(msg);
+        contentArea.appendChild(msg);
         appendRerunBtn();
         return;
       }
@@ -12569,12 +12605,17 @@ function mountEpisodeContinuityPanel(rightCol, item) {
         parts.push(`${res.characterCount} character${res.characterCount === 1 ? '' : 's'}`);
       if (res.priorEpisodesCount > 0)
         parts.push(`${res.priorEpisodesCount} prior episode${res.priorEpisodesCount === 1 ? '' : 's'}`);
-      const canonPart = res.checkedCount - (res.characterCount || 0) - (res.priorEpisodesCount || 0);
+      if (res.compareEpisodeTitle)
+        parts.push(`comparison: ${res.compareEpisodeTitle}`);
+      const canonPart = res.checkedCount
+        - (res.characterCount || 0)
+        - (res.priorEpisodesCount || 0)
+        - (res.compareEpisodeTitle ? 1 : 0);
       if (canonPart > 0) parts.push(`${canonPart} canon entr${canonPart === 1 ? 'y' : 'ies'}`);
       meta.textContent = res.flags.length === 0
         ? `No issues found (checked: ${parts.join(', ') || 'nothing'}).`
         : `${res.flags.length} issue${res.flags.length === 1 ? '' : 's'} found (checked: ${parts.join(', ')}).`;
-      panelBody.appendChild(meta);
+      contentArea.appendChild(meta);
 
       for (const f of res.flags) {
         const card = document.createElement('div');
@@ -12688,26 +12729,26 @@ function mountEpisodeContinuityPanel(rightCol, item) {
 
         dismissBtn.addEventListener('click', () => {
           card.remove();
-          if (panelBody.querySelectorAll('.ep-cont-flag').length === 0) {
+          if (contentArea.querySelectorAll('.ep-cont-flag').length === 0) {
             const msg = document.createElement('p');
             msg.className = 'ep-cont-status';
             msg.textContent = 'All flags dismissed.';
-            panelBody.appendChild(msg);
+            contentArea.appendChild(msg);
             appendRerunBtn();
           }
         });
 
-        panelBody.appendChild(card);
+        contentArea.appendChild(card);
       }
 
       appendRerunBtn();
     } catch (err) {
-      panelBody.innerHTML = '';
+      contentArea.innerHTML = '';
       const errEl = document.createElement('p');
       errEl.className = 'ep-cont-status';
       const cleanErr = (err.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
       errEl.textContent = `Error: ${cleanErr || 'Continuity check failed.'}`;
-      panelBody.appendChild(errEl);
+      contentArea.appendChild(errEl);
       appendRerunBtn();
     }
   }
@@ -12717,8 +12758,8 @@ function mountEpisodeContinuityPanel(rightCol, item) {
     rerun.type = 'button';
     rerun.className = 'btn-secondary ep-cont-run-btn';
     rerun.textContent = 'Run again';
-    rerun.addEventListener('click', () => runCheck(rerun));
-    panelBody.appendChild(rerun);
+    rerun.addEventListener('click', () => runCheck());
+    contentArea.appendChild(rerun);
   }
 
   renderIdle();
