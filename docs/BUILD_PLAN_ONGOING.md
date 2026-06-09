@@ -424,6 +424,10 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 - After fixing, log any cancel buttons that were wired to wrong handlers or missing handlers entirely in a comment block at the top of each file touched.
 - **Smoke:** Open and cancel the entry create form in: Unsorted, Characters, Episodes, Open Questions, Canon Bible (Edit Mode), Writing Lab. Open and cancel the archive confirmation on one entry. Open and cancel the delete confirmation on one entry. Open and cancel the Canon Review approve dialog. Open and cancel the quick-capture modal (Cmd+Shift+N). Confirm no partial data written in any case. Confirm no stale state lingers after cancel (reopening the same form shows blank/original state).
 
+- **Audit result 2026-06-08:** All cancel/close/dismiss handlers verified correct via live Playwright testing. Scope covered: Unsorted/Characters/Episodes/Open Questions/Canon Bible/Writing Lab create cancel ✓; edit cancel ✓; delete confirm cancel ✓; Canon Review approve/reject/send-back/defer confirm cancel ✓; Canon lock form cancel ✓; quick-capture modal cancel ✓; tag picker close ✓; route picker dismiss ✓; Writing Lab delete confirm cancel ✓. No wrong handlers, no missing handlers, no partial writes, no stale state on reopen. Note: Archive in regular workspaces has no confirmation dialog (immediate with undo) — no cancel button exists or is needed. Note: diff-on-save modal and Writing Lab explicit create-cancel are not yet built (future features PCANON-DIFF). No files required changes.
+
+- **Smoke passed 2026-06-08.**
+
 ---
 
 ## Status fields (continued)
