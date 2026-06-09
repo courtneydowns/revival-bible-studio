@@ -124,6 +124,21 @@
 | **PDOC-WIRE Documents wiring** | **CLI** | First-class workspace wiring, multi-file |
 | **PPOL3 UI Polish: post-PBRAIN-STRUCT** | **VS Code ext / CLI** | Per item in POLISH_NOTES_ONGOING.md + print/PDF |
 | **PPOL-ONGOING Ongoing polish** | **VS Code ext / CLI** | Open-ended; tool choice per item |
+| **PPOL2b-SEARCH Inline search/filter** | **CLI** | New filter component across 13 workspaces |
+| **PBLOCK-LABEL Blocking specificity labels** | **VS Code ext** | Display-layer only; requires PBLOCK ✅ PCONFLICT-SEV ✅ POQ-DEPENDS ✅ |
+| **PBLOCK-CROSS Cross-workspace blocking** | **VS Code ext / CLI** | New blocking field + picker across multiple workspaces; requires PBLOCK-LABEL |
+| **PBLOCK-RESOLVE-PROMPT Blocking resolution prompt** | **VS Code ext** | Event hook on resolve/archive across workspaces; requires PBLOCK-CROSS |
+| **PBLOCK-DASHBOARD Blocking dashboard** | **CLI** | New panel on Home; requires PBLOCK-CROSS, PBLOCK-LABEL |
+| **PBLOCK-HISTORY Blocking history on entries** | **CLI** | New collapsed log across all workspaces; requires PBLOCK-CROSS |
+| **PAI-STATUS-SUGGEST AI-suggested status values** | **VS Code ext** | New action on existing detail panels |
+| **PAI-ENTRY-ROUTE-SUGGEST AI-suggested routing** | **VS Code ext** | New action on quick-capture + Unsorted |
+| **PAI-TAG-SUGGEST-EDIT AI tag suggestions with editing** | **VS Code ext** | Extension of PAI-TAGS; requires PAI-TAGS |
+| **PAI-BLOCK-SUGGEST AI-suggested OQ blocking** | **VS Code ext** | New action on OQ entries; requires POQ-DEPENDS ✅ |
+| **PAI-RELATIONSHIP-SUGGEST AI-suggested cross-workspace links** | **CLI** | Cross-table reads + link creation across workspaces |
+| **PAI-METADATA-AUDIT AI metadata audit** | **CLI** | Cross-entry scan + batch UI; touches all workspaces |
+| **PAI-CONFIDENCE-SUGGEST AI-suggested confidence level** | **VS Code ext** | New action on canon entry Edit Mode; requires PCANON-CONFIDENCE ✅ |
+| **PCHAT-SEARCH Chat history search** | **CLI** | New search module across chat tables |
+| **PCHAT-EXPORT Chat plain-text export** | **VS Code ext** | Export action on existing chat toolbar |
 
 ---
 

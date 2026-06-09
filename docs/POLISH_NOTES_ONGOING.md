@@ -73,19 +73,7 @@ Running log of UI/UX observations from smoke tests. Addressed in PPOL1 (pre-impo
 - [x] PPOL2-26 [PSEARCH] Search: Canon Bible hits route to the page top, not the matched entry ✅ PPOL2b
 
 ### Noticed during PPOL2b smoke
-- [ ] PPOL2b-S01 [PPOL2b] Unsorted: no inline search/filter on left-column list — add text input above the list to narrow entries by title or body
-- [ ] PPOL2b-S02 [PPOL2b] Source Material: no inline search/filter on left-column list — narrow sources by title or body
-- [ ] PPOL2b-S03 [PPOL2b] Documents: no inline search/filter on left-column list — narrow documents by title or body
-- [ ] PPOL2b-S04 [PPOL2b] Open Questions: no inline search/filter on left-column list — narrow questions by title or body
-- [ ] PPOL2b-S05 [PPOL2b] Conflicts: no inline search/filter on left-column list — narrow conflicts by title or body
-- [ ] PPOL2b-S06 [PPOL2b] Decisions: no inline search/filter on left-column list — narrow decisions by title or body
-- [ ] PPOL2b-S07 [PPOL2b] Brainstorm: no inline search/filter on left-column list — narrow ideas by title or body
-- [ ] PPOL2b-S08 [PPOL2b] Research: no inline search/filter on left-column list — narrow research entries by title or body
-- [ ] PPOL2b-S09 [PPOL2b] Characters: no inline search/filter on left-column list — narrow characters by name or body
-- [ ] PPOL2b-S10 [PPOL2b] Episodes: no inline search/filter on left-column list — narrow episodes by title or body
-- [ ] PPOL2b-S11 [PPOL2b] Writing Lab: no inline search/filter on left-column list — narrow drafts by title or body
-- [ ] PPOL2b-S12 [PPOL2b] Canon Bible: no inline text filter on entry list — AI search (P42) covers semantic queries but there is no quick local filter to narrow the visible list by title keyword
-- [ ] PPOL2b-S13 [PPOL2b] Canon Review: no inline search/filter on proposal list — narrow proposals by proposed title or body
+- ~~PPOL2b-S01–S13~~ **Moved to FEATURE_BACKLOG_ONGOING.md as `PPOL2b-SEARCH`** — inline search/filter on all 13 workspace left columns is a new feature component, not a polish fix.
 
 ### Noticed during P46 smoke
 - [ ] P46-PPOL [P46-A] Flanagan Filter panel — "Run" button clipped on right edge; panel width needs to accommodate the full button row without overflow
@@ -103,6 +91,9 @@ Running log of UI/UX observations from smoke tests. Addressed in PPOL1 (pre-impo
 - [ ] PPOL-NAV-BADGES [PPOL-CANCEL] Nav badges missing on Conflicts and Decisions — both workspaces should show an entry count badge matching the existing badge pattern on Canon Review, Conflicts (conflict count), and Open Questions. Add count badges to both Conflicts and Decisions nav items.
 - [ ] PPOL-CANON-REVIEW-TAGS [PPOL-CANCEL] Canon Review proposals have no tag UI — cannot add or view tags on a proposal. Add tag support to Canon Review proposals matching the existing "+ Tag" pattern used across all other workspaces.
 - [ ] PPOL-BACKLINK-TITLES [PPOL-CANCEL] Back-links and source attribution labels show raw ID references (e.g. "Decisions #7", "Characters #5") instead of the entry title. App-wide: wherever a back-link, source attribution, or linked-entry reference is rendered, replace the ID with the actual entry title (e.g. "Decision: The Diane Rewrite", "Character: Jordan"). Applies to: Decisions source_question_id back-link, Canon Review source attribution, cross-workspace attachment labels, and any other location where entries are referenced by ID rather than title.
+
+### Logged during PPOL-ONGOING / June 2026
+- [ ] PPOL-TAG-FORMAT [PPOL-ONGOING] Global tag library: tags are stored and displayed with underscores instead of spaces and lack proper capitalization (e.g. `open_for_revision` instead of "Open for Revision"). Fix app-wide — all tags rendered in the UI should display with spaces and title case. Applies to: tag badges on list items and detail panels, tag pickers, tag filter UI, and any other location where tag names are rendered. Confirm whether stored values also need a data migration or only the render layer needs normalization.
 
 ### Logged during PPOL-ONGOING / June 2026
 - [ ] PPOL-TAG-FORMAT [PPOL-ONGOING] Global tag library: tags are stored and displayed with underscores instead of spaces and lack proper capitalization (e.g. `open_for_revision` instead of "Open for Revision"). Fix app-wide — all tags rendered in the UI should display with spaces and title case. Applies to: tag badges on list items and detail panels, tag pickers, tag filter UI, and any other location where tag names are rendered. The fix is display-layer only; confirm whether the underlying stored values also need to be migrated or only the render layer needs normalization.

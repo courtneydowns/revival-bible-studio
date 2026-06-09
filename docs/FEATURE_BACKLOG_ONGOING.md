@@ -532,28 +532,204 @@ Extend the AI tag suggestion pattern established in P46-C to all workspaces and 
 
 ---
 
-## Chat search + export (deferred)
+## PPOL2b-SEARCH — Inline search/filter on all workspace left columns
 
-- Chat search: search across all chat history by keyword
-- Chat pop-out: dedicated window for Chat, independent of main app
-- Chat export: export a chat as plain text or markdown
-- Address after core feature set is stable
+**Tool:** CLI — new filter component, touches all 13 workspace left-column lists.
 
----
+All 13 workspace left-column lists currently have no local text filter. Moved here from POLISH_NOTES_ONGOING.md (was PPOL2b-S01–S13).
 
-## Additional Source file types (deferred)
-
-- Currently: file upload for Source Material
-- Deferred: additional file types, OCR for scanned documents, PDF annotation
+- Add a text input above the left-column list in every workspace to narrow visible entries by title or body text
+- Local filter only — no API call, no global search (PSEARCH covers that)
+- Filter is instant/live as the user types; clears on workspace navigation
+- **Workspaces:** Unsorted, Source Material, Documents, Open Questions, Conflicts, Decisions, Brainstorm, Research, Characters, Episodes, Writing Lab, Canon Bible (title keyword only — P42 covers semantic), Canon Review proposals
+- Canon Bible note: P42 covers semantic queries; this fills the gap for quick title-keyword narrowing of the visible list
 
 ---
 
-## Performance + themes (deferred)
+## PAI-TAG-SUGGEST-EDIT — AI tag suggestions with pre-apply editing
 
-- Performance optimization for large datasets
-- Dark/light theme toggle
-- Address after core feature set is stable and in active use
+**Tool:** VS Code ext.
+**Requires:** PAI-TAGS (must be built first)
+
+- AI proposes tags from the existing library — same as PAI-TAGS
+- Before confirming, user can edit the proposed tag set: remove individual suggestions, add tags manually, rename displayed tag (render-layer only)
+- Edit step is always present — not skippable — so no tag is ever applied without deliberate review
+- Applies to all workspaces covered by PAI-TAGS
+- AI suggests; human edits and confirms. No tag auto-applied.
 
 ---
 
-*Last updated: June 2026. Sequencing is not implied by order in this document.*
+## PAI-STATUS-SUGGEST — AI-suggested status values
+
+**Tool:** VS Code ext.
+
+- **Decisions:** suggests Open / Tentative / Final based on language, resolution clarity, and linked context
+- **Open Questions:** suggests Tier 1 / 2 / 3 based on stakes and dependencies
+- **Brainstorm:** suggests Rough / Developing / Ready to Route based on content maturity
+- **Episodes:** suggests Outline / Draft / Locked based on completeness signals
+- Trigger: "Suggest status" button on the entry detail panel — never automatic
+- User confirms or overrides; suggestion is never applied silently
+- AI suggests; human approves.
+
+---
+
+## PAI-BLOCK-SUGGEST — AI-suggested blocking relationships between Open Questions
+
+**Tool:** VS Code ext.
+**Requires:** POQ-DEPENDS ✅
+
+- Trigger: "Suggest dependencies" button on any Open Question, or a batch mode from the OQ workspace toolbar
+- Claude reads question text, tier, and linked context; suggests directed dependency pairs
+- Each suggestion shown as: "Q14 should block Q22 — reason: [one-line rationale]"
+- User confirms or dismisses each pair individually; no dependency created without confirmation
+- Integrates with POQ-DEPENDS — confirmed suggestions create the dependency link
+- AI suggests; human approves.
+
+---
+
+## PAI-ENTRY-ROUTE-SUGGEST — AI-suggested workspace routing on entry creation
+
+**Tool:** VS Code ext.
+
+- Trigger: "Where should this go?" button in quick-capture modal and Unsorted entry detail
+- Claude reads the entry title + body and recommends a destination workspace with a one-line reason
+- User routes or dismisses; suggestion does not move anything automatically
+- Complements the existing highlight-extract-route and Unsorted route action
+- AI suggests; human routes.
+
+---
+
+## PAI-RELATIONSHIP-SUGGEST — AI-suggested cross-workspace links
+
+**Tool:** CLI — cross-table reads + link creation across workspaces.
+
+- Trigger: "Suggest links" button on any entry detail panel
+- Claude reads the entry content and returns a short list of candidate entries (title + workspace + one-line reason)
+- User accepts or dismisses each suggestion individually; no link created without confirmation
+- Applies to: Characters, Episodes, Decisions, Open Questions, Conflicts, Brainstorm, Research, Canon Bible entries
+- AI suggests; human links.
+
+---
+
+## PAI-METADATA-AUDIT — AI metadata audit: batch fill missing fields
+
+**Tool:** CLI — cross-entry scan + batch UI, touches all workspaces.
+
+- Trigger: "Audit metadata" action from workspace toolbar or Settings
+- Surfaces entries missing: status, tier, tags, confidence level, severity — whichever fields apply to that workspace
+- Results shown as a reviewable list; user fills in each field or skips
+- AI may pre-populate suggestions inline (status, tags, tier) — user confirms or overrides each before anything is written
+- Never writes metadata without explicit per-field confirmation
+- Scope: one workspace at a time; no cross-workspace batch
+
+---
+
+## PAI-CONFIDENCE-SUGGEST — AI-suggested confidence level on canon entries
+
+**Tool:** VS Code ext.
+**Requires:** PCANON-CONFIDENCE ✅
+
+- Trigger: "Suggest confidence" button on any canon entry detail panel (Edit Mode)
+- Claude reads the entry body, linked source material, and supporting decisions; reasons about how certain this canon fact is
+- Returns: recommended level + one-paragraph rationale
+- User confirms or overrides; nothing applied without confirmation
+- Pairs with PCANON-CONFIDENCE (confidence field must exist before this is buildable)
+- AI suggests; human approves.
+
+---
+
+## PBLOCK-LABEL — Specific blocking/blocked labels on entries
+
+**Tool:** VS Code ext — display-layer only, no schema changes.
+**Requires:** PBLOCK ✅, PCONFLICT-SEV ✅, POQ-DEPENDS ✅
+
+- **Blocking OQ (POQ-DEPENDS):** "Blocked by: [Q title]" on dependent question; "Blocking: [Q title]" on the blocker
+- **Blocking flag (PBLOCK):** "Blocking: [named episode/character/arc]" — the named target is already stored; surface it in the badge
+- **Blocking Conflict (PCONFLICT-SEV):** "Blocking: [linked entry title or freeform description]" on list item badge and detail panel
+- Applies everywhere a blocking/blocked state is rendered: list item badges, detail panel indicators, Needs Attention panel entries
+- Display-layer change only — no schema changes required
+
+---
+
+## PBLOCK-CROSS — Cross-workspace blocking relationships
+
+**Tool:** VS Code ext / CLI — new blocking field + picker, multi-file.
+**Requires:** PBLOCK-LABEL
+
+- Any entry in Decisions, Brainstorm, Canon Bible (Edit Mode), Characters, or Episodes can be marked as blocking a named target (episode, character, arc, draft, or another entry via picker)
+- Blocking entries surface in Needs Attention panel with specific label (see PBLOCK-LABEL)
+- Removing a blocking relationship requires confirmation
+- Link-don't-copy — blocked target is a reference, not a copy
+- Bi-directional visibility: the blocked entry shows what is blocking it; the blocker shows what it is blocking
+
+---
+
+## PBLOCK-DASHBOARD — Blocking dashboard
+
+**Tool:** CLI — new panel on Home.
+**Requires:** PBLOCK-CROSS, PBLOCK-LABEL
+
+- Grouped by workspace; each item is a click-through to the entry
+- Shows: blocker title, workspace, what it's blocking, age of the block
+- Filters: Blocking only / Blocked only / All
+- Sits within or alongside the Needs Attention panel on Home
+- Never auto-resolves anything — display only
+
+---
+
+## PBLOCK-RESOLVE-PROMPT — Blocking resolution prompt
+
+**Tool:** VS Code ext — event hook on resolve/archive handlers.
+**Requires:** PBLOCK-CROSS
+
+- Prompt: "This was blocking [X] — do you want to review or update [X]?"
+- One-click navigation to the downstream entry from the prompt
+- Dismiss without action always available — no forced workflow
+- Applies to: OQ resolved (POQ-DEPENDS), Conflict severity changed away from Blocking, blocking flag cleared (PBLOCK), cross-workspace block cleared (PBLOCK-CROSS)
+
+---
+
+## PBLOCK-HISTORY — Blocking history on entries
+
+**Tool:** CLI — new collapsed log across all workspaces.
+**Requires:** PBLOCK-CROSS
+
+- Records: what this entry has blocked or been blocked by, including resolved relationships
+- Each record: relationship type, other entry title + workspace, date set, date resolved (if resolved)
+- Read-only — not editable
+- Collapsed by default; expandable on click; matches archive section pattern
+
+---
+
+## PCHAT-SEARCH — Chat history search
+
+**Tool:** CLI — new search module across chat tables.
+
+- Search across all chat history by keyword
+- Results show chat title + matching message preview; click-through opens that chat at the matched message
+- Scoped to current project chats only
+
+---
+
+## PCHAT-EXPORT — Chat plain-text export
+
+**Tool:** VS Code ext — export action on existing chat toolbar.
+
+- Export any chat as a downloadable .txt or .md file
+- Includes: chat title, date, all messages with role labels (You / Claude), attachments noted inline
+- Distinct from PCHAT-ROUTE (which routes content to workspaces); this is a file download
+
+---
+
+## Deferred
+
+Held until core feature set is stable and in active use.
+
+- **Chat pop-out** — dedicated window for Chat independent of main app
+- **Additional Source file types** — OCR for scanned documents, PDF annotation
+- **Performance optimization** — large dataset handling
+- **Themes** — dark/light theme toggle
+
+---
+
+*Last updated: June 9, 2026. Sequencing is not implied by order in this document.*

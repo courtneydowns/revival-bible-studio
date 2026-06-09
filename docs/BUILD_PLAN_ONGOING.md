@@ -501,12 +501,12 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ## Open Questions enhancements
 
-### POQ-DEPENDS — Open Question dependencies
+### POQ-DEPENDS — Open Question dependencies ✅
 - Mark one Open Question as "depends on" another
 - Dependency shown as a soft block indicator on the dependent question's list item
 - Blocked questions surface with reduced visual priority while the blocker is unresolved
 - Removing the dependency requires confirmation
-- **Smoke:** Mark Q2 as depending on Q1; confirm block indicator on Q2; resolve Q1; confirm block indicator clears from Q2
+- **Smoke passed.**
 
 ---
 
@@ -799,13 +799,149 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ---
 
+## Inline search/filter
+
+### PPOL2b-SEARCH — Inline search/filter on all workspace left columns
+**Tool:** CLI
+- Text input above the left-column list in every workspace to narrow visible entries by title or body
+- Local filter only — no API call; clears on workspace navigation
+- **Workspaces:** Unsorted, Source Material, Documents, Open Questions, Conflicts, Decisions, Brainstorm, Research, Characters, Episodes, Writing Lab, Canon Bible (title keyword — P42 covers semantic), Canon Review proposals
+- **Smoke:** Type in the filter on three workspaces; confirm list narrows live; clear filter, confirm full list restored
+
+---
+
+## Blocking specificity + blocking system
+
+### PBLOCK-LABEL — Specific blocking/blocked labels on entries
+**Tool:** VS Code ext
+**Requires:** PBLOCK ✅, PCONFLICT-SEV ✅, POQ-DEPENDS ✅
+- Blocking and blocked indicators throughout the app show generic badges. Replace with specific labels naming exactly what is blocking or blocked.
+- **Blocking OQ (POQ-DEPENDS):** "Blocked by: [Q title]" on dependent question; "Blocking: [Q title]" on the blocker
+- **Blocking flag (PBLOCK):** "Blocking: [named episode/character/arc]" — target already stored; surface it in the badge
+- **Blocking Conflict (PCONFLICT-SEV):** "Blocking: [linked entry title or freeform description]" on list item badge and detail panel
+- Applies everywhere a blocking/blocked state is rendered: list item badges, detail panel indicators, Needs Attention panel entries
+- Display-layer change only — no schema changes required
+- **Smoke:** Set a blocking OQ dependency; confirm list item reads "Blocked by: [Q title]" not just "Blocked"; set a Blocking-severity conflict; confirm badge reads "Blocking: [description]"; check Needs Attention panel entries show same specific labels
+
+### PBLOCK-CROSS — Cross-workspace blocking relationships
+**Tool:** VS Code ext / CLI
+**Requires:** PBLOCK-LABEL
+- Any entry in Decisions, Brainstorm, Canon Bible (Edit Mode), Characters, or Episodes can be marked as blocking a named target (episode, character, arc, draft, or another entry via picker)
+- Blocking entries surface in Needs Attention panel with specific label per PBLOCK-LABEL
+- Removing a blocking relationship requires confirmation
+- Link-don't-copy — blocked target is a reference, not a copy
+- Bi-directional visibility: blocked entry shows what is blocking it; blocker shows what it is blocking
+- **Smoke:** Mark a Decision as blocking "S1E4 draft"; confirm it surfaces in Needs Attention with specific label; resolve the Decision; confirm block clears; confirm bi-directional visibility on both entries
+
+### PBLOCK-RESOLVE-PROMPT — Blocking resolution prompt
+**Tool:** VS Code ext
+**Requires:** PBLOCK-CROSS
+- When a blocker is resolved, archived, or closed, a prompt surfaces: "This was blocking [X] — do you want to review or update [X]?"
+- One-click navigation to the downstream entry from the prompt
+- Dismiss without action always available — no forced workflow
+- Applies to: OQ resolved (POQ-DEPENDS), Conflict severity changed away from Blocking, blocking flag cleared (PBLOCK), cross-workspace block cleared (PBLOCK-CROSS)
+- **Smoke:** Resolve a blocking OQ; confirm prompt appears naming the downstream entry; click through, confirm navigation; dismiss another, confirm no action taken
+
+### PBLOCK-DASHBOARD — Blocking dashboard
+**Tool:** CLI
+**Requires:** PBLOCK-CROSS, PBLOCK-LABEL
+- Read-only panel on Home alongside Needs Attention showing everything currently blocking or blocked across all workspaces
+- Grouped by workspace; each item click-through to the entry
+- Shows: blocker title, workspace, what it's blocking, age of the block
+- Filters: Blocking only / Blocked only / All
+- Never auto-resolves anything — display only
+- **Smoke:** Create blocking entries across three workspaces; open dashboard; confirm all appear grouped with correct labels and ages; click through to one, confirm navigation; test each filter
+
+### PBLOCK-HISTORY — Blocking history on entries
+**Tool:** CLI
+**Requires:** PBLOCK-CROSS
+- Passive collapsed log on every entry showing all blocking relationships over time, including resolved ones
+- Each record: relationship type, other entry title + workspace, date set, date resolved (if resolved)
+- Read-only — not editable; collapsed by default; matches archive section pattern
+- **Smoke:** Create and resolve two blocking relationships on one entry; open blocking history; confirm both appear with set and resolved dates; confirm active blocks also appear
+
+---
+
+## AI metadata assistance
+
+### PAI-STATUS-SUGGEST — AI-suggested status values
+**Tool:** VS Code ext
+- On demand, Claude recommends a status value based on entry content
+- Decisions: Open / Tentative / Final; OQ: Tier 1/2/3; Brainstorm: Rough / Developing / Ready to Route; Episodes: Outline / Draft / Locked
+- Trigger: "Suggest status" button on detail panel — never automatic
+- User confirms or overrides; never applied silently
+- **Smoke:** Trigger on a Decision, OQ, and Brainstorm entry; confirm suggestion + rationale appears; confirm value; confirm only confirmed status written
+
+### PAI-ENTRY-ROUTE-SUGGEST — AI-suggested workspace routing on entry creation
+**Tool:** VS Code ext
+- When creating via quick-capture or Unsorted, Claude suggests which workspace the content belongs in with one-line reason
+- Trigger: "Where should this go?" button — never automatic
+- User routes or dismisses; nothing moves without confirmation
+- **Smoke:** Create an entry in quick-capture; trigger suggestion; confirm recommendation + reason; route to suggested workspace; confirm entry created there
+
+### PAI-TAG-SUGGEST-EDIT — AI tag suggestions with pre-apply editing
+**Tool:** VS Code ext
+**Requires:** PAI-TAGS (must be built first)
+- AI proposes tags from existing library; user edits the proposed set before confirming — remove suggestions, add tags manually
+- Edit step always present; no tag ever applied without deliberate review
+- App-wide — all workspaces covered by PAI-TAGS
+- **Smoke:** Trigger tag suggestion on an entry; remove one suggested tag, add one manually; confirm; confirm only confirmed tags applied
+
+### PAI-BLOCK-SUGGEST — AI-suggested blocking relationships between Open Questions
+**Tool:** VS Code ext
+**Requires:** POQ-DEPENDS ✅
+- On demand, Claude reviews Open Questions and suggests directed dependency pairs with one-line rationale
+- Trigger: "Suggest dependencies" button on OQ entry or batch mode from OQ toolbar
+- User confirms or dismisses each pair individually; confirmed pairs create POQ-DEPENDS links
+- **Smoke:** Run on a set of OQs; confirm dependency suggestions appear with rationale; confirm one, dismiss one; confirm confirmed pair creates dependency link
+
+### PAI-RELATIONSHIP-SUGGEST — AI-suggested cross-workspace links
+**Tool:** CLI
+- On demand, Claude reads an entry and returns candidate entries to link, with one-line reason per candidate
+- User accepts or dismisses each individually; no link created without confirmation
+- Applies to: Characters, Episodes, Decisions, Open Questions, Conflicts, Brainstorm, Research, Canon Bible entries
+- **Smoke:** Trigger on a Character entry; confirm candidate list appears; accept one link, dismiss one; confirm accepted link is bidirectional
+
+### PAI-METADATA-AUDIT — AI metadata audit: batch fill missing fields
+**Tool:** CLI
+- On demand, Claude scans a workspace for entries missing status, tier, tags, confidence, or severity
+- Results shown as reviewable list; AI pre-populates suggestions inline; user confirms or overrides per field
+- Never writes metadata without explicit per-field confirmation; one workspace at a time
+- **Smoke:** Create entries with missing fields; run audit on that workspace; confirm missing-field list surfaces; fill two fields, skip one; confirm only confirmed fields written
+
+### PAI-CONFIDENCE-SUGGEST — AI-suggested confidence level on canon entries
+**Tool:** VS Code ext
+**Requires:** PCANON-CONFIDENCE ✅
+- On demand, Claude recommends Confirmed / Probable / Speculative for a canon entry with reasoning
+- Trigger: "Suggest confidence" button on canon entry detail panel (Edit Mode)
+- User confirms or overrides; nothing applied without confirmation
+- **Smoke:** Trigger on three canon entries with different evidence strength; confirm recommendation + rationale per entry; confirm one, override one, dismiss one
+
+---
+
+## Chat enhancements
+
+### PCHAT-SEARCH — Chat history search
+**Tool:** CLI
+- Search across all chat history by keyword
+- Results show chat title + matching message preview; click-through opens that chat at the matched message
+- Scoped to current project chats only
+- **Smoke:** Create three chats with distinct keywords; search for each; confirm correct chat and message surfaces; click through, confirm navigation to matched message
+
+### PCHAT-EXPORT — Chat plain-text export
+**Tool:** VS Code ext
+- Export any chat as a downloadable .txt or .md file
+- Includes: chat title, date, all messages with role labels (You / Claude), attachments noted inline
+- Distinct from PCHAT-ROUTE (which routes content to workspaces); this is a file download
+- **Smoke:** Export a chat with attachments; confirm file downloads; confirm title, messages, and attachment notes present; confirm formatting clean
+
+---
+
 ## Deferred
 
 Held until core feature set is stable and in active use.
 
-- **Chat search** — search across all chat history by keyword
 - **Chat pop-out** — dedicated window for Chat independent of main app
-- **Chat plain-text export** — export a chat as a downloadable .txt or .md file (routing to workspaces covered by PCHAT-ROUTE ✅)
 - **Additional Source file types** — OCR for scanned documents, PDF annotation
 - **Performance optimization** — large dataset handling
 - **Themes** — dark/light theme toggle
