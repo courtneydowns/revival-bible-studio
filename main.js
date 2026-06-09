@@ -187,6 +187,39 @@ function registerIpc() {
   ipcMain.handle('episodes:archive', (_event, id) => { const r = db.episodes.archive(id); recordEvent('Episodes', 'archived'); return r; });
   ipcMain.handle('episodes:restore', (_event, id) => db.episodes.restore(id));
   ipcMain.handle('episodes:setStatus', (_event, id, status) => db.episodes.setStatus(id, status));
+  // PEPISODE-PREVON — "Previously on" canon snapshot.
+  ipcMain.handle('episodes:previouslyOn', (_e, id) => db.episodes.previouslyOn(id));
+  ipcMain.handle('episodes:previouslyOnExport', (_e, id) => {
+    const { episode, priorEpisode, lockedEntries } = db.episodes.previouslyOn(id);
+    const lines = [
+      `Revival Studio — Previously on: ${episode.title}`,
+      priorEpisode ? `As of: ${priorEpisode.title}` : 'As of: before this episode',
+      `Generated: ${new Date().toLocaleString()}`,
+      `${lockedEntries.length} locked canon entr${lockedEntries.length === 1 ? 'y' : 'ies'}`,
+      '',
+    ];
+    const byType = {};
+    for (const e of lockedEntries) {
+      const t = e.entry_type ? e.entry_type.charAt(0).toUpperCase() + e.entry_type.slice(1) : 'General';
+      if (!byType[t]) byType[t] = [];
+      byType[t].push(e);
+    }
+    for (const [type, entries] of Object.entries(byType)) {
+      lines.push(`=== ${type} ===`);
+      for (const e of entries) {
+        lines.push(`  ${e.title}${e.locked_label ? '  [' + e.locked_label + ']' : ''}`);
+        if (e.body) lines.push(`  ${e.body}`);
+        lines.push('');
+      }
+    }
+    const folder = path.join(app.getPath('documents'), 'revival-bible-studio', 'previously_on');
+    fs.mkdirSync(folder, { recursive: true });
+    const slug = episode.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
+    const filePath = path.join(folder, `previously-on-${slug}.txt`);
+    fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
+    shell.openPath(folder);
+    return { filePath };
+  });
 
   ipcMain.handle('writingLab:list', () => db.writingLab.list());
   ipcMain.handle('writingLab:listArchived', () => db.writingLab.listArchived());

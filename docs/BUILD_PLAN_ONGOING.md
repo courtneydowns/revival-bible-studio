@@ -536,12 +536,13 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ## Episode enhancements
 
-### PEPISODE-PREVON — "Previously on" canon snapshot
+### PEPISODE-PREVON — "Previously on" canon snapshot ✅
 - On any Episode entry, one-click generates a read-only summary of what canon facts are locked as of the prior episode
 - Generated from existing canon data — no new input required
 - Displayed in a collapsed panel on the episode detail
 - Exportable as plain text
-- **Smoke:** Seed canon entries across two episodes; open Episode 2; generate "Previously on"; confirm summary reflects only canon locked as of Episode 1; export, confirm output
+- **Implementation:** `episodes.previouslyOn(id)` in db.js queries locked non-retired canon entries with `locked_at < episode.created_at`; also surfaces the prior episode (by created_at) for label context. IPC: `episodes:previouslyOn` + `episodes:previouslyOnExport`. UI: `mountPreviouslyOnPanel` collapsed `<details>` section on episode detail — Generate button on first open, Refresh + Export .txt after results load. Export writes to `~/Documents/revival-bible-studio/previously_on/`.
+- **Smoke passed 2026-06-09.**
 
 ---
 

@@ -4602,6 +4602,86 @@
       .bs-archived-thread-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; gap: 8px; }
       .bs-archived-thread-row:hover { background: var(--hover); border-radius: 4px; }
       .bs-archived-thread-title { font-size: 0.85em; color: var(--muted); flex: 1; }
+
+      /* PEPISODE-PREVON — "Previously on" canon snapshot panel */
+      .ep-prevon-section {
+        margin-top: 16px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .ep-prevon-summary {
+        cursor: pointer;
+        padding: 8px 12px;
+        font-size: 0.82em;
+        font-weight: 600;
+        color: var(--muted);
+        user-select: none;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .ep-prevon-summary::-webkit-details-marker { display: none; }
+      .ep-prevon-summary::before { content: '▸ '; font-size: 0.8em; }
+      .ep-prevon-section[open] .ep-prevon-summary::before { content: '▾ '; }
+      .ep-prevon-summary:hover { color: var(--text); }
+      .ep-prevon-body {
+        padding: 10px 12px 12px;
+        border-top: 1px solid var(--border);
+      }
+      .ep-prevon-generate-btn { font-size: 12px; }
+      .ep-prevon-error { font-size: 0.82em; color: var(--danger, #e05c5c); margin: 4px 0; }
+      .ep-prevon-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 10px;
+        flex-wrap: wrap;
+      }
+      .ep-prevon-context { font-size: 0.82em; color: var(--muted); flex: 1; }
+      .ep-prevon-btn-group { display: flex; gap: 6px; }
+      .ep-prevon-action-btn { font-size: 11px; padding: 3px 8px; }
+      .ep-prevon-empty { font-size: 0.82em; color: var(--muted); margin: 4px 0; }
+      .ep-prevon-count { font-size: 0.82em; color: var(--muted); margin: 0 0 10px; }
+      .ep-prevon-group { margin-bottom: 12px; }
+      .ep-prevon-group:last-child { margin-bottom: 0; }
+      .ep-prevon-type-label {
+        font-size: 0.75em;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+      .ep-prevon-entry {
+        padding: 6px 8px;
+        border-left: 2px solid var(--border);
+        margin-bottom: 6px;
+        border-radius: 0 4px 4px 0;
+      }
+      .ep-prevon-entry:last-child { margin-bottom: 0; }
+      .ep-prevon-entry-title {
+        font-size: 0.85em;
+        font-weight: 500;
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .ep-prevon-locked-label {
+        font-size: 0.78em;
+        color: var(--muted);
+        font-weight: 400;
+      }
+      .ep-prevon-entry-body {
+        font-size: 0.8em;
+        color: var(--muted);
+        margin-top: 3px;
+        white-space: pre-wrap;
+        line-height: 1.4;
+      }
     </style>
   </head>
   <body>

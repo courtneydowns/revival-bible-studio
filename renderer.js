@@ -10999,6 +10999,156 @@ async function mountOqDependsPanel(container, item, archivedFlag, onListReload) 
 }
 // ── End POQ-DEPENDS ─────────────────────────────────────────────────────────
 
+// PEPISODE-PREVON — collapsed "Previously on" panel on an episode detail.
+// Shows all locked non-retired canon entries with locked_at before this
+// episode's created_at. One-click generate; exportable as plain text.
+function mountPreviouslyOnPanel(rightCol, item) {
+  const section = document.createElement('details');
+  section.className = 'ep-prevon-section';
+
+  const sum = document.createElement('summary');
+  sum.className = 'ep-prevon-summary';
+  sum.textContent = 'Previously on';
+  section.appendChild(sum);
+
+  const body = document.createElement('div');
+  body.className = 'ep-prevon-body';
+  section.appendChild(body);
+
+  let results = null;
+
+  function renderBody() {
+    body.innerHTML = '';
+
+    if (!results) {
+      const generateBtn = document.createElement('button');
+      generateBtn.type = 'button';
+      generateBtn.className = 'btn-secondary ep-prevon-generate-btn';
+      generateBtn.textContent = 'Generate';
+      generateBtn.addEventListener('click', async () => {
+        generateBtn.disabled = true;
+        generateBtn.textContent = 'Loading…';
+        try {
+          results = await window.revival.episodes.previouslyOn(item.id);
+          renderBody();
+        } catch (_err) {
+          generateBtn.disabled = false;
+          generateBtn.textContent = 'Generate';
+          const errEl = document.createElement('p');
+          errEl.className = 'ep-prevon-error';
+          errEl.textContent = 'Could not load canon snapshot.';
+          body.appendChild(errEl);
+        }
+      });
+      body.appendChild(generateBtn);
+      return;
+    }
+
+    const headerRow = document.createElement('div');
+    headerRow.className = 'ep-prevon-header-row';
+
+    const ctxSpan = document.createElement('span');
+    ctxSpan.className = 'ep-prevon-context';
+    ctxSpan.textContent = results.priorEpisode
+      ? `Canon locked as of: ${results.priorEpisode.title}`
+      : 'Canon locked before this episode was created';
+    headerRow.appendChild(ctxSpan);
+
+    const btnGroup = document.createElement('div');
+    btnGroup.className = 'ep-prevon-btn-group';
+
+    const refreshBtn = document.createElement('button');
+    refreshBtn.type = 'button';
+    refreshBtn.className = 'btn-secondary ep-prevon-action-btn';
+    refreshBtn.textContent = 'Refresh';
+    refreshBtn.addEventListener('click', async () => {
+      refreshBtn.disabled = true;
+      try {
+        results = await window.revival.episodes.previouslyOn(item.id);
+        renderBody();
+      } catch (_err) {
+        refreshBtn.disabled = false;
+      }
+    });
+
+    const exportBtn = document.createElement('button');
+    exportBtn.type = 'button';
+    exportBtn.className = 'btn-secondary ep-prevon-action-btn';
+    exportBtn.textContent = 'Export .txt';
+    exportBtn.addEventListener('click', async () => {
+      exportBtn.disabled = true;
+      try { await window.revival.episodes.previouslyOnExport(item.id); }
+      finally { exportBtn.disabled = false; }
+    });
+
+    btnGroup.append(refreshBtn, exportBtn);
+    headerRow.appendChild(btnGroup);
+    body.appendChild(headerRow);
+
+    const { lockedEntries } = results;
+
+    if (lockedEntries.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'ep-prevon-empty';
+      empty.textContent = 'No locked canon entries as of the prior episode.';
+      body.appendChild(empty);
+      return;
+    }
+
+    const countLine = document.createElement('p');
+    countLine.className = 'ep-prevon-count';
+    countLine.textContent =
+      `${lockedEntries.length} locked canon entr${lockedEntries.length === 1 ? 'y' : 'ies'}`;
+    body.appendChild(countLine);
+
+    const byType = {};
+    for (const e of lockedEntries) {
+      const t = e.entry_type || 'general';
+      if (!byType[t]) byType[t] = [];
+      byType[t].push(e);
+    }
+    for (const [type, entries] of Object.entries(byType)) {
+      const group = document.createElement('div');
+      group.className = 'ep-prevon-group';
+
+      const typeLabel = document.createElement('div');
+      typeLabel.className = 'ep-prevon-type-label';
+      typeLabel.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+      group.appendChild(typeLabel);
+
+      for (const e of entries) {
+        const card = document.createElement('div');
+        card.className = 'ep-prevon-entry';
+
+        const titleRow = document.createElement('div');
+        titleRow.className = 'ep-prevon-entry-title';
+        titleRow.textContent = e.title;
+        if (e.locked_label) {
+          const lbl = document.createElement('span');
+          lbl.className = 'ep-prevon-locked-label';
+          lbl.textContent = e.locked_label;
+          titleRow.appendChild(lbl);
+        }
+        card.appendChild(titleRow);
+
+        if (e.body) {
+          const bodyEl = document.createElement('div');
+          bodyEl.className = 'ep-prevon-entry-body';
+          bodyEl.textContent = e.body;
+          card.appendChild(bodyEl);
+        }
+
+        group.appendChild(card);
+      }
+
+      body.appendChild(group);
+    }
+  }
+
+  renderBody();
+  rightCol.appendChild(section);
+}
+
 const CONTENT_RENDERERS = {
   'Home': renderHomePage,
   'Writing Lab': renderWritingLabPage,
@@ -12703,6 +12853,8 @@ const CONTENT_RENDERERS = {
         });
         const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'episodes');
         callbacks.refreshHistory = refresh;
+        // PEPISODE-PREVON — "Previously on" collapsed canon snapshot.
+        if (!archivedFlag) mountPreviouslyOnPanel(rightCol, item);
       },
 
       leftColExtra(leftCol, rightCol, ctx) {

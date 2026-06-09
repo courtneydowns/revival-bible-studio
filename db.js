@@ -2324,6 +2324,30 @@ episodes.setStatus = function(id, status) {
   return episodes.get(id);
 };
 
+// PEPISODE-PREVON — "Previously on" canon snapshot.
+// Returns all locked non-retired canon entries with locked_at before this
+// episode's created_at, plus the prior episode entry for label context.
+episodes.previouslyOn = function(id) {
+  const db2 = getDb();
+  const ep = db2.prepare('SELECT id, title, created_at FROM episodes_workspace WHERE id = ?').get(id);
+  if (!ep) throw new Error('Episode not found.');
+  // Prior episode: most recent active episode created before (or same time, lower id than) this one.
+  const priorEp = db2.prepare(
+    `SELECT id, title FROM episodes_workspace
+     WHERE archived_at IS NULL
+       AND (created_at < ? OR (created_at = ? AND id < ?))
+     ORDER BY created_at DESC, id DESC LIMIT 1`
+  ).get(ep.created_at, ep.created_at, id);
+  // Locked canon entries established before this episode.
+  const locked = db2.prepare(
+    `SELECT ce.id, ce.entry_type, ce.title, ce.body, ce.locked_at, ce.locked_label
+     FROM canon_entries ce
+     WHERE ce.locked = 1 AND ce.retired = 0 AND ce.locked_at < ?
+     ORDER BY ce.entry_type ASC, ce.title ASC`
+  ).all(ep.created_at);
+  return { episode: ep, priorEpisode: priorEp || null, lockedEntries: locked };
+};
+
 // --- Character relationships repository (P37) ------------------------------
 // Typed edges between characters_workspace entries. Queries join both sides
 // so the renderer gets character names without a second round-trip.

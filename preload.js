@@ -128,6 +128,8 @@ contextBridge.exposeInMainWorld('revival', {
     archive: (id) => ipcRenderer.invoke('episodes:archive', id),
     restore: (id) => ipcRenderer.invoke('episodes:restore', id),
     setStatus: (id, status) => ipcRenderer.invoke('episodes:setStatus', id, status),
+    previouslyOn: (id) => ipcRenderer.invoke('episodes:previouslyOn', id),
+    previouslyOnExport: (id) => ipcRenderer.invoke('episodes:previouslyOnExport', id),
   },
   writingLab: {
     list: () => ipcRenderer.invoke('writingLab:list'),
