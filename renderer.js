@@ -2013,6 +2013,7 @@ const CANON_STATUS_OPTIONS = [
   'draft', 'speculative', 'implied', 'provisional', 'confirmed', 'retired', 'struck',
 ];
 const CANON_CERTAINTY_OPTIONS = ['', 'low', 'medium', 'high'];
+const CANON_CONFIDENCE_OPTIONS = ['', 'confirmed', 'probable', 'speculative'];
 const CANON_REVIEW_STATE_OPTIONS = [
   '', 'placement_ready', 'needs_review', 'unresolved', 'deferred',
   're_confirmation_flagged', 'open_for_revision',
@@ -2251,6 +2252,11 @@ function buildCanonForm({
     CANON_CERTAINTY_OPTIONS,
     entry ? entry.certainty : (seed && seed.certainty) || ''
   );
+  const confidencePicker = picker(
+    'Confidence',
+    CANON_CONFIDENCE_OPTIONS,
+    entry ? entry.confidence : (seed && seed.confidence) || ''
+  );
   const reviewPicker = picker(
     'Review state',
     CANON_REVIEW_STATE_OPTIONS,
@@ -2267,7 +2273,7 @@ function buildCanonForm({
   provInput.checked = entry ? !!entry.provisional : !!(seed && seed.provisional);
   provLabel.append(provSpan, provInput);
 
-  statusRow.append(statusPicker.wrap, certaintyPicker.wrap, reviewPicker.wrap, provLabel);
+  statusRow.append(statusPicker.wrap, certaintyPicker.wrap, confidencePicker.wrap, reviewPicker.wrap, provLabel);
   form.appendChild(statusRow);
 
   // Detail-field host — re-rendered when type changes (create path only).
@@ -2284,6 +2290,7 @@ function buildCanonForm({
       body: bodyInput.value,
       canon_status: statusPicker.input.value || 'draft',
       certainty: certaintyPicker.input.value || null,
+      confidence: confidencePicker.input.value || null,
       review_state: reviewPicker.input.value || null,
       provisional: provInput.checked,
       detail,
@@ -2345,6 +2352,7 @@ function buildCanonForm({
     if (draft.body != null) bodyInput.value = draft.body;
     if (draft.canon_status) statusPicker.input.value = draft.canon_status;
     if (draft.certainty !== undefined) certaintyPicker.input.value = draft.certainty || '';
+    if (draft.confidence !== undefined) confidencePicker.input.value = draft.confidence || '';
     if (draft.review_state !== undefined) reviewPicker.input.value = draft.review_state || '';
     if (draft.provisional !== undefined) provInput.checked = !!draft.provisional;
   }
@@ -2359,7 +2367,7 @@ function buildCanonForm({
   for (const el of [titleInput, bodyInput]) {
     el.addEventListener('input', saveDraft);
   }
-  for (const sel of [statusPicker.input, certaintyPicker.input, reviewPicker.input]) {
+  for (const sel of [statusPicker.input, certaintyPicker.input, confidencePicker.input, reviewPicker.input]) {
     sel.addEventListener('change', saveDraft);
   }
   provInput.addEventListener('change', saveDraft);
@@ -2514,6 +2522,7 @@ function buildCanonCard(
   }
   if (e.retired) addChip('retired', 'canon-chip-retired');
   if (e.provisional) addChip('provisional', 'canon-chip-provisional');
+  if (e.confidence) addChip(e.confidence, `canon-chip-confidence canon-chip-confidence-${e.confidence}`);
   if (e.canon_status) addChip(`status: ${e.canon_status}`);
   if (e.certainty) addChip(`certainty: ${e.certainty}`);
   if (e.review_state) addChip(`review: ${e.review_state}`);
@@ -2906,6 +2915,7 @@ function renderCanonBiblePage(section) {
   // AND. State lives here; the bar UI is (re)built by renderFilterBar().
   let filterEntryType = 'all';   // 'all' | one of the 18 entry_type keys
   let filterLock = 'all';        // 'all' | 'locked' | 'unlocked'
+  let filterConfidence = '';     // '' | 'confirmed' | 'probable' | 'speculative'
   let filterCharacterId = '';    // '' | canon_entries.id (string) of a character
   let filterSeasonId = '';       // '' | canon_entries.id (string) of a season
   const filtersBar = document.createElement('div');
@@ -2990,6 +3000,29 @@ function renderCanonBiblePage(section) {
     });
     filtersMain.appendChild(lockSel);
 
+    // Confidence — three values + any.
+    const confSel = document.createElement('select');
+    confSel.className = 'canon-filter-select';
+    confSel.setAttribute('aria-label', 'Filter by confidence');
+    for (const [val, lbl] of [
+      ['', 'Any confidence'],
+      ['confirmed', 'Confirmed'],
+      ['probable', 'Probable'],
+      ['speculative', 'Speculative'],
+    ]) {
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = lbl;
+      confSel.appendChild(opt);
+    }
+    confSel.value = filterConfidence;
+    confSel.addEventListener('change', () => {
+      filterConfidence = confSel.value || '';
+      renderFilterBar();
+      renderLists();
+    });
+    filtersMain.appendChild(confSel);
+
     // Character — built from current character entries (active + retired).
     const charSel = document.createElement('select');
     charSel.className = 'canon-filter-select';
@@ -3057,6 +3090,7 @@ function renderCanonBiblePage(section) {
     const activeDims =
       (filterEntryType !== 'all' ? 1 : 0) +
       (filterLock !== 'all' ? 1 : 0) +
+      (filterConfidence ? 1 : 0) +
       (filterCharacterId ? 1 : 0) +
       (filterSeasonId ? 1 : 0);
     if (activeDims > 0) {
@@ -3067,6 +3101,7 @@ function renderCanonBiblePage(section) {
       clear.addEventListener('click', () => {
         filterEntryType = 'all';
         filterLock = 'all';
+        filterConfidence = '';
         filterCharacterId = '';
         filterSeasonId = '';
         renderFilterBar();
@@ -3233,6 +3268,7 @@ function renderCanonBiblePage(section) {
     }
     if (filterLock === 'locked' && !entry.locked) return false;
     if (filterLock === 'unlocked' && entry.locked) return false;
+    if (filterConfidence && entry.confidence !== filterConfidence) return false;
     if (filterCharacterId && !idx.charMatchIds.has(entry.id)) return false;
     if (filterSeasonId && !idx.seasonMatchIds.has(entry.id)) return false;
     return true;
@@ -3782,6 +3818,7 @@ function renderCanonBiblePage(section) {
           body: payload.body,
           canon_status: payload.canon_status,
           certainty: payload.certainty,
+          confidence: payload.confidence,
           review_state: payload.review_state,
           provisional: payload.provisional,
           detail: payload.detail,
@@ -3859,6 +3896,7 @@ function renderCanonBiblePage(section) {
           body: payload.body,
           canon_status: payload.canon_status,
           certainty: payload.certainty,
+          confidence: payload.confidence,
           review_state: payload.review_state,
           provisional: payload.provisional,
           detail: payload.detail,
@@ -5244,6 +5282,7 @@ function renderCanonReviewPage(section, workspaceName) {
       body: approveDraft.body != null ? approveDraft.body : latestEdits.body,
       canon_status: approveDraft.canon_status || 'draft',
       certainty: approveDraft.certainty || null,
+      confidence: approveDraft.confidence || null,
       review_state: approveDraft.review_state || null,
       provisional: !!approveDraft.provisional,
     };
@@ -5265,6 +5304,7 @@ function renderCanonReviewPage(section, workspaceName) {
           body: payload.body,
           canon_status: payload.canon_status,
           certainty: payload.certainty,
+          confidence: payload.confidence,
           review_state: payload.review_state,
           provisional: payload.provisional,
           detail: payload.detail,

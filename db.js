@@ -1785,6 +1785,17 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '053_pcanon_confidence',
+    up(db) {
+      // PCANON-CONFIDENCE — Confirmed/Probable/Speculative confidence badge.
+      // Distinct from the existing `certainty` (low/medium/high) and lock status.
+      // Passive display only — no workflow gate.
+      db.exec(`
+        ALTER TABLE canon_entries ADD COLUMN confidence TEXT CHECK(confidence IN ('confirmed','probable','speculative'));
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -2815,7 +2826,7 @@ async function exportAll(destFolder) {
   // 4. Each Canon entry as its own .txt — one file per entry, grouped by type.
   const canonEntries = db
     .prepare(
-      `SELECT id, entry_type, title, body, canon_status, certainty, review_state,
+      `SELECT id, entry_type, title, body, canon_status, certainty, confidence, review_state,
               locked, locked_label, provisional, retired, created_at, updated_at
          FROM canon_entries
         ORDER BY entry_type ASC, id ASC`
@@ -2834,6 +2845,7 @@ async function exportAll(destFolder) {
       `Type:   ${ce.entry_type}`,
       `Title:  ${ce.title || ''}`,
       `Status: ${ce.canon_status || ''}${ce.certainty ? ` (${ce.certainty})` : ''}`,
+      ce.confidence ? `Confidence: ${ce.confidence}` : null,
       ce.review_state ? `Review: ${ce.review_state}` : null,
       ce.locked ? `Locked: ${ce.locked_label || 'yes'}` : null,
       ce.provisional ? 'Provisional: yes' : null,
@@ -3071,7 +3083,7 @@ const CANON_LIST_COLUMNS = `
   ce.id, ce.entry_type, ce.title, ce.body,
   ce.locked, ce.locked_at, ce.locked_label,
   ce.retired, ce.retired_at, ce.replaces_entry_id, ce.replaced_by_entry_id,
-  ce.provisional, ce.canon_status, ce.certainty, ce.review_state,
+  ce.provisional, ce.canon_status, ce.certainty, ce.review_state, ce.confidence,
   ce.origin_kind, ce.origin_entry_id, ce.origin_session_id, ce.origin_lock_code,
   ce.created_at, ce.updated_at,
   s.label AS origin_session_label, s.session_date AS origin_session_date
@@ -3501,6 +3513,7 @@ const canonProposals = {
         body: payload.body,
         canon_status: payload.canon_status,
         certainty: payload.certainty,
+        confidence: payload.confidence,
         review_state: payload.review_state,
         provisional: payload.provisional,
         detail: payload.detail,
@@ -3773,6 +3786,7 @@ const CANON_STATUS_VALUES = [
   'draft', 'speculative', 'implied', 'provisional', 'confirmed', 'retired', 'struck',
 ];
 const CANON_CERTAINTY_VALUES = ['low', 'medium', 'high'];
+const CANON_CONFIDENCE_VALUES = ['confirmed', 'probable', 'speculative'];
 const CANON_REVIEW_STATE_VALUES = [
   'placement_ready', 'needs_review', 'unresolved', 'deferred',
   're_confirmation_flagged', 'open_for_revision',
@@ -4064,6 +4078,9 @@ const canon = {
       ? payload.review_state
       : null;
     const provisional = payload.provisional ? 1 : 0;
+    const confidence = CANON_CONFIDENCE_VALUES.includes(payload.confidence)
+      ? payload.confidence
+      : null;
 
     const detailColumns = pickDetailColumns(entryType, payload.detail);
     if (detailColumns) ensureRequiredFields(entryType, detailColumns);
@@ -4094,13 +4111,13 @@ const canon = {
          (created_at, updated_at, entry_type, title, body,
           locked, locked_at, locked_label,
           retired, retired_at,
-          provisional, canon_status, certainty, review_state,
+          provisional, canon_status, certainty, review_state, confidence,
           origin_kind, origin_entry_id, origin_session_id, origin_lock_code)
        VALUES
          (?, ?, ?, ?, ?,
           0, NULL, NULL,
           0, NULL,
-          ?, ?, ?, ?,
+          ?, ?, ?, ?, ?,
           'manual', NULL, NULL, NULL)`
     );
 
@@ -4108,7 +4125,7 @@ const canon = {
     db.transaction(() => {
       const info = insertEntry.run(
         now, now, entryType, title, body,
-        provisional, canonStatus, certainty, reviewState
+        provisional, canonStatus, certainty, reviewState, confidence
       );
       newId = info.lastInsertRowid;
       if (detailColumns) {
@@ -4176,6 +4193,14 @@ const canon = {
     if (payload.provisional !== undefined) {
       sets.push('provisional = ?');
       params.push(payload.provisional ? 1 : 0);
+    }
+    if (payload.confidence !== undefined) {
+      const v = payload.confidence || null;
+      if (v !== null && !CANON_CONFIDENCE_VALUES.includes(v)) {
+        throw new Error(`Invalid confidence: ${v}.`);
+      }
+      sets.push('confidence = ?');
+      params.push(v);
     }
 
     const now = new Date().toISOString();
@@ -4307,7 +4332,7 @@ const canon = {
     const existing = db
       .prepare(
         `SELECT id, entry_type, title, body,
-                provisional, canon_status, certainty, review_state,
+                provisional, canon_status, certainty, review_state, confidence,
                 origin_kind, origin_entry_id, origin_session_id, origin_lock_code,
                 retired
            FROM canon_entries
@@ -4359,6 +4384,12 @@ const canon = {
           ? 1
           : 0
         : existing.provisional;
+    const newConfidence =
+      payload.confidence !== undefined
+        ? payload.confidence && CANON_CONFIDENCE_VALUES.includes(payload.confidence)
+          ? payload.confidence
+          : null
+        : existing.confidence;
 
     let mergedDetail = null;
     if (cfg && cfg.table) {
@@ -4394,20 +4425,20 @@ const canon = {
               locked, locked_at, locked_label,
               retired, retired_at,
               replaces_entry_id, replaced_by_entry_id,
-              provisional, canon_status, certainty, review_state,
+              provisional, canon_status, certainty, review_state, confidence,
               origin_kind, origin_entry_id, origin_session_id, origin_lock_code)
            VALUES
              (?, ?, ?, ?, ?,
               0, NULL, NULL,
               0, NULL,
               ?, NULL,
-              ?, ?, ?, ?,
+              ?, ?, ?, ?, ?,
               ?, ?, ?, ?)`
         )
         .run(
           now, now, entryType, newTitle, newBody,
           eid,
-          newProvisional, newStatus, newCertainty, newReviewState,
+          newProvisional, newStatus, newCertainty, newReviewState, newConfidence,
           existing.origin_kind, existing.origin_entry_id,
           existing.origin_session_id, existing.origin_lock_code
         );
@@ -5421,6 +5452,7 @@ function canonExport(params) {
 
       const meta = [`**Status:** ${entry.canon_status || 'draft'}`];
       if (entry.certainty) meta.push(`**Certainty:** ${entry.certainty}`);
+      if (entry.confidence) meta.push(`**Confidence:** ${entry.confidence}`);
       if (entry.locked) meta.push(`**Locked:** ${entry.locked_label || 'yes'}`);
       if (entry.provisional) meta.push(`**Provisional**`);
       if (entry.legacy_ids && entry.legacy_ids.length > 0) {

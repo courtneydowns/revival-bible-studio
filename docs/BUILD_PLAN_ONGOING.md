@@ -453,12 +453,12 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ## Canon Bible enhancements
 
-### PCANON-CONFIDENCE — Canon entry confidence level
+### PCANON-CONFIDENCE — Canon entry confidence level ✅
 - Add **Confirmed / Probable / Speculative** confidence field to every canon entry
 - Distinct from lock status — passive badge only, no workflow gate
 - Visible on list items and detail panel
 - Filterable in Canon Bible browse
-- **Smoke:** Set confidence on three entries; filter by Speculative, confirm results; confirm badge visible in list and detail
+- **Smoke passed 2026-06-09.**
 
 ### PCANON-DIFF — Canon edit diff on save
 - When saving an edit to a canon entry in Edit Mode, show a before/after diff before the save completes
