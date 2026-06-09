@@ -2291,6 +2291,37 @@ brainstorm.devIntoBackRefs = (kind, targetId) => {
 
 const research = makeEntryRepo('research_items');
 
+// PRESEARCH-USED — override list/listArchived to include `used` boolean (1/0):
+// a research entry is "used" when it appears as source_kind='research' in any
+// cross_workspace_attachments row (covering both manual links and routed entries).
+research.list = () =>
+  getDb()
+    .prepare(
+      `SELECT ri.*,
+        CASE WHEN EXISTS (
+          SELECT 1 FROM cross_workspace_attachments
+          WHERE source_kind = 'research' AND source_id = ri.id
+        ) THEN 1 ELSE 0 END AS used
+       FROM research_items ri
+       WHERE ri.archived_at IS NULL
+       ORDER BY ri.created_at DESC, ri.id DESC`
+    )
+    .all();
+
+research.listArchived = () =>
+  getDb()
+    .prepare(
+      `SELECT ri.*,
+        CASE WHEN EXISTS (
+          SELECT 1 FROM cross_workspace_attachments
+          WHERE source_kind = 'research' AND source_id = ri.id
+        ) THEN 1 ELSE 0 END AS used
+       FROM research_items ri
+       WHERE ri.archived_at IS NOT NULL
+       ORDER BY ri.archived_at DESC, ri.id DESC`
+    )
+    .all();
+
 // PAUDIT-6 — set the external_url on a Research entry.
 research.setExternalUrl = (id, url) => {
   const db = getDb();

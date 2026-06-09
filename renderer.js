@@ -12488,8 +12488,12 @@ const CONTENT_RENDERERS = {
   // Research shares the lifecycle but is styled distinctly (blue source accent +
   // tailored labels) so it never reads like Brainstorm's open ideation.
   // PAUDIT-6: wrapped in IIFE to hold reloadRef for external_url inline edit.
+  // PRESEARCH-USED: also holds usedFilter state for linked/unused filter bar.
   'Research': (() => {
     const reloadRef = { fn: null };
+    // null = show all; 'linked' = only used; 'unused' = only unused.
+    let usedFilter = null;
+
     return makeEntryWorkspace({
       apiName: 'research',
       entityKind: 'research',
@@ -12499,11 +12503,74 @@ const CONTENT_RENDERERS = {
       titlePlaceholder: 'What was researched?',
       bodyPlaceholder: 'Findings, and where they came from — source/link (optional)',
 
+      matchesExtra(item) {
+        if (usedFilter === null) return true;
+        const isUsed = !!item.used;
+        return usedFilter === 'linked' ? isUsed : !isUsed;
+      },
+
+      isFilterActive() {
+        return usedFilter !== null;
+      },
+
       leftColExtra(leftCol, rightCol, ctx) {
         reloadRef.fn = ctx.reloadList;
+
+        const filterBar = document.createElement('div');
+        filterBar.className = 'research-used-filter-bar';
+
+        function renderFilterBar() {
+          filterBar.innerHTML = '';
+          const allBtn = document.createElement('button');
+          allBtn.type = 'button';
+          allBtn.className = 'research-used-filter-btn' + (usedFilter === null ? ' active' : '');
+          allBtn.textContent = 'All';
+          allBtn.addEventListener('click', () => {
+            usedFilter = null;
+            renderFilterBar();
+            ctx.reloadList();
+          });
+          filterBar.appendChild(allBtn);
+
+          const linkedBtn = document.createElement('button');
+          linkedBtn.type = 'button';
+          linkedBtn.className = 'research-used-filter-btn research-used-filter-btn-linked' + (usedFilter === 'linked' ? ' active' : '');
+          linkedBtn.textContent = 'Linked';
+          linkedBtn.addEventListener('click', () => {
+            usedFilter = 'linked';
+            renderFilterBar();
+            ctx.reloadList();
+          });
+          filterBar.appendChild(linkedBtn);
+
+          const unusedBtn = document.createElement('button');
+          unusedBtn.type = 'button';
+          unusedBtn.className = 'research-used-filter-btn research-used-filter-btn-unused' + (usedFilter === 'unused' ? ' active' : '');
+          unusedBtn.textContent = 'Unused';
+          unusedBtn.addEventListener('click', () => {
+            usedFilter = 'unused';
+            renderFilterBar();
+            ctx.reloadList();
+          });
+          filterBar.appendChild(unusedBtn);
+        }
+
+        renderFilterBar();
+        leftCol.insertBefore(filterBar, ctx.addBtn);
       },
 
       listItemExtra(btn, item) {
+        // PRESEARCH-USED: linked/unused badge on title row.
+        const titleRow = btn.querySelector('.tc-list-title');
+        if (titleRow) {
+          const badge = document.createElement('span');
+          badge.className = item.used
+            ? 'tc-list-badge badge-research-linked'
+            : 'tc-list-badge badge-research-unused';
+          badge.textContent = item.used ? 'Linked' : 'Unused';
+          titleRow.insertBefore(badge, titleRow.lastChild);
+        }
+        // PAUDIT-6: external URL preview line.
         if (!item.external_url) return;
         const urlLine = document.createElement('div');
         urlLine.className = 'tc-list-preview research-url-preview';

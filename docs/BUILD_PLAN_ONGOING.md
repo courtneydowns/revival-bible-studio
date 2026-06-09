@@ -548,10 +548,11 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ## Research enhancements
 
-### PRESEARCH-USED — Research "Used in" indicator
+### PRESEARCH-USED — Research "Used in" indicator ✅
 - Passive badge on every Research entry showing whether it has been linked or routed anywhere ("linked" vs. "unused")
 - Filterable: filter Research by used vs. unused
-- **Smoke:** Create three Research entries; link one to a Character; route one to Brainstorm; confirm linked and routed entries show "linked" badge; confirm third shows "unused"; filter by unused, confirm only third appears
+- **Implementation:** `research.list()` / `research.listArchived()` in db.js overridden with EXISTS subquery on `cross_workspace_attachments` (source_kind='research') to add `used` boolean. Research workspace wrapped in IIFE; `matchesExtra` / `isFilterActive` filter hooks added; All/Linked/Unused filter bar in `leftColExtra`; linked/unused badge on every list item title row via `listItemExtra`. CSS in index.html.
+- **Smoke passed.**
 
 ---
 
