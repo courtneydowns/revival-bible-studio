@@ -6752,6 +6752,7 @@ function renderSettingsPage(section) {
 
   renderManageTags(section);
   renderNeedsAttentionSettings(section);
+  renderConfigBackup(section);
   renderPanicExport(section);
   renderCanonExport(section);
   renderSessionLog(section);
@@ -7359,6 +7360,90 @@ function renderAppHealth(section) {
 // Source Material entry as a .txt, every Canon entry as a .txt, all proposals
 // as proposals.json, and all tags as tags.json — into a timestamped folder.
 // Copy-only: nothing in the app is deleted, archived, or finalized.
+// --- Settings: Config Backup (PCONFIG-BACKUP) --------------------------------
+// Export: Project Rules, staleness thresholds, user-created tags → JSON file
+// chosen by save dialog. API key is intentionally excluded.
+// Import: open a backup JSON, restore DB-backed fields and apply thresholds
+// back to localStorage. Merge-only for tags (never deletes existing tags).
+function renderConfigBackup(section) {
+  const block = document.createElement('div');
+  block.className = 'entry-form settings-block';
+
+  const heading = document.createElement('h2');
+  heading.className = 'settings-heading';
+  heading.textContent = 'Config Backup';
+
+  const desc = document.createElement('p');
+  desc.className = 'settings-desc';
+  desc.textContent =
+    'Export your Project Rules, staleness thresholds, and custom tags to a JSON file ' +
+    'you can restore later. Your API key is never included in the export.';
+
+  // Export row
+  const exportBtn = document.createElement('button');
+  exportBtn.type = 'button';
+  exportBtn.textContent = 'Export Config…';
+
+  const exportStatus = document.createElement('p');
+  exportStatus.className = 'draft-status';
+
+  exportBtn.addEventListener('click', async () => {
+    exportBtn.disabled = true;
+    setStatus(exportStatus, 'Exporting…');
+    try {
+      const thresholds = getNeedsThresholds();
+      const res = await window.revival.config.export(thresholds);
+      if (res.canceled) {
+        setStatus(exportStatus, 'Export canceled — nothing was written.');
+      } else {
+        setStatus(exportStatus, `Config exported to: ${res.filePath}`);
+      }
+    } catch (err) {
+      setStatus(exportStatus, `Export failed: ${err.message || err}`);
+    }
+    exportBtn.disabled = false;
+  });
+
+  // Import row
+  const importBtn = document.createElement('button');
+  importBtn.type = 'button';
+  importBtn.textContent = 'Import Config…';
+  importBtn.style.marginTop = '8px';
+
+  const importStatus = document.createElement('p');
+  importStatus.className = 'draft-status';
+
+  importBtn.addEventListener('click', async () => {
+    importBtn.disabled = true;
+    setStatus(importStatus, 'Importing…');
+    try {
+      const res = await window.revival.config.import();
+      if (res.canceled) {
+        setStatus(importStatus, 'Import canceled — nothing was changed.');
+      } else {
+        // Apply thresholds back to localStorage.
+        if (res.stalenessThresholds && typeof res.stalenessThresholds === 'object') {
+          setNeedsThresholds(res.stalenessThresholds);
+        }
+        const when = res.exportedAt
+          ? ` (exported ${res.exportedAt.slice(0, 10)})`
+          : '';
+        setStatus(
+          importStatus,
+          `Config restored${when}. Project Rules updated; ${res.tagsRestored} tag(s) added. ` +
+          'Reload the app to see all changes.'
+        );
+      }
+    } catch (err) {
+      setStatus(importStatus, `Import failed: ${err.message || err}`);
+    }
+    importBtn.disabled = false;
+  });
+
+  block.append(heading, desc, exportBtn, exportStatus, importBtn, importStatus);
+  section.appendChild(block);
+}
+
 function renderPanicExport(section) {
   const block = document.createElement('div');
   block.className = 'entry-form settings-block';

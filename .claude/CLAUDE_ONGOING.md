@@ -250,7 +250,6 @@ These features are in `docs/FEATURE_BACKLOG_ONGOING.md` and `docs/BUILD_PLAN_ONG
 - **PRESEARCH-CITE:** Research entries get a source citation field, linkable to Source Material.
 - **PEMPTY-STATE:** Empty state copy on all workspaces + first-session guide on Home (dismissable, non-recurring).
 - **PHEALTH:** App health panel in Settings — migration count, SQLite size, record counts, orphan detection + cleanup.
-- **PCONFIG-BACKUP:** Config export/import in Settings (Project Rules, thresholds, user tags — no API key).
 - **PFLAN-EXPAND:** Flanagan Filter expands to Brainstorm, Writing Lab, Characters, Episodes, Canon Review, Canon Bible (Edit Mode), Conflicts (lightweight), Decisions (lightweight). Fifth mode: Production Check (Tier 3 only).
 - **PAI-WIRE:** AI features wire to each other — P44→P41, P42→P43, P46→P41, P45→P43. All user-triggered, no automatic routing.
 - **PDOC-WIRE:** Documents becomes first-class — Chat-attachable, highlight-extract-route target, linkable to Characters/Episodes, Flanagan Filter, Canon proposal path.

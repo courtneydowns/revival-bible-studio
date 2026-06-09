@@ -541,6 +541,61 @@ function registerIpc() {
     db.canonImport.stageEntries(entries, fileName)
   );
 
+  // PCONFIG-BACKUP — export Project Rules + user-created tags + staleness
+  // thresholds to a JSON file chosen by the user. API key is never included.
+  // Staleness thresholds are renderer-owned (localStorage), so the renderer
+  // passes them in; we bundle them into the JSON alongside the DB-backed data.
+  ipcMain.handle('config:export', async (_event, stalenessThresholds) => {
+    const configData = db.configBackup.export();
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      projectRules: configData.projectRules,
+      stalenessThresholds: stalenessThresholds || {},
+      userTags: configData.userTags,
+    };
+    const result = await dialog.showSaveDialog({
+      title: 'Save Config Backup',
+      defaultPath: `revival-config-${timestampSlug()}.json`,
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (result.canceled) return { canceled: true };
+    fs.writeFileSync(result.filePath, JSON.stringify(payload, null, 2), 'utf8');
+    return { canceled: false, filePath: result.filePath };
+  });
+
+  // PCONFIG-BACKUP — import: open a backup file, restore Project Rules + user
+  // tags to the DB, and return the thresholds for the renderer to apply to
+  // localStorage. Nothing is overwritten until the file is validated.
+  ipcMain.handle('config:import', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select Config Backup',
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+      properties: ['openFile'],
+    });
+    if (result.canceled || !result.filePaths.length) return { canceled: true };
+    let payload;
+    try {
+      payload = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8'));
+    } catch {
+      throw new Error('Could not read config file — is it a valid Revival config backup?');
+    }
+    if (!payload || typeof payload !== 'object' || payload.version !== 1) {
+      throw new Error('Unrecognized config format. Expected a Revival config backup (version 1).');
+    }
+    const { tagsRestored } = db.configBackup.import({
+      projectRules: payload.projectRules,
+      userTags: payload.userTags,
+    });
+    return {
+      canceled: false,
+      projectRules: payload.projectRules,
+      stalenessThresholds: payload.stalenessThresholds || {},
+      tagsRestored,
+      exportedAt: payload.exportedAt || null,
+    };
+  });
+
   ipcMain.handle('settings:getProjectRules', () => db.settings.getProjectRules());
   ipcMain.handle('settings:setProjectRules', (_event, text) =>
     db.settings.setProjectRules(text)

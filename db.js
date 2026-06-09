@@ -3311,6 +3311,57 @@ const settings = {
   },
 };
 
+// --- Config Backup (PCONFIG-BACKUP) ----------------------------------------
+// Lightweight export/import of user-customized settings: Project Rules,
+// user-created tags. API key is intentionally excluded — it must never leave
+// the machine in a backup file. Staleness thresholds live in localStorage
+// (renderer-owned), so main.js ferries them as plain JSON alongside the
+// DB-backed data; they never touch the DB.
+const configBackup = {
+  export: () => {
+    const database = getDb();
+    const row = database
+      .prepare('SELECT project_rules FROM settings WHERE id = 1')
+      .get();
+    const userTags = database
+      .prepare('SELECT name, category FROM tags WHERE is_seed = 0 ORDER BY name ASC')
+      .all();
+    return { projectRules: (row && row.project_rules) || '', userTags };
+  },
+
+  // Restore project rules and user-created tags from a backup payload. Tags
+  // are merged (idempotent create) — we never delete tags that were added after
+  // the backup so this is always safe to run. Returns { tagsRestored } count.
+  import: ({ projectRules, userTags } = {}) => {
+    const database = getDb();
+    database
+      .prepare('UPDATE settings SET project_rules = ?, updated_at = ? WHERE id = 1')
+      .run(typeof projectRules === 'string' ? projectRules : '', new Date().toISOString());
+    let tagsRestored = 0;
+    const tx = database.transaction((tagList) => {
+      for (const tag of tagList) {
+        const name = String(tag.name || '').trim().toLowerCase();
+        if (!name) continue;
+        const cat = (tag.category || '').trim() || null;
+        const exists = database
+          .prepare('SELECT id FROM tags WHERE name = ? COLLATE NOCASE')
+          .get(name);
+        if (!exists) {
+          const now = new Date().toISOString();
+          database
+            .prepare(
+              'INSERT INTO tags (name, category, is_seed, created_at, updated_at) VALUES (?, ?, 0, ?, ?)'
+            )
+            .run(name, cat, now, now);
+          tagsRestored++;
+        }
+      }
+    });
+    tx(Array.isArray(userTags) ? userTags : []);
+    return { ok: true, tagsRestored };
+  },
+};
+
 // --- Panic Export (P21) ----------------------------------------------------
 // One-shot safety dump of EVERYTHING into a folder the user chose. This only
 // copies — nothing is deleted, archived, or finalized (per CLAUDE.md: Panic
@@ -6490,4 +6541,5 @@ module.exports = {
   canonImport,
   sessionLogs,
   health,
+  configBackup,
 };

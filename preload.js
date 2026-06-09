@@ -389,6 +389,12 @@ contextBridge.exposeInMainWorld('revival', {
   panic: {
     export: () => ipcRenderer.invoke('panic:export'),
   },
+  // PCONFIG-BACKUP — lightweight settings backup/restore. stalenessThresholds
+  // is a plain object from localStorage, bundled into the JSON by main.
+  config: {
+    export: (stalenessThresholds) => ipcRenderer.invoke('config:export', stalenessThresholds),
+    import: () => ipcRenderer.invoke('config:import'),
+  },
   // PHEALTH — app health stats and orphan cleanup.
   health: {
     getStats:       () => ipcRenderer.invoke('health:getStats'),

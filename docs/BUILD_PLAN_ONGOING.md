@@ -749,11 +749,12 @@ Extends the existing episode continuity checker. Do not remove or alter existing
 
 ## Config backup
 
-### PCONFIG-BACKUP — Settings config backup/restore
+### PCONFIG-BACKUP — Settings config backup/restore ✅
 - Export: Project Rules text, staleness thresholds, tag library (user-created tags only). API key excluded from export for security.
 - Import: restore config from export file
 - Separate from Panic Export (which covers data)
-- **Smoke:** Export config, wipe Settings, import from export file, confirm Project Rules and thresholds restored; confirm API key was NOT exported
+- **Implementation:** `db.configBackup.export()` reads `settings.project_rules` + all `tags` where `is_seed=0`. `db.configBackup.import()` restores project rules via UPDATE and merge-creates missing user tags (idempotent, never deletes existing tags). IPC: `config:export` (accepts staleness thresholds from renderer, opens save dialog, writes `revival-config-<timestamp>.json`); `config:import` (open dialog, parse + validate version 1, restore DB, return thresholds). Preload: `window.revival.config.export/import`. Renderer: `renderConfigBackup(section)` in Settings between Needs Attention and Panic Export — Export Config… button bundles localStorage thresholds; Import Config… button applies returned thresholds to localStorage after restore.
+- **Smoke:** Export config, wipe Settings, import from export file, confirm Project Rules and thresholds restored; confirm API key was NOT exported. Smoke passed.
 
 ---
 

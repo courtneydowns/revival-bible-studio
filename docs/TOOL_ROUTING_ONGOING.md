@@ -110,7 +110,7 @@
 | ~~**PRESEARCH-CITE Research source citation**~~ ✅ | **VS Code ext** | Source field on existing Research entry |
 | **PEMPTY-STATE Empty state + onboarding** | **VS Code ext** | Empty state copy + first-session guide |
 | **PHEALTH App health indicator** | **VS Code ext** | Read-only panel in Settings |
-| **PCONFIG-BACKUP Config backup/restore** | **VS Code ext** | Export/import config in Settings |
+| ~~**PCONFIG-BACKUP Config backup/restore**~~ ✅ | **VS Code ext** | Export/import config in Settings |
 | **PSESSION-RESUME Session resume on launch** | **VS Code ext** | Last-entry persistence on app boot |
 | **PSCRATCHPAD Entry-level scratchpad** | **CLI** | New field across all workspaces, schema migration needed |
 | **PBREADCRUMB Back-reference breadcrumb** | **VS Code ext** | Breadcrumb on existing detail panel header |

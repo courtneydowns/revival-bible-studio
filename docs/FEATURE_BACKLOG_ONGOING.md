@@ -153,7 +153,7 @@ Lightweight database and app health display in Settings.
 
 ---
 
-## PCONFIG-BACKUP — Settings config backup/restore
+## PCONFIG-BACKUP — Settings config backup/restore ✅ complete
 
 Export and restore app configuration separately from data.
 
