@@ -383,7 +383,7 @@ Two DB columns that exist but have no UI — same pattern as PAUDIT-5:
 - **Open Questions tier setter:** `tier` is shown passively in Flanagan but has no setter anywhere in the OQ entry itself. Add a tier field (Tier 1 / Tier 2 / Tier 3) to the OQ create and edit forms. PBLOCK's tier escalation action already works — this fills the gap for initial set and direct edit.
 - **Smoke passed 2026-06-08.**
 
-### PAUDIT-7 — Command palette regression fix
+### PAUDIT-7 — Command palette regression fix ✅
 **Tool:** CLI
 PKEY was marked ✅ complete and the command palette (Cmd+K) previously worked, but the audit found it is currently not implemented — likely a regression from a later phase. Multi-file touches (global event listener, palette component, renderer wiring).
 - Restore Cmd+K command palette to working state matching the original PKEY spec: jump to any workspace, recent entries, actions; full keyboard navigation; tab through list items, Enter to open

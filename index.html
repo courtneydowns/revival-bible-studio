@@ -2995,6 +2995,85 @@
         font-size: 12px;
       }
 
+      /* --- PKEY command palette (Cmd/Ctrl+K) --------------------------------
+         Spotlight-style command palette. Overlays everything (z 110). Input at
+         top; results scroll below. Active item highlighted with --accent bg.
+         Arrow keys / Tab navigate; Enter activates; Escape closes. */
+      .pal-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 110;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding-top: 10vh;
+        background: rgba(0, 0, 0, 0.5);
+      }
+      .pal-overlay[hidden] { display: none; }
+      .pal-modal {
+        width: 560px;
+        max-width: 92vw;
+        background: var(--panel);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: 0 20px 56px rgba(0, 0, 0, 0.5);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .pal-search-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+      }
+      .pal-search-icon { color: var(--muted); font-size: 15px; flex: none; }
+      #pal-input {
+        flex: 1;
+        background: none;
+        border: none;
+        outline: none;
+        font: inherit;
+        font-size: 14px;
+        color: var(--text);
+      }
+      #pal-input::placeholder { color: var(--muted); }
+      .pal-hint { font-size: 11px; color: var(--muted); flex: none; }
+      .pal-results {
+        max-height: 380px;
+        overflow-y: auto;
+        padding: 6px 0;
+      }
+      .pal-section-label {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--muted);
+        padding: 8px 14px 4px;
+      }
+      .pal-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 14px;
+        cursor: pointer;
+        font-size: 13px;
+        border-radius: 0;
+        transition: background 0.1s;
+      }
+      .pal-item:hover,
+      .pal-item[data-active="true"] {
+        background: var(--accent);
+        color: #fff;
+      }
+      .pal-item-icon { font-size: 14px; flex: none; width: 18px; text-align: center; }
+      .pal-item-label { flex: 1; }
+      .pal-item-sub { font-size: 11px; opacity: 0.7; }
+      .pal-empty { padding: 18px 14px; text-align: center; color: var(--muted); font-size: 13px; }
+
       /* --- PCAP global quick-capture --------------------------------------
          Cmd/Ctrl+Shift+N opens this modal from any workspace. Title + body,
          one click saves straight to Unsorted; Escape or Cancel dismisses.
@@ -4460,6 +4539,20 @@
             </div>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- PKEY command palette: Cmd/Ctrl+K opens from any workspace.
+         Lists workspaces and recent entries; keyboard-navigable. Hidden until
+         invoked. -->
+    <div id="pal-overlay" class="pal-overlay" hidden>
+      <div class="pal-modal" role="dialog" aria-modal="true" aria-label="Command palette">
+        <div class="pal-search-row">
+          <span class="pal-search-icon" aria-hidden="true">⌘</span>
+          <input id="pal-input" type="text" placeholder="Jump to workspace or entry…" autocomplete="off" spellcheck="false" />
+          <span class="pal-hint">↑↓ navigate · ↵ open · Esc close</span>
+        </div>
+        <div id="pal-results" class="pal-results" role="listbox"></div>
       </div>
     </div>
 

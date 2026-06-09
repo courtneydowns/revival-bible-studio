@@ -13772,4 +13772,146 @@ _undoPill.textContent = '⌘Z  Undo available';
 document.body.appendChild(_undoPill);
 UndoStack.onChange((count) => { _undoPill.hidden = count === 0; });
 
+// PKEY — command palette (Cmd/Ctrl+K) ----------------------------------------
+// Spotlight-style jump palette. Lists workspaces + recent entries. Keyboard-
+// navigable with arrow keys and Tab; Enter activates; Escape closes.
+
+const palOverlay = document.getElementById('pal-overlay');
+const palInput = document.getElementById('pal-input');
+const palResults = document.getElementById('pal-results');
+
+let _palActiveIdx = -1;
+
+const NAV_ICONS_PAL = NAV_ICONS; // reuse the workspace icon map
+
+function _palItems(query) {
+  const q = (query || '').trim().toLowerCase();
+  const items = [];
+
+  // Recent entries (session-scoped; shown first when no query, or filtered)
+  const recents = getRecentlyViewed();
+  for (const r of recents) {
+    if (!q || r.title.toLowerCase().includes(q) || r.workspace.toLowerCase().includes(q)) {
+      items.push({ kind: 'entry', icon: NAV_ICONS_PAL[r.workspace] || '•', label: r.title, sub: r.workspace, workspace: r.workspace, entryId: r.id, section: 'Recent' });
+    }
+  }
+
+  // Workspaces
+  for (const ws of WORKSPACES) {
+    if (!q || ws.toLowerCase().includes(q)) {
+      items.push({ kind: 'workspace', icon: NAV_ICONS_PAL[ws] || '•', label: ws, sub: '', workspace: ws, section: 'Workspaces' });
+    }
+  }
+
+  return items;
+}
+
+function _palRender(query) {
+  const items = _palItems(query);
+  palResults.innerHTML = '';
+
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.className = 'pal-empty';
+    empty.textContent = 'No results';
+    palResults.appendChild(empty);
+    _palActiveIdx = -1;
+    return;
+  }
+
+  let currentSection = null;
+  items.forEach((item, idx) => {
+    if (item.section !== currentSection) {
+      currentSection = item.section;
+      const label = document.createElement('div');
+      label.className = 'pal-section-label';
+      label.textContent = currentSection;
+      palResults.appendChild(label);
+    }
+    const el = document.createElement('div');
+    el.className = 'pal-item';
+    el.setAttribute('role', 'option');
+    el.dataset.idx = idx;
+    el.innerHTML = `<span class="pal-item-icon" aria-hidden="true">${item.icon}</span><span class="pal-item-label">${item.label}</span>${item.sub ? `<span class="pal-item-sub">${item.sub}</span>` : ''}`;
+    el.addEventListener('mousedown', (e) => { e.preventDefault(); _palActivate(idx); });
+    el.addEventListener('mousemove', () => _palSetActive(idx));
+    palResults.appendChild(el);
+  });
+
+  _palSetActive(0);
+}
+
+function _palSetActive(idx) {
+  const els = palResults.querySelectorAll('.pal-item');
+  if (!els.length) { _palActiveIdx = -1; return; }
+  idx = Math.max(0, Math.min(idx, els.length - 1));
+  _palActiveIdx = idx;
+  els.forEach((el, i) => el.setAttribute('data-active', i === idx ? 'true' : 'false'));
+  // Scroll into view without jerking the viewport.
+  const target = els[idx];
+  if (target) target.scrollIntoView({ block: 'nearest' });
+}
+
+function _palActivate(idx) {
+  const items = _palItems(palInput.value);
+  const item = items[idx];
+  if (!item) return;
+  closePalette();
+  if (item.kind === 'entry') {
+    route(item.workspace, item.entryId);
+  } else {
+    route(item.workspace);
+  }
+}
+
+function openPalette() {
+  palInput.value = '';
+  palOverlay.hidden = false;
+  _palRender('');
+  palInput.focus();
+}
+
+function closePalette() {
+  palOverlay.hidden = true;
+  _palActiveIdx = -1;
+}
+
+palInput.addEventListener('input', () => _palRender(palInput.value));
+
+palInput.addEventListener('keydown', (e) => {
+  const items = palResults.querySelectorAll('.pal-item');
+  if (e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey)) {
+    e.preventDefault();
+    _palSetActive(_palActiveIdx + 1);
+  } else if (e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey)) {
+    e.preventDefault();
+    _palSetActive(_palActiveIdx - 1);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (_palActiveIdx >= 0) _palActivate(_palActiveIdx);
+  } else if (e.key === 'Escape') {
+    e.preventDefault();
+    closePalette();
+  }
+});
+
+palOverlay.addEventListener('mousedown', (e) => {
+  if (e.target === palOverlay) closePalette();
+});
+
+window.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 'k' || e.key === 'K')) {
+    e.preventDefault();
+    if (palOverlay.hidden) {
+      openPalette();
+    } else {
+      closePalette();
+    }
+  }
+  if (e.key === 'Escape' && !palOverlay.hidden) {
+    e.preventDefault();
+    closePalette();
+  }
+});
+
 route('Home');
