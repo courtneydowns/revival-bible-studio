@@ -9913,6 +9913,329 @@ function setupCharArcTracker(leftCol, rightCol, ctx) {
   });
 }
 
+// PARC-B — Character arc tracker: visual timeline.
+// Horizontal scroll grid: episodes on X axis, characters on Y axis.
+// Characters togglable on/off with color-coded chips.
+// Locked canon events: solid circle; OQs: outlined rotated square (softer);
+// Decisions: solid square if final, outlined if open/tentative.
+// Click any marker → exits visual timeline and opens the source entry.
+function setupCharVisualTimeline(leftCol, rightCol, ctx) {
+  const { list, reloadList } = ctx;
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'btn-secondary char-vt-toggle';
+  toggle.textContent = 'Visual Timeline';
+  leftCol.insertBefore(toggle, list);
+
+  let vtMode = false;
+
+  const CHAR_COLORS = [
+    '#e74c3c', '#3498db', '#2ecc71', '#f39c12',
+    '#9b59b6', '#1abc9c', '#e67e22', '#e91e63',
+    '#00bcd4', '#ff5722', '#607d8b', '#795548',
+  ];
+
+  function parseSeason(title) {
+    const m = (title || '').match(/\bS(\d+)E\d+/i) || (title || '').match(/\bSeason\s+(\d+)/i);
+    return m ? parseInt(m[1], 10) : null;
+  }
+
+  function parseEpNum(title) {
+    const m = (title || '').match(/\bS\d+E(\d+)/i);
+    return m ? parseInt(m[1], 10) : null;
+  }
+
+  function epShortLabel(ep) {
+    const s = parseSeason(ep.title);
+    const e = parseEpNum(ep.title);
+    if (s !== null && e !== null) return { season: `S${s}`, ep: `E${e}` };
+    const t = ep.title || '(untitled)';
+    return { season: '', ep: t.length > 8 ? t.slice(0, 7) + '…' : t };
+  }
+
+  function exitVtMode() {
+    vtMode = false;
+    toggle.classList.remove('active');
+    leftCol.style.display = '';
+    reloadList();
+  }
+
+  async function enterVtMode() {
+    vtMode = true;
+    toggle.classList.add('active');
+    leftCol.style.display = 'none';
+    rightCol.innerHTML = '';
+
+    const vtContainer = document.createElement('div');
+    vtContainer.className = 'vt-container';
+    rightCol.appendChild(vtContainer);
+
+    let allChars = [];
+    try { allChars = await window.revival.characters.list(); } catch { /* no-op */ }
+
+    if (!allChars.length) {
+      vtContainer.innerHTML = '<div class="vt-empty">No characters in the database yet.</div>';
+      return;
+    }
+
+    const charColors = {};
+    allChars.forEach((c, i) => { charColors[c.id] = CHAR_COLORS[i % CHAR_COLORS.length]; });
+
+    const toggledIds = new Set(allChars.slice(0, Math.min(4, allChars.length)).map(c => c.id));
+    const arcCache = new Map();
+
+    async function getArcData(charId) {
+      if (!arcCache.has(charId)) {
+        try {
+          arcCache.set(charId, await window.revival.characters.arcTimeline(charId));
+        } catch { arcCache.set(charId, null); }
+      }
+      return arcCache.get(charId);
+    }
+
+    const header = document.createElement('div');
+    header.className = 'vt-header';
+    vtContainer.appendChild(header);
+
+    const backBtn = document.createElement('button');
+    backBtn.type = 'button';
+    backBtn.className = 'btn-secondary vt-back';
+    backBtn.textContent = '← Back';
+    backBtn.addEventListener('click', exitVtMode);
+    header.appendChild(backBtn);
+
+    const titleEl = document.createElement('span');
+    titleEl.className = 'vt-title';
+    titleEl.textContent = 'Visual Timeline';
+    header.appendChild(titleEl);
+
+    const chipsWrap = document.createElement('div');
+    chipsWrap.className = 'vt-char-chips';
+    header.appendChild(chipsWrap);
+
+    const gridWrap = document.createElement('div');
+    gridWrap.className = 'vt-grid-wrap';
+    vtContainer.appendChild(gridWrap);
+
+    function buildChips() {
+      chipsWrap.innerHTML = '';
+
+      const allBtn = document.createElement('button');
+      allBtn.type = 'button';
+      allBtn.className = 'vt-chip-ctrl';
+      allBtn.textContent = 'All';
+      allBtn.addEventListener('click', () => {
+        allChars.forEach(c => toggledIds.add(c.id));
+        buildChips();
+        renderGrid();
+      });
+      chipsWrap.appendChild(allBtn);
+
+      const noneBtn = document.createElement('button');
+      noneBtn.type = 'button';
+      noneBtn.className = 'vt-chip-ctrl';
+      noneBtn.textContent = 'None';
+      noneBtn.addEventListener('click', () => {
+        toggledIds.clear();
+        buildChips();
+        renderGrid();
+      });
+      chipsWrap.appendChild(noneBtn);
+
+      for (const c of allChars) {
+        const on = toggledIds.has(c.id);
+        const color = charColors[c.id];
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'vt-char-chip';
+        chip.textContent = c.title;
+        chip.style.borderColor = on ? color : 'var(--border)';
+        chip.style.color = on ? color : 'var(--muted)';
+        chip.style.background = on ? `${color}18` : '';
+        chip.addEventListener('click', () => {
+          if (toggledIds.has(c.id)) toggledIds.delete(c.id);
+          else toggledIds.add(c.id);
+          buildChips();
+          renderGrid();
+        });
+        chipsWrap.appendChild(chip);
+      }
+    }
+
+    async function renderGrid() {
+      gridWrap.innerHTML = '';
+
+      const visibleChars = allChars.filter(c => toggledIds.has(c.id));
+      if (!visibleChars.length) {
+        const empty = document.createElement('div');
+        empty.className = 'vt-empty';
+        empty.textContent = 'Select one or more characters above to view their timeline.';
+        gridWrap.appendChild(empty);
+        return;
+      }
+
+      await Promise.all(visibleChars.map(c => getArcData(c.id)));
+
+      // Build unified episode list from the arc result with the most episodes.
+      let allEps = [];
+      for (const c of visibleChars) {
+        const data = arcCache.get(c.id);
+        if (data && data.rows.length > allEps.length) allEps = data.rows.map(r => r.episode);
+      }
+
+      if (!allEps.length) {
+        const empty = document.createElement('div');
+        empty.className = 'vt-empty';
+        empty.textContent = 'No episodes in the database yet.';
+        gridWrap.appendChild(empty);
+        return;
+      }
+
+      const table = document.createElement('table');
+      table.className = 'vt-grid';
+      const thead = document.createElement('thead');
+
+      const epRow = document.createElement('tr');
+      const corner = document.createElement('th');
+      corner.className = 'vt-corner';
+      corner.textContent = 'Character';
+      epRow.appendChild(corner);
+
+      for (const ep of allEps) {
+        const { season, ep: epCode } = epShortLabel(ep);
+        const th = document.createElement('th');
+        th.className = 'vt-ep-header';
+        if (ep.ep_status === 'locked') th.classList.add('vt-ep-locked');
+        th.title = ep.title || '(untitled)';
+        if (season) {
+          const sLabel = document.createElement('span');
+          sLabel.className = 'vt-ep-season-label';
+          sLabel.textContent = season;
+          th.appendChild(sLabel);
+        }
+        const codeEl = document.createElement('span');
+        codeEl.className = 'vt-ep-code';
+        codeEl.textContent = epCode;
+        th.appendChild(codeEl);
+        if (ep.ep_status && ep.ep_status !== 'locked') {
+          const statusEl = document.createElement('span');
+          statusEl.className = 'vt-ep-status-label';
+          statusEl.textContent = ep.ep_status;
+          th.appendChild(statusEl);
+        }
+        epRow.appendChild(th);
+      }
+      thead.appendChild(epRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      for (const c of visibleChars) {
+        const data = arcCache.get(c.id);
+        const color = charColors[c.id];
+        const tr = document.createElement('tr');
+        tr.className = 'vt-char-row';
+
+        const labelTd = document.createElement('td');
+        labelTd.className = 'vt-char-label';
+        const dot = document.createElement('span');
+        dot.className = 'vt-char-dot';
+        dot.style.background = color;
+        labelTd.appendChild(dot);
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'vt-char-name';
+        nameSpan.textContent = c.title;
+        labelTd.appendChild(nameSpan);
+        if (c.char_status) {
+          const sb = document.createElement('span');
+          sb.className = 'vt-char-status-tag';
+          sb.textContent = c.char_status;
+          labelTd.appendChild(sb);
+        }
+        tr.appendChild(labelTd);
+
+        for (const ep of allEps) {
+          const td = document.createElement('td');
+          td.className = 'vt-cell';
+
+          if (data) {
+            const epData = data.rows.find(r => r.episode.id === ep.id);
+            if (epData) {
+              const { canon_facts, open_questions, decisions } = epData;
+
+              // Locked canon events: solid filled circle.
+              for (const cf of canon_facts) {
+                const m = document.createElement('button');
+                m.type = 'button';
+                m.className = 'vt-marker vt-marker-canon';
+                m.style.background = color;
+                m.style.borderColor = color;
+                m.title = `Canon: ${cf.title || '(untitled)'}`;
+                m.setAttribute('aria-label', `Open canon entry: ${cf.title}`);
+                m.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  exitVtMode();
+                  route('Canon Bible', cf.id);
+                });
+                td.appendChild(m);
+              }
+
+              // Open questions: outlined rotated square (softer / working).
+              for (const oq of open_questions) {
+                const m = document.createElement('button');
+                m.type = 'button';
+                m.className = 'vt-marker vt-marker-oq';
+                m.style.borderColor = color;
+                m.title = `Open Q: ${oq.title || '(untitled)'}`;
+                m.setAttribute('aria-label', `Open question: ${oq.title}`);
+                m.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  exitVtMode();
+                  route('Open Questions', oq.id);
+                });
+                td.appendChild(m);
+              }
+
+              // Decisions: solid square if final, outlined if tentative/open.
+              for (const d of decisions) {
+                const isFinal = d.decision_status === 'final';
+                const m = document.createElement('button');
+                m.type = 'button';
+                m.className = 'vt-marker vt-marker-decision';
+                m.style.borderColor = color;
+                m.style.background = isFinal ? color : 'transparent';
+                m.title = `Decision: ${d.title || '(untitled)'}`;
+                m.setAttribute('aria-label', `Open decision: ${d.title}`);
+                m.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  exitVtMode();
+                  route('Decisions', d.id);
+                });
+                td.appendChild(m);
+              }
+            }
+          }
+
+          tr.appendChild(td);
+        }
+
+        tbody.appendChild(tr);
+      }
+
+      table.appendChild(tbody);
+      gridWrap.appendChild(table);
+    }
+
+    buildChips();
+    await renderGrid();
+  }
+
+  toggle.addEventListener('click', () => {
+    if (vtMode) exitVtMode();
+    else enterVtMode();
+  });
+}
+
 // Mounts the "Relationships" section in a character's detail panel.
 // Shows existing relationships and an "Add Relationship" form.
 async function mountCharRelationships(container, charId) {
@@ -13334,6 +13657,7 @@ const CONTENT_RENDERERS = {
 
         setupCharRelationalView(leftCol, rightCol, ctx);
         setupCharArcTracker(leftCol, rightCol, ctx);
+        setupCharVisualTimeline(leftCol, rightCol, ctx);
       },
     });
   })(),

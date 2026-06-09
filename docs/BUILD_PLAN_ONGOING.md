@@ -579,13 +579,14 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 - **Implementation:** `characters.arcTimeline(charId)` in db.js returns episodes + per-episode canon facts (locked_at ≤ episode.created_at), linked OQs (unresolved at that point via cross_workspace_attachments), and linked decisions. IPC: `characters:arcTimeline`. UI: `setupCharArcTracker` toggle button in Characters left column — hides left col, shows full-width arc panel with character selector dropdown, status filter chips, season filter chips (auto-detected from episode titles), and episode rows (collapsible details). Also fixed pre-existing syntax error: `mountDraftLockPanel` was inside `CONTENT_RENDERERS` object literal; moved to top-level.
 - **Smoke passed 2026-06-09.**
 
-### PARC-B — Character arc tracker: visual timeline
+### PARC-B — Character arc tracker: visual timeline ✅
 - Horizontal scroll, season/episode markers on X axis
 - Character state plotted at each marker
 - Color-coded by character; multiple characters togglable
 - Locked canon events: fixed markers; working/draft events: softer markers
 - Click any marker to open the source entry
-- **Smoke:** View visual timeline for two characters simultaneously; click a marker, confirm source entry opens; toggle a character off, confirm their markers hide
+- **Implementation:** `setupCharVisualTimeline` in renderer.js; CSS `.vt-*` in index.html. Episodes on X, one row per toggled character. Canon facts: solid filled circle; OQs: outlined rotated square (softer/working); Decisions: solid square if final, outlined if open/tentative. All markers clickable → `route(workspace, id)`. Character chips (All/None/individual) toggle rows live. Arc data cached per character to avoid redundant IPC calls.
+- **Smoke passed 2026-06-09.**
 
 ---
 
