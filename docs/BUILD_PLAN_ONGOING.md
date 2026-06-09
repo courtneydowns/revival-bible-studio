@@ -592,7 +592,7 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ## Episode structure
 
-### PEPISODE-STRUCT — Episode structure checklist
+### PEPISODE-STRUCT — Episode structure checklist ✅
 - Per-episode checklist panel derived from Flanagan Master episodic structure rules:
   - [ ] Cold open: in medias res
   - [ ] Act Two: rewatch-layer scene identified
@@ -600,7 +600,8 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
   - [ ] Coda: quiet devastation candidate identified
   - [ ] Quiet devastation: satisfies structural signature
 - Manually checked by user — not auto-evaluated
-- AI-assist option: "Evaluate this episode against the checklist" — Claude reads episode entry + gives verdict per item. User confirms or overrides each.
+- AI-assist option: "Evaluate with AI" — Claude reads episode entry + gives verdict per item. User confirms or overrides each.
+- **Implementation:** Migration `057_pepisode_struct` creates `episode_struct_checklist` table (episode_id, item_key, checked, ai_verdict, ai_rationale, user_override). `db.episodeStruct` repo: get/setChecked/setAiVerdicts/setOverride. IPC: `episodes:structGet`, `episodes:structSetChecked`, `episodes:structSetOverride`, `claude:episodeStructEval`. UI: `mountEpisodeStructPanel` collapsed `<details>` on episode detail — 5 checkboxes (manually checkable, persists immediately), "Evaluate with AI" button triggers Claude, per-item verdict badge + rationale + Confirm/Override buttons. Overrides clear on next AI run. Panel mounted before "Previously on" in detailExtra.
 - **Smoke:** Open an episode entry, manually check three checklist items; run AI assist, confirm it returns per-item verdict; override one AI verdict, confirm override persists
 
 ---

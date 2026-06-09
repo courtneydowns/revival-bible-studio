@@ -195,6 +195,10 @@ function registerIpc() {
   // PDRAFT-LOCK — Episodes draft lock/unlock.
   ipcMain.handle('episodes:draftLock',   (_event, id, forName) => db.episodes.draftLock(id, forName));
   ipcMain.handle('episodes:draftUnlock', (_event, id, note)    => db.episodes.draftUnlock(id, note));
+  // PEPISODE-STRUCT — Episode structure checklist.
+  ipcMain.handle('episodes:structGet',        (_e, id)           => db.episodeStruct.get(id));
+  ipcMain.handle('episodes:structSetChecked', (_e, id, key, val) => db.episodeStruct.setChecked(id, key, val));
+  ipcMain.handle('episodes:structSetOverride',(_e, id, key, val) => db.episodeStruct.setOverride(id, key, val));
   // PEPISODE-PREVON — "Previously on" canon snapshot.
   ipcMain.handle('episodes:previouslyOn', (_e, id) => db.episodes.previouslyOn(id));
   ipcMain.handle('episodes:previouslyOnExport', (_e, id) => {
@@ -1399,6 +1403,74 @@ function registerIpc() {
     });
 
     return { flags: enriched, checkedCount: locked.length };
+  });
+
+  // PEPISODE-STRUCT — AI evaluation of episode against the 5-item structure checklist.
+  // Reads the episode entry (title + body) and returns a per-item verdict.
+  ipcMain.handle('claude:episodeStructEval', async (_e, episodeId, model) => {
+    const apiKey = db.settings.getClaudeApiKey();
+    if (!apiKey) throw new Error('No Claude API key configured. Add one in Settings.');
+    const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
+
+    const ep = db.episodes.get(episodeId);
+    if (!ep) throw new Error('Episode not found.');
+    if (!ep.body || !ep.body.trim()) {
+      return { skipped: true };
+    }
+
+    const ITEMS = [
+      { key: 'cold_open',  label: 'Cold open: in medias res',                                 desc: 'The episode opens mid-action, pulling the viewer directly into the story with no preamble.' },
+      { key: 'act_two',    label: 'Act Two: rewatch-layer scene identified',                   desc: 'A scene in Act Two that rewards a second viewing — it reads differently once you know how the episode ends.' },
+      { key: 'act_three',  label: 'Act Three: consequence scene present',                      desc: 'A scene in Act Three where the weight of earlier choices lands — emotional or plot consequences made visible.' },
+      { key: 'coda',       label: 'Coda: quiet devastation candidate identified',              desc: 'The closing beat offers a candidate for the "quiet devastation" structural signature — small, precise, emotionally resonant.' },
+      { key: 'quiet_dev',  label: 'Quiet devastation: satisfies structural signature',         desc: 'The episode\'s quiet devastation beat fully satisfies the Flanagan structural signature: quiet, specific, devastating.' },
+    ];
+
+    const systemPrompt =
+      'You are a television story analyst specializing in the Flanagan structural method. ' +
+      'Evaluate an episode outline or draft against five structural checklist items. ' +
+      'For each item return a verdict of "pass", "fail", or "uncertain" with a one-sentence rationale. ' +
+      '"pass" = the episode clearly satisfies this element. ' +
+      '"fail" = the episode clearly does not satisfy it. ' +
+      '"uncertain" = there is not enough information in the episode to judge. ' +
+      'Be honest and direct. Do not overpraise. If the body is vague or short, lean toward "uncertain".\n\n' +
+      'Respond with a JSON object in this exact shape — no markdown, no explanation outside JSON:\n' +
+      '{\n' +
+      '  "items": [\n' +
+      '    { "key": "<item_key>", "verdict": "pass|fail|uncertain", "rationale": "<one sentence>" }\n' +
+      '  ]\n' +
+      '}\n\n' +
+      '## Checklist items\n\n' +
+      ITEMS.map((it) => `- ${it.key}: ${it.label}\n  ${it.desc}`).join('\n');
+
+    const userMessage =
+      `## Episode: ${ep.title || 'Untitled'}\n\n${ep.body}`;
+
+    const data = await callClaudeAPI(apiKey, {
+      model: safeModel,
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    });
+
+    const textBlock = (data.content || []).find((b) => b.type === 'text');
+    if (!textBlock) throw new Error('Unexpected response from Claude API.');
+
+    let parsed;
+    try {
+      const raw = textBlock.text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error('Claude returned malformed JSON. Try again.');
+    }
+
+    const items = Array.isArray(parsed.items) ? parsed.items : [];
+    // Save to DB
+    db.episodeStruct.setAiVerdicts(episodeId, items.map((it) => ({
+      key: it.key, verdict: it.verdict || null, rationale: it.rationale || null,
+    })));
+
+    return { items };
   });
 
   // P46-C — Tag suggestions for a saved Flanagan analysis.

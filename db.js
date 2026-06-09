@@ -1846,6 +1846,29 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '057_pepisode_struct',
+    up(db) {
+      // PEPISODE-STRUCT — per-episode structure checklist (5 Flanagan items).
+      // checked:        user manually ticked the item.
+      // ai_verdict:     Claude's verdict ('pass' | 'fail' | 'uncertain').
+      // ai_rationale:   Claude's one-line explanation.
+      // user_override:  1=user confirmed pass, 0=user overrode to fail, NULL=no override.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS episode_struct_checklist (
+          id            INTEGER PRIMARY KEY,
+          episode_id    INTEGER NOT NULL REFERENCES episodes_workspace(id) ON DELETE CASCADE,
+          item_key      TEXT NOT NULL,
+          checked       INTEGER NOT NULL DEFAULT 0,
+          ai_verdict    TEXT,
+          ai_rationale  TEXT,
+          user_override INTEGER,
+          updated_at    TEXT,
+          UNIQUE(episode_id, item_key)
+        );
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -2476,6 +2499,70 @@ characters.arcTimeline = function(charId) {
   }));
 
   return { character: char, rows };
+};
+
+// PEPISODE-STRUCT — Episode structure checklist (5 Flanagan items).
+// Returns one row per item_key, upserts rows as needed.
+const STRUCT_ITEM_KEYS = ['cold_open', 'act_two', 'act_three', 'coda', 'quiet_dev'];
+
+const episodeStruct = {
+  get(episodeId) {
+    const db2 = getDb();
+    const rows = db2
+      .prepare('SELECT * FROM episode_struct_checklist WHERE episode_id = ?')
+      .all(episodeId);
+    // Return a map keyed by item_key; missing keys have default state.
+    const map = {};
+    for (const key of STRUCT_ITEM_KEYS) {
+      map[key] = { checked: 0, ai_verdict: null, ai_rationale: null, user_override: null };
+    }
+    for (const row of rows) {
+      if (map[row.item_key] !== undefined) map[row.item_key] = row;
+    }
+    return map;
+  },
+
+  setChecked(episodeId, itemKey, checked) {
+    const db2 = getDb();
+    const now = new Date().toISOString();
+    db2.prepare(`
+      INSERT INTO episode_struct_checklist (episode_id, item_key, checked, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(episode_id, item_key) DO UPDATE SET checked = excluded.checked, updated_at = excluded.updated_at
+    `).run(episodeId, itemKey, checked ? 1 : 0, now);
+  },
+
+  setAiVerdicts(episodeId, verdicts) {
+    // verdicts: [{ key, verdict, rationale }]
+    const db2 = getDb();
+    const now = new Date().toISOString();
+    const upsert = db2.prepare(`
+      INSERT INTO episode_struct_checklist (episode_id, item_key, checked, ai_verdict, ai_rationale, user_override, updated_at)
+      VALUES (?, ?, COALESCE((SELECT checked FROM episode_struct_checklist WHERE episode_id=? AND item_key=?), 0), ?, ?, NULL, ?)
+      ON CONFLICT(episode_id, item_key) DO UPDATE SET
+        ai_verdict   = excluded.ai_verdict,
+        ai_rationale = excluded.ai_rationale,
+        user_override = NULL,
+        updated_at   = excluded.updated_at
+    `);
+    const tx = db2.transaction(() => {
+      for (const v of verdicts) {
+        upsert.run(episodeId, v.key, episodeId, v.key, v.verdict || null, v.rationale || null, now);
+      }
+    });
+    tx();
+  },
+
+  setOverride(episodeId, itemKey, override) {
+    // override: 1 = pass, 0 = fail, null = clear override
+    const db2 = getDb();
+    const now = new Date().toISOString();
+    db2.prepare(`
+      INSERT INTO episode_struct_checklist (episode_id, item_key, checked, user_override, updated_at)
+      VALUES (?, ?, COALESCE((SELECT checked FROM episode_struct_checklist WHERE episode_id=? AND item_key=?), 0), ?, ?)
+      ON CONFLICT(episode_id, item_key) DO UPDATE SET user_override = excluded.user_override, updated_at = excluded.updated_at
+    `).run(episodeId, itemKey, episodeId, itemKey, override === null ? null : (override ? 1 : 0), now);
+  },
 };
 
 // PEPISODE-PREVON — "Previously on" canon snapshot.
@@ -6026,6 +6113,7 @@ module.exports = {
   characters,
   characterRelationships,
   episodes,
+  episodeStruct,
   writingLab,
   chats,
   chatSources,

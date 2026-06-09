@@ -135,6 +135,10 @@ contextBridge.exposeInMainWorld('revival', {
     draftUnlock: (id, note)    => ipcRenderer.invoke('episodes:draftUnlock', id, note),
     previouslyOn: (id) => ipcRenderer.invoke('episodes:previouslyOn', id),
     previouslyOnExport: (id) => ipcRenderer.invoke('episodes:previouslyOnExport', id),
+    // PEPISODE-STRUCT — structure checklist persistence.
+    structGet:        (id)           => ipcRenderer.invoke('episodes:structGet', id),
+    structSetChecked: (id, key, val) => ipcRenderer.invoke('episodes:structSetChecked', id, key, val),
+    structSetOverride:(id, key, val) => ipcRenderer.invoke('episodes:structSetOverride', id, key, val),
   },
   writingLab: {
     list: () => ipcRenderer.invoke('writingLab:list'),
@@ -218,6 +222,9 @@ contextBridge.exposeInMainWorld('revival', {
     // PWLAB-CANON-COMPARE — draft vs. locked canon divergence check.
     canonCompare: (draftTitle, draftBody, model) =>
       ipcRenderer.invoke('claude:canonCompare', draftTitle, draftBody, model),
+    // PEPISODE-STRUCT — AI evaluation of episode against structure checklist.
+    episodeStructEval: (episodeId, model) =>
+      ipcRenderer.invoke('claude:episodeStructEval', episodeId, model),
     // P45 — AI import assistant: type suggestions + duplicate flags.
     importAssist: (entries, model) =>
       ipcRenderer.invoke('claude:importAssist', entries, model),

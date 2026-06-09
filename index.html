@@ -5011,6 +5011,113 @@
       .bs-archived-thread-title { font-size: 0.85em; color: var(--muted); flex: 1; }
 
       /* PEPISODE-PREVON — "Previously on" canon snapshot panel */
+      /* PEPISODE-STRUCT — Episode structure checklist panel */
+      .ep-struct-section {
+        margin-top: 16px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .ep-struct-summary {
+        cursor: pointer;
+        padding: 8px 12px;
+        font-size: 0.82em;
+        font-weight: 600;
+        color: var(--muted);
+        user-select: none;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .ep-struct-summary::-webkit-details-marker { display: none; }
+      .ep-struct-summary::before { content: '▸ '; font-size: 0.8em; }
+      .ep-struct-section[open] .ep-struct-summary::before { content: '▾ '; }
+      .ep-struct-summary:hover { color: var(--text); }
+      .ep-struct-body {
+        padding: 10px 12px 12px;
+        border-top: 1px solid var(--border);
+      }
+      .ep-struct-item {
+        margin-bottom: 10px;
+      }
+      .ep-struct-item:last-of-type { margin-bottom: 0; }
+      .ep-struct-check-wrap {
+        display: flex;
+        align-items: flex-start;
+        gap: 7px;
+        cursor: pointer;
+        font-size: 0.85em;
+      }
+      .ep-struct-cb {
+        margin-top: 2px;
+        flex-shrink: 0;
+        cursor: pointer;
+      }
+      .ep-struct-label {
+        color: var(--text);
+        line-height: 1.4;
+      }
+      .ep-struct-ai-row {
+        margin-top: 4px;
+        margin-left: 20px;
+        display: flex;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 6px;
+        font-size: 0.78em;
+      }
+      .ep-struct-verdict-badge {
+        display: inline-block;
+        padding: 1px 7px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 0.9em;
+        flex-shrink: 0;
+      }
+      .ep-struct-verdict-pass     { background: rgba(77,158,109,0.15); color: #4d9e6d; }
+      .ep-struct-verdict-fail     { background: rgba(224,92,92,0.15);  color: #e05c5c; }
+      .ep-struct-verdict-uncertain{ background: rgba(180,180,100,0.15);color: #b4a840; }
+      .ep-struct-rationale {
+        color: var(--muted);
+        line-height: 1.4;
+        flex: 1;
+        min-width: 0;
+      }
+      .ep-struct-override-badge {
+        font-size: 0.82em;
+        padding: 1px 7px;
+        border-radius: 10px;
+        background: var(--sidebar-bg);
+        color: var(--muted);
+        border: 1px solid var(--border);
+      }
+      .ep-struct-override-btn, .ep-struct-clear-btn {
+        font-size: 11px;
+        padding: 1px 7px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .ep-struct-override-btn:hover, .ep-struct-clear-btn:hover {
+        background: var(--sidebar-bg);
+        color: var(--text);
+      }
+      .ep-struct-override-fail-btn { color: var(--danger, #e05c5c); }
+      .ep-struct-override-fail-btn:hover { color: var(--danger, #e05c5c); border-color: var(--danger, #e05c5c); }
+      .ep-struct-ai-bar {
+        margin-top: 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-top: 1px solid var(--border);
+        padding-top: 10px;
+      }
+      .ep-struct-eval-btn { font-size: 12px; padding: 4px 10px; }
+      .ep-struct-ai-status { font-size: 0.8em; color: var(--muted); }
+
       .ep-prevon-section {
         margin-top: 16px;
         border: 1px solid var(--border);

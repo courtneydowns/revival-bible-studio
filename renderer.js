@@ -11719,6 +11719,197 @@ async function mountOqDependsPanel(container, item, archivedFlag, onListReload) 
 }
 // ── End POQ-DEPENDS ─────────────────────────────────────────────────────────
 
+// PEPISODE-STRUCT — Per-episode structure checklist (5 Flanagan items).
+// Manually checkable by the user; AI-assist evaluates all items in one call.
+// Per-item: user checkbox, AI verdict badge, user-override buttons (confirm/override).
+const EP_STRUCT_ITEMS = [
+  { key: 'cold_open', label: 'Cold open: in medias res' },
+  { key: 'act_two',   label: 'Act Two: rewatch-layer scene identified' },
+  { key: 'act_three', label: 'Act Three: consequence scene present' },
+  { key: 'coda',      label: 'Coda: quiet devastation candidate identified' },
+  { key: 'quiet_dev', label: 'Quiet devastation: satisfies structural signature' },
+];
+
+function mountEpisodeStructPanel(rightCol, item) {
+  const section = document.createElement('details');
+  section.className = 'ep-struct-section';
+
+  const sum = document.createElement('summary');
+  sum.className = 'ep-struct-summary';
+  sum.textContent = 'Structure Checklist';
+  section.appendChild(sum);
+
+  const body = document.createElement('div');
+  body.className = 'ep-struct-body';
+  section.appendChild(body);
+
+  let state = {};
+
+  function verdictClass(v) {
+    if (v === 'pass')      return 'ep-struct-verdict-pass';
+    if (v === 'fail')      return 'ep-struct-verdict-fail';
+    if (v === 'uncertain') return 'ep-struct-verdict-uncertain';
+    return '';
+  }
+  function verdictLabel(v) {
+    if (v === 'pass')      return 'AI: pass';
+    if (v === 'fail')      return 'AI: fail';
+    if (v === 'uncertain') return 'AI: uncertain';
+    return '';
+  }
+  function overrideLabel(v) {
+    if (v === 1) return 'Confirmed pass';
+    if (v === 0) return 'Overridden to fail';
+    return null;
+  }
+
+  function renderBody() {
+    body.innerHTML = '';
+
+    for (const it of EP_STRUCT_ITEMS) {
+      const row = state[it.key] || { checked: 0, ai_verdict: null, ai_rationale: null, user_override: null };
+
+      const itemEl = document.createElement('div');
+      itemEl.className = 'ep-struct-item';
+
+      // Checkbox + label
+      const checkWrap = document.createElement('label');
+      checkWrap.className = 'ep-struct-check-wrap';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'ep-struct-cb';
+      cb.checked = !!row.checked;
+      cb.addEventListener('change', async () => {
+        await window.revival.episodes.structSetChecked(item.id, it.key, cb.checked ? 1 : 0);
+        state[it.key] = { ...row, checked: cb.checked ? 1 : 0 };
+      });
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'ep-struct-label';
+      labelSpan.textContent = it.label;
+      checkWrap.append(cb, labelSpan);
+      itemEl.appendChild(checkWrap);
+
+      // AI verdict row (shown if ai_verdict is set)
+      if (row.ai_verdict) {
+        const aiRow = document.createElement('div');
+        aiRow.className = 'ep-struct-ai-row';
+
+        const badge = document.createElement('span');
+        badge.className = `ep-struct-verdict-badge ${verdictClass(row.ai_verdict)}`;
+        badge.textContent = verdictLabel(row.ai_verdict);
+        aiRow.appendChild(badge);
+
+        if (row.ai_rationale) {
+          const rationale = document.createElement('span');
+          rationale.className = 'ep-struct-rationale';
+          rationale.textContent = row.ai_rationale;
+          aiRow.appendChild(rationale);
+        }
+
+        // Override buttons (only if no override set yet)
+        const override = row.user_override;
+        const overrideLabel2 = overrideLabel(override);
+
+        if (overrideLabel2) {
+          const overrideBadge = document.createElement('span');
+          overrideBadge.className = 'ep-struct-override-badge';
+          overrideBadge.textContent = overrideLabel2;
+          aiRow.appendChild(overrideBadge);
+
+          const clearBtn = document.createElement('button');
+          clearBtn.type = 'button';
+          clearBtn.className = 'btn-ghost ep-struct-clear-btn';
+          clearBtn.textContent = 'Clear override';
+          clearBtn.addEventListener('click', async () => {
+            await window.revival.episodes.structSetOverride(item.id, it.key, null);
+            state[it.key] = { ...state[it.key], user_override: null };
+            renderBody();
+          });
+          aiRow.appendChild(clearBtn);
+        } else {
+          const confirmBtn = document.createElement('button');
+          confirmBtn.type = 'button';
+          confirmBtn.className = 'btn-ghost ep-struct-override-btn';
+          confirmBtn.textContent = 'Confirm';
+          confirmBtn.addEventListener('click', async () => {
+            await window.revival.episodes.structSetOverride(item.id, it.key, 1);
+            state[it.key] = { ...state[it.key], user_override: 1 };
+            renderBody();
+          });
+
+          const overrideBtnEl = document.createElement('button');
+          overrideBtnEl.type = 'button';
+          overrideBtnEl.className = 'btn-ghost ep-struct-override-btn ep-struct-override-fail-btn';
+          overrideBtnEl.textContent = 'Override';
+          overrideBtnEl.addEventListener('click', async () => {
+            await window.revival.episodes.structSetOverride(item.id, it.key, 0);
+            state[it.key] = { ...state[it.key], user_override: 0 };
+            renderBody();
+          });
+
+          aiRow.append(confirmBtn, overrideBtnEl);
+        }
+
+        itemEl.appendChild(aiRow);
+      }
+
+      body.appendChild(itemEl);
+    }
+
+    // AI-assist button bar
+    const aiBar = document.createElement('div');
+    aiBar.className = 'ep-struct-ai-bar';
+    const evalBtn = document.createElement('button');
+    evalBtn.type = 'button';
+    evalBtn.className = 'btn-secondary ep-struct-eval-btn';
+    evalBtn.textContent = 'Evaluate with AI';
+    const aiStatus = document.createElement('span');
+    aiStatus.className = 'ep-struct-ai-status';
+
+    evalBtn.addEventListener('click', async () => {
+      evalBtn.disabled = true;
+      aiStatus.textContent = 'Evaluating…';
+      try {
+        const model = (typeof chatModelSelect !== 'undefined' && chatModelSelect.value)
+          ? chatModelSelect.value : 'claude-sonnet-4-6';
+        const res = await window.revival.claude.episodeStructEval(item.id, model);
+        if (res.skipped) {
+          aiStatus.textContent = 'Add episode body text before evaluating.';
+          evalBtn.disabled = false;
+          return;
+        }
+        // Merge returned verdicts into local state
+        for (const v of (res.items || [])) {
+          if (state[v.key]) {
+            state[v.key] = { ...state[v.key], ai_verdict: v.verdict, ai_rationale: v.rationale, user_override: null };
+          } else {
+            state[v.key] = { checked: 0, ai_verdict: v.verdict, ai_rationale: v.rationale, user_override: null };
+          }
+        }
+        aiStatus.textContent = '';
+        renderBody();
+      } catch (err) {
+        aiStatus.textContent = err.message || 'Evaluation failed.';
+        evalBtn.disabled = false;
+      }
+    });
+
+    aiBar.append(evalBtn, aiStatus);
+    body.appendChild(aiBar);
+  }
+
+  // Load state then render
+  window.revival.episodes.structGet(item.id).then((s) => {
+    state = s || {};
+    renderBody();
+  }).catch(() => {
+    state = {};
+    renderBody();
+  });
+
+  rightCol.appendChild(section);
+}
+
 // PEPISODE-PREVON — collapsed "Previously on" panel on an episode detail.
 // Shows all locked non-retired canon entries with locked_at before this
 // episode's created_at. One-click generate; exportable as plain text.
@@ -13785,6 +13976,8 @@ const CONTENT_RENDERERS = {
         });
         const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'episodes');
         callbacks.refreshHistory = refresh;
+        // PEPISODE-STRUCT — structure checklist (5 Flanagan items).
+        if (!archivedFlag) mountEpisodeStructPanel(rightCol, item);
         // PEPISODE-PREVON — "Previously on" collapsed canon snapshot.
         if (!archivedFlag) mountPreviouslyOnPanel(rightCol, item);
       },
