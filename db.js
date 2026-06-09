@@ -3055,21 +3055,24 @@ const dashboard = {
   // active tier-1 questions (the highest-importance tier). Read-only.
   navBadges: () => {
     const db = getDb();
+    const now = Date.now();
+    function ageDays(ts) {
+      if (!ts) return null;
+      return Math.max(0, Math.floor((now - new Date(ts).getTime()) / 86400000));
+    }
+    const u  = db.prepare(`SELECT COUNT(*) AS n, MIN(created_at) AS oldest FROM unsorted_items WHERE archived_at IS NULL`).get();
+    const cr = db.prepare(`SELECT COUNT(*) AS n, MIN(created_at) AS oldest FROM canon_proposals WHERE status = 'pending'`).get();
+    const oq = db.prepare(`SELECT COUNT(*) AS n, MIN(updated_at) AS oldest FROM open_questions WHERE archived_at IS NULL AND tier = 1`).get();
+    const co = db.prepare(`SELECT COUNT(*) AS n, MIN(updated_at) AS oldest FROM conflicts WHERE archived_at IS NULL`).get();
     return {
-      unsorted: db
-        .prepare(`SELECT COUNT(*) AS n FROM unsorted_items WHERE archived_at IS NULL`)
-        .get().n,
-      canonReview: db
-        .prepare(`SELECT COUNT(*) AS n FROM canon_proposals WHERE status = 'pending'`)
-        .get().n,
-      openQuestions: db
-        .prepare(
-          `SELECT COUNT(*) AS n FROM open_questions WHERE archived_at IS NULL AND tier = 1`
-        )
-        .get().n,
-      conflicts: db
-        .prepare(`SELECT COUNT(*) AS n FROM conflicts WHERE archived_at IS NULL`)
-        .get().n,
+      unsorted:               u.n,
+      unsortedOldestDays:     ageDays(u.oldest),
+      canonReview:            cr.n,
+      canonReviewOldestDays:  ageDays(cr.oldest),
+      openQuestions:          oq.n,
+      openQuestionsOldestDays: ageDays(oq.oldest),
+      conflicts:              co.n,
+      conflictsOldestDays:    ageDays(co.oldest),
     };
   },
 };

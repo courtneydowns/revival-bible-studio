@@ -1038,6 +1038,24 @@ function makeEntryWorkspace(config) {
     // PBRAIN-STRUCT: workspace-specific list item extras (e.g. status badges).
     if (config.listItemExtra) config.listItemExtra(btn, item, archivedFlag);
 
+    // PSTALE: subtle age marker when item hasn't been touched in ≥ threshold days.
+    if (!archivedFlag && config.staleThresholdDays) {
+      const threshold = typeof config.staleThresholdDays === 'function'
+        ? config.staleThresholdDays()
+        : config.staleThresholdDays;
+      const ts = item.updated_at || item.created_at;
+      if (ts && threshold > 0) {
+        const age = Math.floor((Date.now() - new Date(ts).getTime()) / 86400000);
+        if (age >= threshold) {
+          const staleEl = document.createElement('span');
+          staleEl.className = 'tc-list-stale';
+          staleEl.textContent = `${age}d`;
+          staleEl.title = `Not updated in ${age} days`;
+          btn.appendChild(staleEl);
+        }
+      }
+    }
+
     btn.addEventListener('click', () => {
       selectedId = item.id;
       renderList();
@@ -4760,6 +4778,19 @@ function renderCanonReviewPage(section, workspaceName) {
       btn.appendChild(src);
     }
 
+    // PSTALE: age marker for proposals pending longer than canonReviewDays.
+    if (p.status === 'pending' && p.created_at) {
+      const threshold = getNeedsThresholds().canonReviewDays;
+      const age = Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000);
+      if (age >= threshold) {
+        const staleEl = document.createElement('span');
+        staleEl.className = 'tc-list-stale';
+        staleEl.textContent = `${age}d`;
+        staleEl.title = `Pending for ${age} days`;
+        btn.appendChild(staleEl);
+      }
+    }
+
     btn.addEventListener('click', () => {
       selectedId = p.id;
       renderList();
@@ -6757,7 +6788,7 @@ function renderNeedsAttentionSettings(section) {
   const desc = document.createElement('p');
   desc.className = 'settings-desc';
   desc.textContent =
-    'Days before an item appears in the Needs Attention panel on Home. Changes apply immediately on next Home visit.';
+    'Controls three staleness thresholds: when items appear in the Needs Attention panel on Home, when nav badges show an age suffix, and when list items show a staleness marker. Changes take effect immediately.';
 
   const fields = [
     { key: 'tier1QuestionDays', label: 'Tier-1 Open Questions (days without update)' },
@@ -10806,6 +10837,7 @@ const CONTENT_RENDERERS = {
       entityKind: 'open_questions',
       draftPrefix: 'open_questions',
       addLabel: 'Add Question',
+      staleThresholdDays: () => getNeedsThresholds().tier1QuestionDays,
 
       matchesExtra(item) {
         if (!categoryFilter) return true;
@@ -11076,6 +11108,7 @@ const CONTENT_RENDERERS = {
       sectionClass: 'ws-conflicts',
       titlePlaceholder: 'What contradicts what?',
       bodyPlaceholder: 'The two sides in tension, and where each comes from (optional)',
+      staleThresholdDays: () => getNeedsThresholds().conflictDays,
 
       matchesExtra(item) {
         return severityFilter === null || item.severity === severityFilter;
@@ -12424,12 +12457,18 @@ for (const name of WORKSPACES) {
   label.className = 'nav-label';
   label.textContent = name;
   btn.append(icon, label);
-  // PHOME: count badge for the three queue-style workspaces. Hidden until the
+  // PHOME: count badge for the four queue-style workspaces. Hidden until the
   // count is > 0 (refreshNavBadges manages visibility).
+  // PSTALE: two inner spans so the age suffix can be hidden on the collapsed rail.
   if (NAV_BADGE_KEYS[name]) {
     const badge = document.createElement('span');
     badge.className = 'nav-badge';
     badge.style.display = 'none';
+    const nbCount = document.createElement('span');
+    nbCount.className = 'nb-count';
+    const nbAge = document.createElement('span');
+    nbAge.className = 'nb-age';
+    badge.append(nbCount, nbAge);
     btn.appendChild(badge);
     navBadgeEls[name] = badge;
   }
@@ -12452,9 +12491,13 @@ async function refreshNavBadges() {
     const el = navBadgeEls[ws];
     if (!el) continue;
     const n = counts[key] || 0;
-    el.textContent = n > 99 ? '99+' : String(n);
+    const d = counts[key + 'OldestDays'];
+    el.querySelector('.nb-count').textContent = n > 99 ? '99+' : String(n);
+    el.querySelector('.nb-age').textContent = (n > 0 && d != null) ? ` · ${d}d` : '';
     el.style.display = n > 0 ? '' : 'none';
-    el.title = `${n} ${n === 1 ? 'item' : 'items'}`;
+    el.title = n > 0 && d != null
+      ? `${n} ${n === 1 ? 'item' : 'items'}, oldest ${d}d`
+      : `${n} ${n === 1 ? 'item' : 'items'}`;
   }
 }
 refreshNavBadges();

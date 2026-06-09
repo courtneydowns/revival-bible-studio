@@ -488,12 +488,14 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ## Stale item nudges
 
-### PSTALE — Stale item nudges
+### PSTALE — Stale item nudges ✅
 - Nav badge aging: badges show count + age of oldest unresolved item ("3 · 45d")
 - Staleness indicator on list items not touched in 30+ days (subtle visual marker)
 - Thresholds configurable in Settings (defaults: 14d Tier-1 questions, 30d conflicts, 7d Canon Review)
 - Never auto-resolves or auto-archives — surfacing only
-- **Smoke:** Create items and artificially age them in dev; confirm badges show age; confirm list item staleness markers appear; adjust threshold in Settings, confirm update
+- **Implementation:** `navBadges()` in db.js returns `*OldestDays` per badge via combined COUNT/MIN queries. Nav badges use two inner spans (`.nb-count`, `.nb-age`) — age hidden on collapsed rail via CSS. `makeEntryWorkspace.buildListItem` checks `config.staleThresholdDays` (lazy function); Open Questions uses `tier1QuestionDays`, Conflicts uses `conflictDays`. Canon Review `buildListItem` checks `canonReviewDays` on pending proposals. Settings description updated to reflect all three uses.
+- **Smoke:** Lower a threshold in Settings to 1d; confirm nav badge shows "N · Xd" on that workspace; confirm list items in that workspace show a small age marker; restore threshold.
+- **Smoke passed.**
 
 ---
 
