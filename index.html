@@ -2147,6 +2147,52 @@
       }
       .wl-assistant-clear-btn:hover { color: var(--text); }
 
+      /* PWLAB-CANON-COMPARE — Canon Compare panel */
+      .wl-compare {
+        margin-top: 16px;
+        border: 1px solid var(--border);
+        border-left: 3px solid #e8a043;
+        border-radius: 6px;
+        background: rgba(232, 160, 67, 0.03);
+      }
+      .wl-compare-header {
+        display: flex; align-items: center; gap: 8px;
+        padding: 8px 12px;
+        cursor: pointer; user-select: none;
+      }
+      .wl-compare-header-label {
+        flex: 1; font-size: 12px; font-weight: 600;
+        color: #e8a043; text-transform: uppercase; letter-spacing: 0.06em;
+      }
+      .wl-compare-toggle { font-size: 11px; color: var(--muted); }
+      .wl-compare-run-btn { font-size: 11px; padding: 2px 8px; }
+      .wl-compare-body { padding: 10px 12px 12px; }
+      .wl-compare-flag {
+        margin-top: 10px;
+        padding: 8px 10px;
+        border-left: 3px solid #e8a043;
+        border-radius: 0 4px 4px 0;
+        background: rgba(232, 160, 67, 0.07);
+      }
+      .wl-compare-flag-citation { font-size: 0.9em; font-weight: 600; }
+      .wl-compare-flag-reason {
+        margin: 4px 0 0;
+        font-size: 0.85em;
+        color: var(--text-secondary, var(--text));
+      }
+      .wl-compare-flag-loc {
+        margin: 4px 0 0;
+        font-size: 0.8em;
+        color: var(--muted);
+        font-style: italic;
+      }
+      .wl-compare-flag-actions {
+        margin-top: 6px;
+        display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+      }
+      .wl-compare-flag-routed { font-size: 11px; color: var(--accent); }
+      .wl-compare-flag-error { font-size: 11px; color: var(--danger, #c0392b); }
+
       /* --- Home dashboard (P27) --------------------------------------- */
       /* PHOME-NEEDS: Needs Attention panel */
       .needs-attention {

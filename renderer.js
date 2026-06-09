@@ -8373,6 +8373,12 @@ function renderWritingLabPage(section) {
     proposeBtn.className = 'btn-secondary wl-propose-btn';
     proposeBtn.textContent = 'Propose Canon';
 
+    // PWLAB-CANON-COMPARE — on-demand draft vs. locked canon divergence check.
+    const compareBtn = document.createElement('button');
+    compareBtn.type = 'button';
+    compareBtn.className = 'btn-secondary wl-compare-btn';
+    compareBtn.textContent = 'Compare to Canon';
+
     const archiveBtn = document.createElement('button');
     archiveBtn.type = 'button';
     archiveBtn.className = 'btn-secondary';
@@ -8397,7 +8403,7 @@ function renderWritingLabPage(section) {
     if (archivedAtStart) {
       bar.append(status, spacer, ...wlPopoutParts, archiveBtn, deleteBtn);
     } else {
-      bar.append(status, spacer, proposeBtn, ...wlPopoutParts, archiveBtn, deleteBtn);
+      bar.append(status, spacer, compareBtn, proposeBtn, ...wlPopoutParts, archiveBtn, deleteBtn);
     }
 
     // P44 — source attachment row: always visible below the editor bar.
@@ -8950,6 +8956,227 @@ function renderWritingLabPage(section) {
     });
 
     rightCol.appendChild(assistant);
+
+    // PWLAB-CANON-COMPARE — collapsible results panel; hidden until first run.
+    const comparePanel = document.createElement('div');
+    comparePanel.className = 'wl-compare';
+    comparePanel.hidden = true;
+
+    const cmpHeader = document.createElement('div');
+    cmpHeader.className = 'wl-compare-header';
+    const cmpLabel = document.createElement('span');
+    cmpLabel.className = 'wl-compare-header-label';
+    cmpLabel.textContent = 'Canon Compare';
+    const cmpRunBtn = document.createElement('button');
+    cmpRunBtn.type = 'button';
+    cmpRunBtn.className = 'btn-primary wl-compare-run-btn';
+    cmpRunBtn.textContent = 'Run again';
+    const cmpToggle = document.createElement('span');
+    cmpToggle.className = 'wl-compare-toggle';
+    cmpToggle.textContent = '▼ collapse';
+    cmpHeader.append(cmpLabel, cmpRunBtn, cmpToggle);
+    comparePanel.appendChild(cmpHeader);
+
+    const cmpBody = document.createElement('div');
+    cmpBody.className = 'wl-compare-body';
+    comparePanel.appendChild(cmpBody);
+
+    let cmpOpen = true;
+    cmpHeader.addEventListener('click', (e) => {
+      if (e.target === cmpRunBtn) return;
+      cmpOpen = !cmpOpen;
+      cmpBody.hidden = !cmpOpen;
+      cmpToggle.textContent = cmpOpen ? '▼ collapse' : '▶ expand';
+    });
+
+    async function runCompare() {
+      await flushNow();
+      const draftTitle = titleInput.value.trim();
+      const draftBody = bodyInput.value.trim();
+      comparePanel.hidden = false;
+      cmpBody.hidden = false;
+      cmpOpen = true;
+      cmpToggle.textContent = '▼ collapse';
+      cmpBody.innerHTML = '';
+
+      if (!draftBody) {
+        const msg = document.createElement('p');
+        msg.className = 'cr-conflict-status';
+        msg.textContent = 'Add draft body text before running comparison.';
+        cmpBody.appendChild(msg);
+        return;
+      }
+
+      compareBtn.disabled = true;
+      cmpRunBtn.disabled = true;
+      const checking = document.createElement('p');
+      checking.className = 'cr-conflict-status';
+      checking.textContent = 'Comparing draft against locked canon entries…';
+      cmpBody.appendChild(checking);
+
+      try {
+        const model = (typeof chatModelSelect !== 'undefined' && chatModelSelect.value)
+          ? chatModelSelect.value : 'claude-sonnet-4-6';
+        const res = await window.revival.claude.canonCompare(draftTitle, draftBody, model);
+        cmpBody.innerHTML = '';
+
+        if (res.skipped) {
+          const msg = document.createElement('p');
+          msg.className = 'cr-conflict-status';
+          msg.textContent = 'Add draft body text before running comparison.';
+          cmpBody.appendChild(msg);
+        } else if (res.checkedCount === 0) {
+          const msg = document.createElement('p');
+          msg.className = 'cr-conflict-status';
+          msg.textContent = 'No locked canon entries to compare against.';
+          cmpBody.appendChild(msg);
+        } else if (res.flags.length === 0) {
+          const msg = document.createElement('p');
+          msg.className = 'cr-conflict-status';
+          msg.textContent =
+            `No divergences found (checked ${res.checkedCount} locked entr${res.checkedCount === 1 ? 'y' : 'ies'}).`;
+          cmpBody.appendChild(msg);
+        } else {
+          const summary = document.createElement('p');
+          summary.className = 'cr-conflict-status';
+          summary.textContent =
+            `${res.flags.length} divergence${res.flags.length === 1 ? '' : 's'} found ` +
+            `(checked ${res.checkedCount} locked entr${res.checkedCount === 1 ? 'y' : 'ies'}):`;
+          cmpBody.appendChild(summary);
+
+          for (const f of res.flags) {
+            const card = document.createElement('div');
+            card.className = 'wl-compare-flag';
+
+            const citation = document.createElement('div');
+            citation.className = 'wl-compare-flag-citation';
+            citation.textContent = `${f.tcode} — ${f.title}`;
+
+            const reason = document.createElement('p');
+            reason.className = 'wl-compare-flag-reason';
+            reason.textContent = f.reason;
+
+            card.append(citation, reason);
+
+            if (f.draftLocation) {
+              const loc = document.createElement('p');
+              loc.className = 'wl-compare-flag-loc';
+              loc.textContent = `In draft: "${f.draftLocation}"`;
+              card.appendChild(loc);
+            }
+
+            const flagActions = document.createElement('div');
+            flagActions.className = 'wl-compare-flag-actions';
+
+            const routeConflictBtn = document.createElement('button');
+            routeConflictBtn.type = 'button';
+            routeConflictBtn.className = 'btn-secondary';
+            routeConflictBtn.style.cssText = 'font-size:11px;padding:2px 8px;';
+            routeConflictBtn.textContent = 'Route to Conflicts';
+
+            const routeOqBtn = document.createElement('button');
+            routeOqBtn.type = 'button';
+            routeOqBtn.className = 'btn-secondary';
+            routeOqBtn.style.cssText = 'font-size:11px;padding:2px 8px;';
+            routeOqBtn.textContent = 'Route to Open Questions';
+
+            const flagDismissBtn = document.createElement('button');
+            flagDismissBtn.type = 'button';
+            flagDismissBtn.className = 'btn-secondary';
+            flagDismissBtn.style.cssText = 'font-size:11px;padding:2px 8px;';
+            flagDismissBtn.textContent = 'Dismiss';
+
+            flagActions.append(routeConflictBtn, routeOqBtn, flagDismissBtn);
+            card.appendChild(flagActions);
+
+            const flagBody =
+              `Canon entry: ${f.tcode} — ${f.title}\n\n${f.reason}` +
+              (f.draftLocation ? `\n\nDraft location: "${f.draftLocation}"` : '') +
+              `\n\nSource draft: "${draftTitle || 'Untitled'}"`;
+
+            routeConflictBtn.addEventListener('click', async () => {
+              routeConflictBtn.disabled = true;
+              routeOqBtn.disabled = true;
+              flagDismissBtn.disabled = true;
+              try {
+                await window.revival.conflicts.create({
+                  title: `Canon divergence: ${f.title}`,
+                  body: flagBody,
+                });
+                flagActions.innerHTML = '';
+                const routed = document.createElement('span');
+                routed.className = 'wl-compare-flag-routed';
+                routed.textContent = 'Routed to Conflicts.';
+                flagActions.appendChild(routed);
+              } catch (routeErr) {
+                routeConflictBtn.disabled = false;
+                routeOqBtn.disabled = false;
+                flagDismissBtn.disabled = false;
+                const cleanErr = (routeErr.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+                const errEl = document.createElement('span');
+                errEl.className = 'wl-compare-flag-error';
+                errEl.textContent = cleanErr || 'Failed to create conflict.';
+                flagActions.appendChild(errEl);
+              }
+            });
+
+            routeOqBtn.addEventListener('click', async () => {
+              routeConflictBtn.disabled = true;
+              routeOqBtn.disabled = true;
+              flagDismissBtn.disabled = true;
+              try {
+                await window.revival.openQuestions.create({
+                  title: `Canon question: ${f.title}`,
+                  body: flagBody,
+                });
+                flagActions.innerHTML = '';
+                const routed = document.createElement('span');
+                routed.className = 'wl-compare-flag-routed';
+                routed.textContent = 'Routed to Open Questions.';
+                flagActions.appendChild(routed);
+              } catch (routeErr) {
+                routeConflictBtn.disabled = false;
+                routeOqBtn.disabled = false;
+                flagDismissBtn.disabled = false;
+                const cleanErr = (routeErr.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+                const errEl = document.createElement('span');
+                errEl.className = 'wl-compare-flag-error';
+                errEl.textContent = cleanErr || 'Failed to create open question.';
+                flagActions.appendChild(errEl);
+              }
+            });
+
+            flagDismissBtn.addEventListener('click', () => {
+              card.remove();
+              if (cmpBody.querySelectorAll('.wl-compare-flag').length === 0) {
+                cmpBody.innerHTML = '';
+                const msg = document.createElement('p');
+                msg.className = 'cr-conflict-status';
+                msg.textContent = 'All flags dismissed.';
+                cmpBody.appendChild(msg);
+              }
+            });
+
+            cmpBody.appendChild(card);
+          }
+        }
+      } catch (cmpErr) {
+        cmpBody.innerHTML = '';
+        const errEl = document.createElement('p');
+        errEl.className = 'cr-conflict-status';
+        const cleanErr = (cmpErr.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+        errEl.textContent = `Error: ${cleanErr || 'Comparison failed.'}`;
+        cmpBody.appendChild(errEl);
+      } finally {
+        compareBtn.disabled = false;
+        cmpRunBtn.disabled = false;
+      }
+    }
+
+    compareBtn.addEventListener('click', runCompare);
+    cmpRunBtn.addEventListener('click', (e) => { e.stopPropagation(); runCompare(); });
+
+    rightCol.appendChild(comparePanel);
 
     // PFLAN-EXPAND — Flanagan Filter (full five modes) on Writing Lab drafts.
     // Gated on item existing (unsaved new drafts have no DB row yet).

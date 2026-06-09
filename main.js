@@ -1270,6 +1270,96 @@ function registerIpc() {
   ipcMain.handle('flanaganAnalyses:delete', (_e, id) =>
     db.flanaganAnalyses.delete(id));
 
+  // PWLAB-CANON-COMPARE — On-demand draft vs. locked canon divergence check.
+  // Takes the draft title + body; returns flagged divergences with draft location
+  // citations. Never runs automatically; never touches canon.
+  ipcMain.handle('claude:canonCompare', async (_e, draftTitle, draftBody, model) => {
+    const apiKey = db.settings.getClaudeApiKey();
+    if (!apiKey) throw new Error('No Claude API key configured. Add one in Settings.');
+
+    const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
+
+    if (!draftBody || !draftBody.trim()) {
+      return { flags: [], checkedCount: 0, skipped: true };
+    }
+
+    const allEntries = db.canon.list();
+    const locked = allEntries.filter((e) => e.locked);
+    if (locked.length === 0) return { flags: [], checkedCount: 0 };
+
+    const blocks = locked.map((e) => {
+      const primaryId = (e.legacy_ids || []).find((l) => l.isPrimary);
+      const tcode = primaryId ? primaryId.code : `#${e.id}`;
+      return `[${tcode}] ${e.entry_type.toUpperCase()}: ${e.title}\n${e.body || ''}`;
+    });
+
+    const systemPrompt =
+      'You are a continuity analyst for a TV writers\' room. ' +
+      'Your job is to identify details in a draft that diverge from locked canon entries. ' +
+      'A divergence is any place where the draft states or strongly implies something that ' +
+      'conflicts with, contradicts, or is inconsistent with an established locked canon fact. ' +
+      'This includes direct contradictions, inconsistent character details, timeline conflicts, ' +
+      'and location or fact mismatches. ' +
+      'Do NOT flag: thematic differences, speculation, things not covered by canon, ' +
+      'or things that could plausibly coexist with canon. ' +
+      'Only flag clear divergences from stated locked facts.\n\n' +
+      'For each flag provide a short quote or phrase from the draft (draftLocation) that ' +
+      'identifies approximately where the divergence appears — keep it under 80 characters.\n\n' +
+      'Respond with a JSON object in this exact shape — no markdown, no explanation outside JSON:\n' +
+      '{\n' +
+      '  "flags": [\n' +
+      '    {\n' +
+      '      "entryId": <number or null>,\n' +
+      '      "tcode": "<T-code or #id string>",\n' +
+      '      "title": "<canon entry title>",\n' +
+      '      "reason": "<one sentence describing how the draft diverges from the canon entry>",\n' +
+      '      "draftLocation": "<short quote or phrase from the draft identifying the divergence>"\n' +
+      '    }\n' +
+      '  ]\n' +
+      '}\n' +
+      'If there are no divergences, return { "flags": [] }.\n\n' +
+      '## Locked Canon Entries\n\n' +
+      blocks.join('\n\n---\n\n');
+
+    const userMessage = `## Draft: ${draftTitle || 'Untitled'}\n\n${draftBody}`;
+
+    const data = await callClaudeAPI(apiKey, {
+      model: safeModel,
+      max_tokens: 2048,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    });
+
+    const textBlock = (data.content || []).find((b) => b.type === 'text');
+    if (!textBlock) throw new Error('Unexpected response shape from Claude API.');
+
+    let parsed;
+    try {
+      const raw = textBlock.text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error('Claude returned malformed JSON. Try again.');
+    }
+
+    const flags = Array.isArray(parsed.flags) ? parsed.flags : [];
+    const enriched = flags.map((f) => {
+      const match = locked.find((e) => {
+        const primaryId = (e.legacy_ids || []).find((l) => l.isPrimary);
+        const tcode = primaryId ? primaryId.code : `#${e.id}`;
+        return tcode === f.tcode || e.title === f.title;
+      });
+      return {
+        entryId: match ? match.id : (f.entryId || null),
+        tcode:   f.tcode || (match ? `#${match.id}` : '?'),
+        title:   f.title || (match ? match.title : '?'),
+        reason:  f.reason || '',
+        draftLocation: f.draftLocation || '',
+      };
+    });
+
+    return { flags: enriched, checkedCount: locked.length };
+  });
+
   // P46-C — Tag suggestions for a saved Flanagan analysis.
   // Takes the analysis text and the full tag library; returns up to 5 tag names
   // that genuinely fit. Never auto-applies — caller must confirm.

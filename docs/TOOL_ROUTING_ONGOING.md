@@ -97,7 +97,7 @@
 | **PSTALE Stale item nudges** | **CLI** ✅ | Staleness logic + badge aging, touches nav + all workspaces |
 | **POQ-DEPENDS Open Question dependencies** | **VS Code ext** ✅ | Dependency field + block indicator on existing Open Questions entry |
 | **PWLAB-SECTIONS Writing Lab section markers** | **VS Code ext** | Section marker insertion + jump-to list on existing Writing Lab page |
-| **PWLAB-CANON-COMPARE Draft vs. canon comparison** | **CLI** | New AI action wired into Writing Lab, reads full canon |
+| **PWLAB-CANON-COMPARE Draft vs. canon comparison** | **CLI** ✅ | New AI action wired into Writing Lab, reads full canon |
 | **PEPISODE-PREVON "Previously on" snapshot** | **VS Code ext** | Generated panel on existing Episode detail |
 | **PRESEARCH-USED Research "Used in" indicator** | **VS Code ext** | Passive badge on existing Research list + detail |
 | **PDRAFT-LOCK Character/Episode draft lock** | **VS Code ext** | Lock state on existing entry components |

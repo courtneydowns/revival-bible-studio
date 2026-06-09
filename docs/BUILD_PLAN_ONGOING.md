@@ -524,12 +524,13 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 - Word count and scene/section count shown passively in status bar
 - **Smoke:** Insert three section markers; confirm jump-to list appears with all three; click each, confirm scroll; confirm section count in status bar
 
-### PWLAB-CANON-COMPARE — Writing Lab draft vs. canon comparison
+### PWLAB-CANON-COMPARE — Writing Lab draft vs. canon comparison ✅
 - On-demand action from any Writing Lab draft: Claude reads the draft body and surfaces details that diverge from locked canon entries
 - Results as a flagged list with source citations (canon entry + approximate draft location)
 - User reviews each flag; can route to Conflicts or Open Questions, or dismiss
 - Never runs automatically; never touches canon
 - **Smoke:** Write a draft with a deliberate canon divergence; run comparison; confirm flag surfaces with correct canon entry cited; route flag to Conflicts, confirm entry created; dismiss another flag, confirm it clears
+- **Smoke passed 2026-06-09.**
 
 ---
 
