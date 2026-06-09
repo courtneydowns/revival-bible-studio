@@ -632,14 +632,61 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ---
 
+### PEPISODE-CONT-2 — Episode continuity checker: expanded scope
+**Tool:** CLI
+**Requires:** PEPISODE-CONT ✅
+
+Extends the existing episode continuity checker in four ways. Do not remove or alter existing behavior.
+
+**1. Cross-episode context on Episodes page**
+- Add an optional "Compare against episode" picker to the continuity check panel on any Episode entry
+- User can select one other episode from the Episodes list or from canon as additional context for the check
+- The selected episode's content is passed to Claude alongside the primary episode entry
+- Original body-text-only path remains intact and unchanged — the picker is additive, not a replacement
+
+**2. Episodes continuity check on Canon Review queue**
+- When a Canon Review proposal is for an episode entry, surface the continuity check action on that proposal's detail panel
+- Same behavior as the Episodes workspace: body text + optional cross-episode picker
+- Never runs automatically — user-triggered only
+
+**3. Writing Lab drafts**
+- Add continuity check action to Writing Lab draft detail panel
+- Claude reads the draft body + locked canon entries + optionally one selected episode entry
+- Flags: timeline contradictions, character state inconsistencies, arc breaks
+- Results as flagged list with source citations; user can route each flag to Conflicts or Open Questions, or dismiss
+- Never runs automatically
+
+**4. Characters entries**
+- Add continuity check action to Characters entry detail panel
+- Claude reads the character body + status field + linked canon facts + any linked episode entries
+- Flags inconsistencies across episodes and canon for that character specifically
+- Results as flagged list with source citations; user can route each flag to Conflicts or Open Questions, or dismiss
+- Never runs automatically
+
+**All surfaces:**
+- AI suggests; human approves — no flag auto-routes
+- Results display inline in the relevant detail panel
+- Highlight-extract-route available on all output text
+- User-triggered only in every case
+
+**Smoke:**
+1. Open an Episode entry; run continuity check without cross-episode picker — confirm existing behavior unchanged
+2. Select a second episode from the picker; re-run — confirm both episodes reflected in output
+3. Open a Canon Review proposal for an episode entry; confirm continuity check action present; run it
+4. Open a Writing Lab draft; run continuity check; confirm flags surface with canon citations; route one flag to Conflicts
+5. Open a Characters entry; run continuity check; confirm character-specific flags surface; dismiss one flag
+
+---
+
 ## Episode continuity checker
 
-### PEPISODE-CONT — AI episode continuity checker
+### PEPISODE-CONT — AI episode continuity checker ✅
 - On-demand per episode entry: Claude reads episode content + linked character entries (including status field) + relevant canon + prior episode entries
 - Flags: timeline contradictions, character state inconsistencies, arc breaks
 - Results surface as a flagged list with source citations
 - User reviews each flag; can route to Conflicts, Open Questions, or dismiss
 - Never auto-resolves; never touches canon; runs only when user triggers it
+- **Implementation:** `claude:episodeContinuityCheck` IPC in main.js — queries linked characters (CWA both directions), 3 most recent prior episodes, all locked non-retired canon; sends to Claude with typed flag schema (timeline/character_state/arc_break). Preload: `claude.episodeContinuityCheck`. Renderer: `mountEpisodeContinuityPanel` collapsed `<details>` on episode detail — Run button, flag cards with type badge + citation + reason + location, Route to Conflicts / Route to Open Questions / Dismiss per flag. Mounted after "Previously on". CSS: `.ep-cont-*` in index.html.
 - **Smoke:** Create an episode with a deliberate character state inconsistency vs. prior episode; run checker, confirm flag surfaces with correct source citation; route flag to Conflicts, confirm entry created; dismiss another flag, confirm it clears
 
 ---

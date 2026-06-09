@@ -5197,6 +5197,95 @@
         line-height: 1.4;
       }
 
+      /* PEPISODE-CONT — AI episode continuity checker */
+      .ep-cont-section {
+        margin: 12px 0 0;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .ep-cont-summary {
+        padding: 8px 12px;
+        font-size: 0.82em;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--muted);
+        cursor: pointer;
+        user-select: none;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .ep-cont-summary::-webkit-details-marker { display: none; }
+      .ep-cont-summary::before { content: '▸ '; font-size: 0.8em; }
+      .ep-cont-section[open] .ep-cont-summary::before { content: '▾ '; }
+      .ep-cont-summary:hover { color: var(--text); }
+      .ep-cont-body {
+        padding: 10px 12px 12px;
+        border-top: 1px solid var(--border);
+      }
+      .ep-cont-run-btn { font-size: 12px; }
+      .ep-cont-status { font-size: 0.82em; color: var(--muted); margin: 0 0 8px; }
+      .ep-cont-flag {
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 8px 10px;
+        margin-bottom: 8px;
+        background: var(--surface, var(--bg));
+      }
+      .ep-cont-flag:last-of-type { margin-bottom: 6px; }
+      .ep-cont-flag-citation {
+        font-size: 0.8em;
+        font-weight: 600;
+        color: var(--muted);
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        flex-wrap: wrap;
+      }
+      .ep-cont-flag-type {
+        font-size: 0.75em;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 1px 5px;
+        border-radius: 3px;
+        border: 1px solid transparent;
+        flex-shrink: 0;
+      }
+      .ep-cont-type-timeline    { color: #6fa3e0; border-color: #6fa3e0; }
+      .ep-cont-type-character_state { color: #a07cc5; border-color: #a07cc5; }
+      .ep-cont-type-arc_break   { color: #e0946f; border-color: #e0946f; }
+      .ep-cont-flag-reason {
+        font-size: 0.83em;
+        color: var(--text);
+        margin: 0 0 4px;
+        line-height: 1.45;
+      }
+      .ep-cont-flag-loc {
+        font-size: 0.79em;
+        color: var(--muted);
+        margin: 0 0 6px;
+        font-style: italic;
+      }
+      .ep-cont-flag-actions {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+      }
+      .ep-cont-flag-routed {
+        font-size: 0.8em;
+        color: var(--success, #5cb85c);
+      }
+      .ep-cont-flag-error {
+        font-size: 0.8em;
+        color: var(--danger, #e05c5c);
+      }
+
       /* PQUIET — Quiet devastation tracker */
       .qd-section {
         margin: 12px 0 0;

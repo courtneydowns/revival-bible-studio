@@ -12509,6 +12509,222 @@ function mountPreviouslyOnPanel(rightCol, item) {
   rightCol.appendChild(section);
 }
 
+// PEPISODE-CONT — AI episode continuity checker.
+// On-demand: reads this episode + linked characters + prior episodes + locked
+// canon; flags timeline contradictions, character state issues, arc breaks.
+// Each flag is dismissable or routable to Conflicts / Open Questions.
+function mountEpisodeContinuityPanel(rightCol, item) {
+  const section = document.createElement('details');
+  section.className = 'ep-cont-section';
+
+  const sum = document.createElement('summary');
+  sum.className = 'ep-cont-summary';
+  sum.textContent = 'Continuity Check';
+  section.appendChild(sum);
+
+  const panelBody = document.createElement('div');
+  panelBody.className = 'ep-cont-body';
+  section.appendChild(panelBody);
+
+  let hasRun = false;
+
+  function renderIdle() {
+    panelBody.innerHTML = '';
+    const runBtn = document.createElement('button');
+    runBtn.type = 'button';
+    runBtn.className = 'btn-secondary ep-cont-run-btn';
+    runBtn.textContent = 'Run continuity check';
+    runBtn.addEventListener('click', () => runCheck(runBtn));
+    panelBody.appendChild(runBtn);
+  }
+
+  async function runCheck(triggerBtn) {
+    panelBody.innerHTML = '';
+    const checking = document.createElement('p');
+    checking.className = 'ep-cont-status';
+    checking.textContent = 'Checking continuity…';
+    panelBody.appendChild(checking);
+
+    const model = (typeof chatModelSelect !== 'undefined' && chatModelSelect.value)
+      ? chatModelSelect.value : 'claude-sonnet-4-6';
+
+    try {
+      const res = await window.revival.claude.episodeContinuityCheck(item.id, model);
+      panelBody.innerHTML = '';
+      hasRun = true;
+
+      if (res.skipped) {
+        const msg = document.createElement('p');
+        msg.className = 'ep-cont-status';
+        msg.textContent = 'Add episode body text before running the continuity check.';
+        panelBody.appendChild(msg);
+        appendRerunBtn();
+        return;
+      }
+
+      const meta = document.createElement('p');
+      meta.className = 'ep-cont-status';
+      const parts = [];
+      if (res.characterCount > 0)
+        parts.push(`${res.characterCount} character${res.characterCount === 1 ? '' : 's'}`);
+      if (res.priorEpisodesCount > 0)
+        parts.push(`${res.priorEpisodesCount} prior episode${res.priorEpisodesCount === 1 ? '' : 's'}`);
+      const canonPart = res.checkedCount - (res.characterCount || 0) - (res.priorEpisodesCount || 0);
+      if (canonPart > 0) parts.push(`${canonPart} canon entr${canonPart === 1 ? 'y' : 'ies'}`);
+      meta.textContent = res.flags.length === 0
+        ? `No issues found (checked: ${parts.join(', ') || 'nothing'}).`
+        : `${res.flags.length} issue${res.flags.length === 1 ? '' : 's'} found (checked: ${parts.join(', ')}).`;
+      panelBody.appendChild(meta);
+
+      for (const f of res.flags) {
+        const card = document.createElement('div');
+        card.className = 'ep-cont-flag';
+
+        const typeLabel = document.createElement('span');
+        typeLabel.className = `ep-cont-flag-type ep-cont-type-${f.flagType}`;
+        typeLabel.textContent = { timeline: 'Timeline', character_state: 'Character', arc_break: 'Arc' }[f.flagType] || f.flagType;
+
+        const citation = document.createElement('div');
+        citation.className = 'ep-cont-flag-citation';
+        citation.appendChild(typeLabel);
+        const sourceText = document.createTextNode(` — ${f.sourceTitle}`);
+        citation.appendChild(sourceText);
+
+        const reason = document.createElement('p');
+        reason.className = 'ep-cont-flag-reason';
+        reason.textContent = f.reason;
+
+        card.append(citation, reason);
+
+        if (f.location) {
+          const loc = document.createElement('p');
+          loc.className = 'ep-cont-flag-loc';
+          loc.textContent = `In episode: "${f.location}"`;
+          card.appendChild(loc);
+        }
+
+        const actions = document.createElement('div');
+        actions.className = 'ep-cont-flag-actions';
+
+        const routeConflictBtn = document.createElement('button');
+        routeConflictBtn.type = 'button';
+        routeConflictBtn.className = 'btn-secondary';
+        routeConflictBtn.style.cssText = 'font-size:11px;padding:2px 8px;';
+        routeConflictBtn.textContent = 'Route to Conflicts';
+
+        const routeOqBtn = document.createElement('button');
+        routeOqBtn.type = 'button';
+        routeOqBtn.className = 'btn-secondary';
+        routeOqBtn.style.cssText = 'font-size:11px;padding:2px 8px;';
+        routeOqBtn.textContent = 'Route to Open Questions';
+
+        const dismissBtn = document.createElement('button');
+        dismissBtn.type = 'button';
+        dismissBtn.className = 'btn-secondary';
+        dismissBtn.style.cssText = 'font-size:11px;padding:2px 8px;';
+        dismissBtn.textContent = 'Dismiss';
+
+        actions.append(routeConflictBtn, routeOqBtn, dismissBtn);
+        card.appendChild(actions);
+
+        const flagBody =
+          `Source: ${f.sourceKind} — ${f.sourceTitle}` +
+          (f.sourceId ? ` (#${f.sourceId})` : '') +
+          `\n\n${f.reason}` +
+          (f.location ? `\n\nIn episode: "${f.location}"` : '') +
+          `\n\nEpisode: "${item.title || 'Untitled'}"`;
+
+        routeConflictBtn.addEventListener('click', async () => {
+          routeConflictBtn.disabled = true;
+          routeOqBtn.disabled = true;
+          dismissBtn.disabled = true;
+          try {
+            await window.revival.conflicts.create({
+              title: `Continuity: ${f.sourceTitle}`,
+              body: flagBody,
+            });
+            actions.innerHTML = '';
+            const routed = document.createElement('span');
+            routed.className = 'ep-cont-flag-routed';
+            routed.textContent = 'Routed to Conflicts.';
+            actions.appendChild(routed);
+          } catch (err) {
+            routeConflictBtn.disabled = false;
+            routeOqBtn.disabled = false;
+            dismissBtn.disabled = false;
+            const cleanErr = (err.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+            const errEl = document.createElement('span');
+            errEl.className = 'ep-cont-flag-error';
+            errEl.textContent = cleanErr || 'Failed to create conflict.';
+            actions.appendChild(errEl);
+          }
+        });
+
+        routeOqBtn.addEventListener('click', async () => {
+          routeConflictBtn.disabled = true;
+          routeOqBtn.disabled = true;
+          dismissBtn.disabled = true;
+          try {
+            await window.revival.openQuestions.create({
+              title: `Continuity question: ${f.sourceTitle}`,
+              body: flagBody,
+            });
+            actions.innerHTML = '';
+            const routed = document.createElement('span');
+            routed.className = 'ep-cont-flag-routed';
+            routed.textContent = 'Routed to Open Questions.';
+            actions.appendChild(routed);
+          } catch (err) {
+            routeConflictBtn.disabled = false;
+            routeOqBtn.disabled = false;
+            dismissBtn.disabled = false;
+            const cleanErr = (err.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+            const errEl = document.createElement('span');
+            errEl.className = 'ep-cont-flag-error';
+            errEl.textContent = cleanErr || 'Failed to create open question.';
+            actions.appendChild(errEl);
+          }
+        });
+
+        dismissBtn.addEventListener('click', () => {
+          card.remove();
+          if (panelBody.querySelectorAll('.ep-cont-flag').length === 0) {
+            const msg = document.createElement('p');
+            msg.className = 'ep-cont-status';
+            msg.textContent = 'All flags dismissed.';
+            panelBody.appendChild(msg);
+            appendRerunBtn();
+          }
+        });
+
+        panelBody.appendChild(card);
+      }
+
+      appendRerunBtn();
+    } catch (err) {
+      panelBody.innerHTML = '';
+      const errEl = document.createElement('p');
+      errEl.className = 'ep-cont-status';
+      const cleanErr = (err.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+      errEl.textContent = `Error: ${cleanErr || 'Continuity check failed.'}`;
+      panelBody.appendChild(errEl);
+      appendRerunBtn();
+    }
+  }
+
+  function appendRerunBtn() {
+    const rerun = document.createElement('button');
+    rerun.type = 'button';
+    rerun.className = 'btn-secondary ep-cont-run-btn';
+    rerun.textContent = 'Run again';
+    rerun.addEventListener('click', () => runCheck(rerun));
+    panelBody.appendChild(rerun);
+  }
+
+  renderIdle();
+  rightCol.appendChild(section);
+}
+
 // PDRAFT-LOCK — shared draft-lock panel for Characters and Episodes detail views.
 // apiName: 'characters' | 'episodes'
 // reload: async fn that refreshes the detail panel after a lock/unlock.
@@ -14587,6 +14803,8 @@ const CONTENT_RENDERERS = {
         if (!archivedFlag) mountQuietDevastationPanel(rightCol, item);
         // PEPISODE-PREVON — "Previously on" collapsed canon snapshot.
         if (!archivedFlag) mountPreviouslyOnPanel(rightCol, item);
+        // PEPISODE-CONT — AI continuity checker.
+        if (!archivedFlag) mountEpisodeContinuityPanel(rightCol, item);
         // PLOCKED-SPECIFICS — all locked specifics.
         if (!archivedFlag) mountLockedSpecificsPanel(rightCol);
       },

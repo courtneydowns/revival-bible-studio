@@ -1481,6 +1481,145 @@ function registerIpc() {
     return { items };
   });
 
+  // PEPISODE-CONT — AI episode continuity checker.
+  // Reads the episode entry + linked characters (with status) + prior episodes +
+  // relevant locked canon, then flags timeline contradictions, character state
+  // inconsistencies, and arc breaks. Never runs automatically; never touches canon.
+  ipcMain.handle('claude:episodeContinuityCheck', async (_e, episodeId, model) => {
+    const apiKey = db.settings.getClaudeApiKey();
+    if (!apiKey) throw new Error('No Claude API key configured. Add one in Settings.');
+    const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
+
+    const ep = db.episodes.get(episodeId);
+    if (!ep) throw new Error('Episode not found.');
+    if (!ep.body || !ep.body.trim()) return { flags: [], skipped: true };
+
+    // Linked characters — in either direction of cross_workspace_attachments.
+    const dbHandle = db.getDb();
+    const linkedCharRows = dbHandle.prepare(`
+      SELECT DISTINCT cw.id, cw.title, cw.body, cw.char_status
+        FROM characters_workspace cw
+        JOIN cross_workspace_attachments cwa ON (
+          (cwa.host_kind = 'episodes'   AND cwa.host_id   = ? AND cwa.source_kind = 'characters' AND cwa.source_id = cw.id)
+          OR
+          (cwa.host_kind = 'characters' AND cwa.source_kind = 'episodes' AND cwa.source_id = ? AND cwa.host_id = cw.id)
+        )
+        WHERE cw.archived_at IS NULL
+    `).all(episodeId, episodeId);
+
+    // Up to 3 prior episodes (most recent before this one by created_at / id).
+    const priorEps = dbHandle.prepare(`
+      SELECT id, title, body, ep_status, created_at
+        FROM episodes_workspace
+       WHERE archived_at IS NULL
+         AND (created_at < ? OR (created_at = ? AND id < ?))
+       ORDER BY created_at DESC, id DESC
+       LIMIT 3
+    `).all(ep.created_at, ep.created_at, episodeId);
+
+    // Locked, non-retired canon entries.
+    const lockedCanon = dbHandle.prepare(`
+      SELECT ce.id, ce.entry_type, ce.title, ce.body, ce.locked_at, ce.locked_label
+        FROM canon_entries ce
+       WHERE ce.locked = 1 AND ce.retired = 0
+       ORDER BY ce.entry_type ASC, ce.title ASC
+    `).all();
+
+    const checkedCount = lockedCanon.length + priorEps.length + linkedCharRows.length;
+
+    // Build context sections for the prompt.
+    const charSection = linkedCharRows.length === 0
+      ? 'No characters are linked to this episode.'
+      : linkedCharRows.map((c) => {
+          const statusStr = c.char_status ? ` [status: ${c.char_status}]` : '';
+          return `Character #${c.id}: ${c.title}${statusStr}\n${c.body || '(no notes)'}`;
+        }).join('\n\n---\n\n');
+
+    const priorSection = priorEps.length === 0
+      ? 'No prior episodes found.'
+      : priorEps.map((pe) =>
+          `Episode #${pe.id}: ${pe.title} [${pe.ep_status || 'no status'}]\n${pe.body || '(no notes)'}`
+        ).join('\n\n---\n\n');
+
+    const canonSection = lockedCanon.length === 0
+      ? 'No locked canon entries.'
+      : lockedCanon.map((ce) =>
+          `Canon [${ce.entry_type}] #${ce.id}: ${ce.title}\n${ce.body || '(no body)'}`
+        ).join('\n\n---\n\n');
+
+    const systemPrompt =
+      'You are a continuity analyst for a TV writers\' room. ' +
+      'Your job is to flag issues in an episode entry when compared against ' +
+      '(1) linked character entries and their current status, ' +
+      '(2) prior episode entries, and (3) locked canon facts.\n\n' +
+      'Flag ONLY clear, specific issues in one of these three categories:\n' +
+      '  - "timeline": a date, sequence, or timing contradiction\n' +
+      '  - "character_state": a character\'s status, arc, location, or known facts are inconsistent\n' +
+      '  - "arc_break": a narrative arc development in this episode contradicts or skips a prior arc beat\n\n' +
+      'Do NOT flag: thematic differences, speculation, missing information, or things that could plausibly coexist.\n' +
+      'Only flag clear contradictions with specific sourced evidence.\n\n' +
+      'For each flag provide:\n' +
+      '  - "flagType": "timeline" | "character_state" | "arc_break"\n' +
+      '  - "sourceKind": "canon" | "episode" | "character"\n' +
+      '  - "sourceId": the numeric ID of the canon entry, episode, or character cited (null if unknown)\n' +
+      '  - "sourceTitle": the title of the cited source entry\n' +
+      '  - "reason": one sentence describing the specific contradiction\n' +
+      '  - "location": a short quote or phrase from the current episode body (under 80 chars) where the issue appears\n\n' +
+      'Respond with a JSON object in this exact shape — no markdown, no explanation outside JSON:\n' +
+      '{\n' +
+      '  "flags": [\n' +
+      '    {\n' +
+      '      "flagType": "<timeline|character_state|arc_break>",\n' +
+      '      "sourceKind": "<canon|episode|character>",\n' +
+      '      "sourceId": <number or null>,\n' +
+      '      "sourceTitle": "<title of cited entry>",\n' +
+      '      "reason": "<one sentence contradiction description>",\n' +
+      '      "location": "<short quote from current episode>"\n' +
+      '    }\n' +
+      '  ]\n' +
+      '}\n' +
+      'If there are no issues, return { "flags": [] }.\n\n' +
+      '## Linked Characters\n\n' + charSection + '\n\n' +
+      '## Prior Episodes (most recent first)\n\n' + priorSection + '\n\n' +
+      '## Locked Canon\n\n' + canonSection;
+
+    const userMessage =
+      `## Current Episode: ${ep.title || 'Untitled'} [${ep.ep_status || 'no status'}]\n\n${ep.body}`;
+
+    const data = await callClaudeAPI(apiKey, {
+      model: safeModel,
+      max_tokens: 2048,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    });
+
+    const textBlock = (data.content || []).find((b) => b.type === 'text');
+    if (!textBlock) throw new Error('Unexpected response shape from Claude API.');
+
+    let parsed;
+    try {
+      const raw = textBlock.text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error('Claude returned malformed JSON. Try again.');
+    }
+
+    const flags = Array.isArray(parsed.flags) ? parsed.flags : [];
+    return {
+      flags: flags.map((f) => ({
+        flagType:    f.flagType    || 'timeline',
+        sourceKind:  f.sourceKind  || 'canon',
+        sourceId:    typeof f.sourceId === 'number' ? f.sourceId : null,
+        sourceTitle: f.sourceTitle || '?',
+        reason:      f.reason      || '',
+        location:    f.location    || '',
+      })),
+      checkedCount,
+      priorEpisodesCount: priorEps.length,
+      characterCount:     linkedCharRows.length,
+    };
+  });
+
   // P46-C — Tag suggestions for a saved Flanagan analysis.
   // Takes the analysis text and the full tag library; returns up to 5 tag names
   // that genuinely fit. Never auto-applies — caller must confirm.
