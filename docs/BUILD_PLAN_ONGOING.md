@@ -390,7 +390,7 @@ PKEY was marked ✅ complete and the command palette (Cmd+K) previously worked, 
 - Do not add new functionality — restore only
 - **Smoke:** Cmd+K opens palette; type a workspace name, confirm it appears; press Enter, confirm navigation; tab through results with keyboard; Escape closes palette.
 
-### PAUDIT-8 — Dead IPC cleanup
+### PAUDIT-8 — Dead IPC cleanup ✅
 **Tool:** CLI
 Remove dead IPC bridges confirmed by the audit as having no renderer callers. Multi-file (main.js + preload.js). Run after PAUDIT-5 — do not run before archived threads UI exists.
 
@@ -408,7 +408,7 @@ Remove dead IPC bridges confirmed by the audit as having no renderer callers. Mu
 
 **DB columns:** leave all schema-forward columns in place (`category`, `canon_promoted_entry_id`, `external_url`, `canon_character_id`, `canon_episode_id`, `decided_at`). These are planned features; SQLite column drops require table recreation.
 
-- **Smoke:** `npm run dev` — clean launch, zero migration errors. Confirm Brainstorm, Characters, and Canon Bible all load normally after removals.
+- **Smoke passed 2026-06-08.**
 
 ---
 

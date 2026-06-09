@@ -133,12 +133,9 @@ function registerIpc() {
   ipcMain.handle('brainstorm:restore', (_event, id) => db.brainstorm.restore(id));
   // PBRAIN-STRUCT — thread management
   ipcMain.handle('brainstorm:threads.list', () => db.brainstormThreads.list());
-  ipcMain.handle('brainstorm:threads.listArchived', () => db.brainstormThreads.listArchived());
   ipcMain.handle('brainstorm:threads.create', (_event, title) => db.brainstormThreads.create(title));
   ipcMain.handle('brainstorm:threads.update', (_event, id, title) => db.brainstormThreads.update(id, title));
   ipcMain.handle('brainstorm:threads.archive', (_event, id) => db.brainstormThreads.archive(id));
-  ipcMain.handle('brainstorm:threads.restore', (_event, id) => db.brainstormThreads.restore(id));
-  ipcMain.handle('brainstorm:threads.delete', (_event, id) => db.brainstormThreads.delete(id));
   // PBRAIN-STRUCT — item metadata
   ipcMain.handle('brainstorm:setThread', (_event, id, threadId) => db.brainstorm.setThread(id, threadId));
   ipcMain.handle('brainstorm:setDevInto', (_event, id, kind, targetId) => db.brainstorm.setDevInto(id, kind, targetId));
@@ -171,9 +168,6 @@ function registerIpc() {
   );
   ipcMain.handle('characterRelationships:create', (_event, fromId, toId, relType, note) =>
     db.characterRelationships.create(fromId, toId, relType, note)
-  );
-  ipcMain.handle('characterRelationships:update', (_event, id, relType, note) =>
-    db.characterRelationships.update(id, relType, note)
   );
   ipcMain.handle('characterRelationships:delete', (_event, id) =>
     db.characterRelationships.delete(id)
@@ -281,7 +275,6 @@ function registerIpc() {
   // read view has something to show. P32+ replaces this with real proposals.
   ipcMain.handle('canon:list', () => db.canon.list());
   ipcMain.handle('canon:listRetired', () => db.canon.listRetired());
-  ipcMain.handle('canon:count', () => db.canon.count());
   ipcMain.handle('canon:devSeed', () => db.canon.devSeed());
 
   // P32 — direct canon CRUD. Until the Canon Review queue lands (P35) this is

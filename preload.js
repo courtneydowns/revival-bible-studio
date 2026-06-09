@@ -75,12 +75,9 @@ contextBridge.exposeInMainWorld('revival', {
     // PBRAIN-STRUCT — threads
     threads: {
       list: () => ipcRenderer.invoke('brainstorm:threads.list'),
-      listArchived: () => ipcRenderer.invoke('brainstorm:threads.listArchived'),
       create: (title) => ipcRenderer.invoke('brainstorm:threads.create', title),
       update: (id, title) => ipcRenderer.invoke('brainstorm:threads.update', id, title),
       archive: (id) => ipcRenderer.invoke('brainstorm:threads.archive', id),
-      restore: (id) => ipcRenderer.invoke('brainstorm:threads.restore', id),
-      delete: (id) => ipcRenderer.invoke('brainstorm:threads.delete', id),
     },
     // PBRAIN-STRUCT — item metadata
     setThread: (id, threadId) => ipcRenderer.invoke('brainstorm:setThread', id, threadId),
@@ -114,8 +111,6 @@ contextBridge.exposeInMainWorld('revival', {
       ipcRenderer.invoke('characterRelationships:listForChar', charId),
     create: (fromId, toId, relType, note) =>
       ipcRenderer.invoke('characterRelationships:create', fromId, toId, relType, note),
-    update: (id, relType, note) =>
-      ipcRenderer.invoke('characterRelationships:update', id, relType, note),
     delete: (id) => ipcRenderer.invoke('characterRelationships:delete', id),
   },
   episodes: {
@@ -233,7 +228,6 @@ contextBridge.exposeInMainWorld('revival', {
   canon: {
     list: () => ipcRenderer.invoke('canon:list'),
     listRetired: () => ipcRenderer.invoke('canon:listRetired'),
-    count: () => ipcRenderer.invoke('canon:count'),
     devSeed: () => ipcRenderer.invoke('canon:devSeed'),
     // P32 — direct create/edit/archive/delete on canon entries. typeConfig
     // returns the field schema for all 18 entry types so the renderer builds

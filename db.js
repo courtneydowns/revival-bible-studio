@@ -1646,6 +1646,10 @@ const MIGRATIONS = [
       `);
     },
   },
+  // NOTE: '046_session_logs' and '045_chat_entity_attachments' are intentionally
+  // out of numeric order here — 046 was committed before 045 during parallel
+  // feature development. Do NOT renumber; migration names are the identity key
+  // used by schema_migrations to detect applied-once status.
   {
     name: '046_session_logs',
     up(db) {
