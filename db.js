@@ -4586,6 +4586,89 @@ const canon = {
       .run(now, eid);
     return canon.getDetail(eid);
   },
+
+  // PCANON-AFFECTED — approved proposal that created this entry, if any.
+  // Lets renderCanonCard show a clickable "from Characters #X" attribution line
+  // even though canon.create() always writes origin_kind='manual'.
+  getSourceAttribution: (id) => {
+    const eid = Number(id);
+    if (!Number.isFinite(eid)) throw new Error('canon id required');
+    const row = getDb()
+      .prepare(
+        `SELECT source_kind, source_entry_id
+           FROM canon_proposals
+          WHERE target_entry_id = ?
+            AND source_kind IS NOT NULL
+            AND source_entry_id IS NOT NULL
+            AND status = 'approved'
+          ORDER BY reviewed_at DESC
+          LIMIT 1`
+      )
+      .get(eid);
+    return row || null;
+  },
+
+  // PCANON-AFFECTED — reverse lookup: workspace entries (Characters, Episodes,
+  // Decisions) that were linked to a given canon entry at time of retirement.
+  // Two sources: (1) the entry's own origin_kind/origin_entry_id provenance,
+  // (2) canon_proposals that targeted this entry with a source workspace entry.
+  getAffectedBy: (id) => {
+    const eid = Number(id);
+    if (!Number.isFinite(eid)) throw new Error('canon id is required');
+    const db = getDb();
+
+    // origin_kind values that map to the three target workspaces.
+    const ORIGIN_META = {
+      characters_workspace: { kind: 'characters', table: 'characters_workspace', workspace: 'Characters' },
+      episodes_workspace:   { kind: 'episodes',   table: 'episodes_workspace',   workspace: 'Episodes'   },
+      decisions:            { kind: 'decisions',   table: 'decisions',            workspace: 'Decisions'  },
+      decisions_workspace:  { kind: 'decisions',   table: 'decisions',            workspace: 'Decisions'  },
+    };
+
+    const seen = new Set();
+    const results = [];
+
+    function addEntry(kind, entryId, workspace, table) {
+      const key = `${kind}:${entryId}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const row = db.prepare(`SELECT title FROM ${table} WHERE id = ?`).get(entryId);
+      results.push({
+        kind,
+        id: entryId,
+        title: (row && row.title) || '(untitled)',
+        workspace,
+      });
+    }
+
+    // (1) Origin provenance — the single workspace entry this canon entry was
+    //     promoted from, if it's one of the three relevant workspaces.
+    const entry = db
+      .prepare('SELECT origin_kind, origin_entry_id FROM canon_entries WHERE id = ?')
+      .get(eid);
+    if (entry && entry.origin_kind && entry.origin_entry_id) {
+      const meta = ORIGIN_META[entry.origin_kind];
+      if (meta) addEntry(meta.kind, entry.origin_entry_id, meta.workspace, meta.table);
+    }
+
+    // (2) Canon proposals that targeted this entry and carried a source
+    //     workspace entry from one of the three relevant workspaces.
+    const proposals = db
+      .prepare(
+        `SELECT source_kind, source_entry_id
+           FROM canon_proposals
+          WHERE target_entry_id = ?
+            AND source_kind IS NOT NULL
+            AND source_entry_id IS NOT NULL`
+      )
+      .all(eid);
+    for (const p of proposals) {
+      const meta = ORIGIN_META[p.source_kind];
+      if (meta) addEntry(meta.kind, p.source_entry_id, meta.workspace, meta.table);
+    }
+
+    return results;
+  },
 };
 
 // PSEARCH — global search across workspaces, canon entries, chats, and tags.

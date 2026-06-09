@@ -310,6 +310,14 @@ function registerIpc() {
   ipcMain.handle('canon:versionChain', (_event, id) =>
     db.canon.versionChain(id)
   );
+  // PCANON-AFFECTED — source attribution (approved proposal's source workspace
+  // entry) for a canon entry, and reverse workspace lookup at retirement.
+  ipcMain.handle('canon:getSourceAttribution', (_event, id) =>
+    db.canon.getSourceAttribution(id)
+  );
+  ipcMain.handle('canon:getAffectedBy', (_event, id) =>
+    db.canon.getAffectedBy(id)
+  );
 
   // PCONFLICT-2 (auto-route) — scan + auto-route in one shot, deduping by
   // signature so the same collision never gets two Conflicts rows. The UI

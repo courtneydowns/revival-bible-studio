@@ -253,6 +253,9 @@ contextBridge.exposeInMainWorld('revival', {
     // in it. Each item is a full getDetail() record so the renderer can diff
     // versions field by field without a second round trip.
     versionChain: (id) => ipcRenderer.invoke('canon:versionChain', id),
+    // PCANON-AFFECTED — source attribution + affected-by reverse lookup.
+    getSourceAttribution: (id) => ipcRenderer.invoke('canon:getSourceAttribution', id),
+    getAffectedBy: (id) => ipcRenderer.invoke('canon:getAffectedBy', id),
     // PEXPORT — Canon Bible readable export. params = { filterBy, filterId }.
     // filterBy: 'all' | 'entry_type' | 'character' | 'season'.
     // filterId: entry_type string or canon_entries.id.

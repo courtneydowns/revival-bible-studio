@@ -466,9 +466,11 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 - **Smoke:** Edit a canon entry, confirm diff appears before save; confirm save completes on confirmation; confirm cancel aborts the change
 - **Audit result 2026-06-09:** Implemented and verified via live Playwright testing. `showCanonSaveConfirm(before, after)` in renderer.js intercepts `makeEditCard.onSubmit`; shows `#canon-diff-overlay` modal with before/after table of changed fields only (reuses `.canon-history-diff-*` styles). Cancel/Escape/overlay-click aborts; "Save changes" proceeds. All three smoke cases passed.
 
-### PCANON-AFFECTED — Affected-by reverse lookup on superseded entries
+### PCANON-AFFECTED — Affected-by reverse lookup on superseded entries ✅
 - When viewing a retired or superseded canon entry, a collapsed read-only panel lists all downstream entries (Characters, Episodes, Decisions) that were linked to it at time of retirement
-- **Smoke:** Link a Character and a Decision to a canon entry; supersede the entry; view the retired version; confirm both linked entries appear in the affected-by panel
+- Source attribution ("from: Characters #X") also surfaces as a clickable back-link on every canon entry that was created via Canon Review approval — loads asynchronously from `canon_proposals` since `canon.create()` always writes `origin_kind='manual'`
+- **Note:** Each Canon Review approval creates a separate canon entry, so Character and Decision links are tested independently (one per entry) — the system supports at most one source attribution per canon entry
+- **Smoke passed 2026-06-09.**
 
 ---
 

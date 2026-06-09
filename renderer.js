@@ -2493,6 +2493,63 @@ function buildCanonCard(
     }
   }
 
+  // PCANON-AFFECTED — collapsed read-only panel on retired entries listing
+  // all Characters/Episodes/Decisions that were linked at time of retirement.
+  if (e.retired) {
+    const affected = document.createElement('details');
+    affected.className = 'canon-affected';
+    const affSummary = document.createElement('summary');
+    affSummary.className = 'canon-affected-summary';
+    affSummary.textContent = 'Affected by';
+    affected.appendChild(affSummary);
+    const affBody = document.createElement('div');
+    affBody.className = 'canon-affected-body';
+    affBody.textContent = 'Loading…';
+    affected.appendChild(affBody);
+    let affLoaded = false;
+    affected.addEventListener('toggle', async () => {
+      if (!affected.open || affLoaded) return;
+      affLoaded = true;
+      try {
+        const items = await window.revival.canon.getAffectedBy(e.id);
+        affBody.innerHTML = '';
+        if (!items.length) {
+          const empty = document.createElement('span');
+          empty.className = 'canon-affected-empty';
+          empty.textContent = 'No linked entries recorded at time of retirement.';
+          affBody.appendChild(empty);
+        } else {
+          const byWs = {};
+          for (const item of items) {
+            if (!byWs[item.workspace]) byWs[item.workspace] = [];
+            byWs[item.workspace].push(item);
+          }
+          for (const [ws, entries] of Object.entries(byWs)) {
+            const group = document.createElement('div');
+            group.className = 'canon-affected-group';
+            const wsLabel = document.createElement('div');
+            wsLabel.className = 'canon-affected-ws-label';
+            wsLabel.textContent = ws;
+            group.appendChild(wsLabel);
+            for (const item of entries) {
+              const btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'canon-affected-link';
+              btn.textContent = item.title;
+              btn.title = `Go to ${ws} entry`;
+              btn.addEventListener('click', () => route(ws, item.id));
+              group.appendChild(btn);
+            }
+            affBody.appendChild(group);
+          }
+        }
+      } catch (_err) {
+        affBody.textContent = 'Could not load affected entries.';
+      }
+    });
+    card.appendChild(affected);
+  }
+
   if (e.body) {
     const body = document.createElement('div');
     body.className = 'entry-body';
@@ -2560,6 +2617,47 @@ function buildCanonCard(
     prov.className = 'canon-prov';
     prov.textContent = provBits.join(' · ');
     card.appendChild(prov);
+  }
+
+  // PCANON-AFFECTED — async source attribution: if this entry was created by
+  // approving a Canon Review proposal from a workspace entry, render a
+  // clickable "from [workspace] #X" back-link. canon.create() always writes
+  // origin_kind='manual', so this info lives only in canon_proposals.
+  {
+    const CANON_SOURCE_KIND_TO_WS = {
+      characters_workspace: 'Characters', characters: 'Characters',
+      episodes_workspace: 'Episodes',     episodes: 'Episodes',
+      decisions_workspace: 'Decisions',   decisions: 'Decisions',
+      open_questions: 'Open Questions',   conflicts: 'Conflicts',
+      brainstorm_items: 'Brainstorm',     brainstorm: 'Brainstorm',
+      research_items: 'Research',         research: 'Research',
+      unsorted: 'Unsorted',               source_material: 'Source Material',
+      documents: 'Documents',             writing_lab: 'Writing Lab',
+    };
+    // Insert a placeholder; if the query returns nothing the element stays
+    // hidden and takes no space.
+    const attrEl = document.createElement('div');
+    attrEl.className = 'canon-prov';
+    attrEl.hidden = true;
+    card.appendChild(attrEl);
+    window.revival.canon.getSourceAttribution(e.id).then((attr) => {
+      if (!attr) return;
+      const ws = CANON_SOURCE_KIND_TO_WS[attr.source_kind];
+      const label = CANON_SOURCE_KIND_TO_WS[attr.source_kind] || attr.source_kind.replace(/_/g, ' ');
+      attrEl.textContent = 'from: ';
+      if (ws) {
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.className = 'cr-source-link';
+        link.textContent = `${label} #${attr.source_entry_id}`;
+        link.title = `Go to source ${ws} entry`;
+        link.addEventListener('click', () => route(ws, attr.source_entry_id));
+        attrEl.appendChild(link);
+      } else {
+        attrEl.textContent += `${label} #${attr.source_entry_id}`;
+      }
+      attrEl.hidden = false;
+    }).catch(() => {});
   }
 
   // Timestamps.
