@@ -1926,6 +1926,21 @@ const MIGRATIONS = [
       tx();
     },
   },
+  {
+    name: '059_presearch_cite',
+    up(db) {
+      // PRESEARCH-CITE — citation fields on research_items.
+      // citation_text: freeform attribution string (author, publication, date, etc.)
+      // citation_source_id: optional FK linking to a Source Material entry;
+      //   ON DELETE SET NULL so deleting the source doesn't cascade-remove the
+      //   research entry, just clears the link.
+      db.exec(`
+        ALTER TABLE research_items ADD COLUMN citation_text TEXT;
+        ALTER TABLE research_items ADD COLUMN citation_source_id INTEGER
+          REFERENCES source_material(id) ON DELETE SET NULL;
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -2115,6 +2130,19 @@ function makeEntryRepo(table) {
 }
 
 const sourceMaterial = makeEntryRepo('source_material');
+
+// PRESEARCH-CITE — list Research entries that cite a given Source Material entry.
+// Returns active (non-archived) research_items only, newest first.
+sourceMaterial.listResearchCitations = (sourceId) => {
+  return getDb()
+    .prepare(
+      `SELECT id, title, body, created_at, updated_at, citation_text
+         FROM research_items
+        WHERE citation_source_id = ? AND archived_at IS NULL
+        ORDER BY created_at DESC, id DESC`
+    )
+    .all(sourceId);
+};
 
 // PAUDIT-5 — update file_kind and file_path on a Source Material entry.
 sourceMaterial.setFileMeta = (id, { file_kind, file_path } = {}) => {
@@ -2391,6 +2419,7 @@ const research = makeEntryRepo('research_items');
 // PRESEARCH-USED — override list/listArchived to include `used` boolean (1/0):
 // a research entry is "used" when it appears as source_kind='research' in any
 // cross_workspace_attachments row (covering both manual links and routed entries).
+// PRESEARCH-CITE — also JOIN source_material to surface citation_source_title.
 research.list = () =>
   getDb()
     .prepare(
@@ -2398,8 +2427,10 @@ research.list = () =>
         CASE WHEN EXISTS (
           SELECT 1 FROM cross_workspace_attachments
           WHERE source_kind = 'research' AND source_id = ri.id
-        ) THEN 1 ELSE 0 END AS used
+        ) THEN 1 ELSE 0 END AS used,
+        sm.title AS citation_source_title
        FROM research_items ri
+       LEFT JOIN source_material sm ON sm.id = ri.citation_source_id
        WHERE ri.archived_at IS NULL
        ORDER BY ri.created_at DESC, ri.id DESC`
     )
@@ -2412,8 +2443,10 @@ research.listArchived = () =>
         CASE WHEN EXISTS (
           SELECT 1 FROM cross_workspace_attachments
           WHERE source_kind = 'research' AND source_id = ri.id
-        ) THEN 1 ELSE 0 END AS used
+        ) THEN 1 ELSE 0 END AS used,
+        sm.title AS citation_source_title
        FROM research_items ri
+       LEFT JOIN source_material sm ON sm.id = ri.citation_source_id
        WHERE ri.archived_at IS NOT NULL
        ORDER BY ri.archived_at DESC, ri.id DESC`
     )
@@ -2427,6 +2460,26 @@ research.setExternalUrl = (id, url) => {
   db.prepare(`UPDATE research_items SET external_url = ?, updated_at = ? WHERE id = ?`)
     .run(u, new Date().toISOString(), id);
   return db.prepare('SELECT * FROM research_items WHERE id = ?').get(id);
+};
+
+// PRESEARCH-CITE — set citation_text and/or citation_source_id on a Research entry.
+// Either field may be null to clear it. citation_source_id is validated against
+// source_material; an unknown id throws rather than silently storing a broken FK.
+research.setCitation = (id, { citation_text, citation_source_id } = {}) => {
+  const db = getDb();
+  if (!db.prepare('SELECT 1 FROM research_items WHERE id = ?').get(id)) throw new Error('Entry not found.');
+  const text = (citation_text || '').trim() || null;
+  const srcId = citation_source_id != null ? Number(citation_source_id) : null;
+  if (srcId !== null && !db.prepare('SELECT 1 FROM source_material WHERE id = ?').get(srcId)) {
+    throw new Error('Source Material entry not found.');
+  }
+  db.prepare(`UPDATE research_items SET citation_text = ?, citation_source_id = ?, updated_at = ? WHERE id = ?`)
+    .run(text, srcId, new Date().toISOString(), id);
+  return db.prepare(`
+    SELECT ri.*, sm.title AS citation_source_title
+    FROM research_items ri
+    LEFT JOIN source_material sm ON sm.id = ri.citation_source_id
+    WHERE ri.id = ?`).get(id);
 };
 
 // Backed by `characters_workspace` / `episodes_workspace` (renamed from

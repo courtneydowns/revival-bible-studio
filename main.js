@@ -85,6 +85,7 @@ function registerIpc() {
   ipcMain.handle('sourceMaterial:archive', (_event, id) => { const r = db.sourceMaterial.archive(id); recordEvent('Source Material', 'archived'); return r; });
   ipcMain.handle('sourceMaterial:restore', (_event, id) => db.sourceMaterial.restore(id));
   ipcMain.handle('sourceMaterial:setFileMeta', (_event, id, meta) => db.sourceMaterial.setFileMeta(id, meta));
+  ipcMain.handle('sourceMaterial:listResearchCitations', (_event, id) => db.sourceMaterial.listResearchCitations(id));
 
   ipcMain.handle('documents:list', () => db.documents.list());
   ipcMain.handle('documents:listArchived', () => db.documents.listArchived());
@@ -155,6 +156,7 @@ function registerIpc() {
   ipcMain.handle('research:archive', (_event, id) => { const r = db.research.archive(id); recordEvent('Research', 'archived'); return r; });
   ipcMain.handle('research:restore', (_event, id) => db.research.restore(id));
   ipcMain.handle('research:setExternalUrl', (_event, id, url) => db.research.setExternalUrl(id, url));
+  ipcMain.handle('research:setCitation', (_event, id, citation) => db.research.setCitation(id, citation));
 
   ipcMain.handle('characters:list', () => db.characters.list());
   ipcMain.handle('characters:listArchived', () => db.characters.listArchived());

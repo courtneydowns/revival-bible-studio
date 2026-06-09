@@ -13397,6 +13397,59 @@ const CONTENT_RENDERERS = {
 
       renderFileMeta();
       rightCol.appendChild(section);
+
+      // PRESEARCH-CITE — "Cited by Research" back-reference panel.
+      const citeBackSection = document.createElement('div');
+      citeBackSection.className = 'sm-cite-back-section';
+
+      async function renderCiteBackPanel() {
+        citeBackSection.innerHTML = '';
+        const head = document.createElement('div');
+        head.className = 'sm-cite-back-head';
+        head.textContent = 'Cited by Research';
+        citeBackSection.appendChild(head);
+
+        let entries;
+        try {
+          entries = await window.revival.sourceMaterial.listResearchCitations(item.id);
+        } catch {
+          const err = document.createElement('div');
+          err.className = 'sm-cite-back-empty';
+          err.textContent = 'Could not load citations.';
+          citeBackSection.appendChild(err);
+          return;
+        }
+
+        if (!entries || entries.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'sm-cite-back-empty';
+          empty.textContent = 'No Research entries cite this source yet.';
+          citeBackSection.appendChild(empty);
+          return;
+        }
+
+        const list = document.createElement('ul');
+        list.className = 'sm-cite-back-list';
+        for (const entry of entries) {
+          const li = document.createElement('li');
+          li.className = 'sm-cite-back-item';
+          const titleSpan = document.createElement('span');
+          titleSpan.className = 'sm-cite-back-title';
+          titleSpan.textContent = entry.title || '(untitled)';
+          li.appendChild(titleSpan);
+          if (entry.citation_text) {
+            const noteSpan = document.createElement('span');
+            noteSpan.className = 'sm-cite-back-note';
+            noteSpan.textContent = entry.citation_text;
+            li.appendChild(noteSpan);
+          }
+          list.appendChild(li);
+        }
+        citeBackSection.appendChild(list);
+      }
+
+      renderCiteBackPanel();
+      rightCol.appendChild(citeBackSection);
     },
   }),
   'Documents': makeEntryWorkspace({
@@ -14549,10 +14602,13 @@ const CONTENT_RENDERERS = {
   // tailored labels) so it never reads like Brainstorm's open ideation.
   // PAUDIT-6: wrapped in IIFE to hold reloadRef for external_url inline edit.
   // PRESEARCH-USED: also holds usedFilter state for linked/unused filter bar.
+  // PRESEARCH-CITE: holds citeFilter state and citation section logic.
   'Research': (() => {
     const reloadRef = { fn: null };
     // null = show all; 'linked' = only used; 'unused' = only unused.
     let usedFilter = null;
+    // null = show all; 'cited' = only cited; 'uncited' = only uncited.
+    let citeFilter = null;
 
     return makeEntryWorkspace({
       apiName: 'research',
@@ -14564,13 +14620,21 @@ const CONTENT_RENDERERS = {
       bodyPlaceholder: 'Findings, and where they came from — source/link (optional)',
 
       matchesExtra(item) {
-        if (usedFilter === null) return true;
-        const isUsed = !!item.used;
-        return usedFilter === 'linked' ? isUsed : !isUsed;
+        if (usedFilter !== null) {
+          const isUsed = !!item.used;
+          if (usedFilter === 'linked' && !isUsed) return false;
+          if (usedFilter === 'unused' && isUsed) return false;
+        }
+        if (citeFilter !== null) {
+          const isCited = !!(item.citation_text || item.citation_source_id);
+          if (citeFilter === 'cited' && !isCited) return false;
+          if (citeFilter === 'uncited' && isCited) return false;
+        }
+        return true;
       },
 
       isFilterActive() {
-        return usedFilter !== null;
+        return usedFilter !== null || citeFilter !== null;
       },
 
       leftColExtra(leftCol, rightCol, ctx) {
@@ -14581,38 +14645,60 @@ const CONTENT_RENDERERS = {
 
         function renderFilterBar() {
           filterBar.innerHTML = '';
+
+          // Row 1: usage filter (All / Linked / Unused)
+          const usageRow = document.createElement('div');
+          usageRow.className = 'research-filter-row';
+
           const allBtn = document.createElement('button');
           allBtn.type = 'button';
           allBtn.className = 'research-used-filter-btn' + (usedFilter === null ? ' active' : '');
           allBtn.textContent = 'All';
-          allBtn.addEventListener('click', () => {
-            usedFilter = null;
-            renderFilterBar();
-            ctx.reloadList();
-          });
-          filterBar.appendChild(allBtn);
+          allBtn.addEventListener('click', () => { usedFilter = null; renderFilterBar(); ctx.reloadList(); });
+          usageRow.appendChild(allBtn);
 
           const linkedBtn = document.createElement('button');
           linkedBtn.type = 'button';
           linkedBtn.className = 'research-used-filter-btn research-used-filter-btn-linked' + (usedFilter === 'linked' ? ' active' : '');
           linkedBtn.textContent = 'Linked';
-          linkedBtn.addEventListener('click', () => {
-            usedFilter = 'linked';
-            renderFilterBar();
-            ctx.reloadList();
-          });
-          filterBar.appendChild(linkedBtn);
+          linkedBtn.addEventListener('click', () => { usedFilter = 'linked'; renderFilterBar(); ctx.reloadList(); });
+          usageRow.appendChild(linkedBtn);
 
           const unusedBtn = document.createElement('button');
           unusedBtn.type = 'button';
           unusedBtn.className = 'research-used-filter-btn research-used-filter-btn-unused' + (usedFilter === 'unused' ? ' active' : '');
           unusedBtn.textContent = 'Unused';
-          unusedBtn.addEventListener('click', () => {
-            usedFilter = 'unused';
-            renderFilterBar();
-            ctx.reloadList();
-          });
-          filterBar.appendChild(unusedBtn);
+          unusedBtn.addEventListener('click', () => { usedFilter = 'unused'; renderFilterBar(); ctx.reloadList(); });
+          usageRow.appendChild(unusedBtn);
+
+          filterBar.appendChild(usageRow);
+
+          // Row 2: citation filter (All / Cited / Uncited)
+          const citeRow = document.createElement('div');
+          citeRow.className = 'research-filter-row';
+
+          const citeAllBtn = document.createElement('button');
+          citeAllBtn.type = 'button';
+          citeAllBtn.className = 'research-used-filter-btn' + (citeFilter === null ? ' active' : '');
+          citeAllBtn.textContent = 'All';
+          citeAllBtn.addEventListener('click', () => { citeFilter = null; renderFilterBar(); ctx.reloadList(); });
+          citeRow.appendChild(citeAllBtn);
+
+          const citedBtn = document.createElement('button');
+          citedBtn.type = 'button';
+          citedBtn.className = 'research-used-filter-btn research-cite-filter-btn-cited' + (citeFilter === 'cited' ? ' active' : '');
+          citedBtn.textContent = 'Cited';
+          citedBtn.addEventListener('click', () => { citeFilter = 'cited'; renderFilterBar(); ctx.reloadList(); });
+          citeRow.appendChild(citedBtn);
+
+          const uncitedBtn = document.createElement('button');
+          uncitedBtn.type = 'button';
+          uncitedBtn.className = 'research-used-filter-btn research-cite-filter-btn-uncited' + (citeFilter === 'uncited' ? ' active' : '');
+          uncitedBtn.textContent = 'Uncited';
+          uncitedBtn.addEventListener('click', () => { citeFilter = 'uncited'; renderFilterBar(); ctx.reloadList(); });
+          citeRow.appendChild(uncitedBtn);
+
+          filterBar.appendChild(citeRow);
         }
 
         renderFilterBar();
@@ -14631,14 +14717,26 @@ const CONTENT_RENDERERS = {
           titleRow.insertBefore(badge, titleRow.lastChild);
         }
         // PAUDIT-6: external URL preview line.
-        if (!item.external_url) return;
-        const urlLine = document.createElement('div');
-        urlLine.className = 'tc-list-preview research-url-preview';
-        const display = item.external_url.length > 60
-          ? `${item.external_url.slice(0, 60)}…`
-          : item.external_url;
-        urlLine.textContent = display;
-        btn.appendChild(urlLine);
+        if (item.external_url) {
+          const urlLine = document.createElement('div');
+          urlLine.className = 'tc-list-preview research-url-preview';
+          const display = item.external_url.length > 60
+            ? `${item.external_url.slice(0, 60)}…`
+            : item.external_url;
+          urlLine.textContent = display;
+          btn.appendChild(urlLine);
+        }
+        // PRESEARCH-CITE: citation preview line.
+        const citeLabel = item.citation_source_title
+          ? item.citation_source_title
+          : item.citation_text || null;
+        if (citeLabel) {
+          const citeLine = document.createElement('div');
+          citeLine.className = 'tc-list-preview research-cite-preview';
+          const display = citeLabel.length > 60 ? `${citeLabel.slice(0, 60)}…` : citeLabel;
+          citeLine.textContent = `Source: ${display}`;
+          btn.appendChild(citeLine);
+        }
       },
 
       detailExtra(rightCol, item, archivedFlag) {
@@ -14714,6 +14812,164 @@ const CONTENT_RENDERERS = {
         } else {
           rightCol.appendChild(urlSection);
         }
+
+        // PRESEARCH-CITE — citation section (freeform text + source material picker).
+        const citeSection = document.createElement('div');
+        citeSection.className = 'research-cite-section';
+
+        function renderCiteUI() {
+          citeSection.innerHTML = '';
+          const head = document.createElement('div');
+          head.className = 'research-cite-head';
+          head.textContent = 'Citation';
+          citeSection.appendChild(head);
+
+          // Linked source material row.
+          const srcRow = document.createElement('div');
+          srcRow.className = 'research-cite-row';
+          const srcLabel = document.createElement('span');
+          srcLabel.className = 'research-cite-label';
+          srcLabel.textContent = 'Source:';
+          srcRow.appendChild(srcLabel);
+
+          if (item.citation_source_id && item.citation_source_title) {
+            const srcLink = document.createElement('span');
+            srcLink.className = 'research-cite-source-linked';
+            srcLink.textContent = item.citation_source_title;
+            srcRow.appendChild(srcLink);
+            if (!archivedFlag) {
+              const clearBtn = document.createElement('button');
+              clearBtn.type = 'button';
+              clearBtn.className = 'btn-secondary research-url-btn';
+              clearBtn.textContent = 'Clear';
+              clearBtn.addEventListener('click', async () => {
+                try {
+                  const updated = await window.revival.research.setCitation(item.id, {
+                    citation_text: item.citation_text,
+                    citation_source_id: null,
+                  });
+                  Object.assign(item, updated);
+                  if (reloadRef.fn) await reloadRef.fn();
+                  renderCiteUI();
+                } catch { /* non-fatal */ }
+              });
+              srcRow.appendChild(clearBtn);
+            }
+          } else {
+            const srcVal = document.createElement('span');
+            srcVal.className = 'research-cite-source-empty';
+            srcVal.textContent = '—';
+            srcRow.appendChild(srcVal);
+            if (!archivedFlag) {
+              const pickBtn = document.createElement('button');
+              pickBtn.type = 'button';
+              pickBtn.className = 'btn-secondary research-url-btn';
+              pickBtn.textContent = 'Link source…';
+              pickBtn.addEventListener('click', async () => {
+                // Inline source picker: load all active source material entries.
+                srcRow.innerHTML = '';
+                srcRow.appendChild(srcLabel);
+                let allSources;
+                try {
+                  allSources = await window.revival.sourceMaterial.list();
+                } catch { renderCiteUI(); return; }
+
+                if (!allSources || allSources.length === 0) {
+                  const none = document.createElement('span');
+                  none.className = 'research-cite-source-empty';
+                  none.textContent = 'No Source Material entries yet.';
+                  const cancelBtn2 = document.createElement('button');
+                  cancelBtn2.type = 'button';
+                  cancelBtn2.className = 'btn-secondary research-url-btn';
+                  cancelBtn2.textContent = 'Cancel';
+                  cancelBtn2.addEventListener('click', renderCiteUI);
+                  srcRow.append(none, cancelBtn2);
+                  return;
+                }
+
+                const sel = document.createElement('select');
+                sel.className = 'research-cite-source-select';
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = 'Select a Source Material entry…';
+                sel.appendChild(placeholder);
+                for (const s of allSources) {
+                  const opt = document.createElement('option');
+                  opt.value = s.id;
+                  opt.textContent = s.title || '(untitled)';
+                  sel.appendChild(opt);
+                }
+
+                const confirmBtn = document.createElement('button');
+                confirmBtn.type = 'button';
+                confirmBtn.className = 'btn-primary research-url-btn';
+                confirmBtn.textContent = 'Link';
+                confirmBtn.addEventListener('click', async () => {
+                  if (!sel.value) return;
+                  try {
+                    const updated = await window.revival.research.setCitation(item.id, {
+                      citation_text: item.citation_text,
+                      citation_source_id: Number(sel.value),
+                    });
+                    Object.assign(item, updated);
+                    if (reloadRef.fn) await reloadRef.fn();
+                    renderCiteUI();
+                  } catch { renderCiteUI(); }
+                });
+
+                const cancelBtn3 = document.createElement('button');
+                cancelBtn3.type = 'button';
+                cancelBtn3.className = 'btn-secondary research-url-btn';
+                cancelBtn3.textContent = 'Cancel';
+                cancelBtn3.addEventListener('click', renderCiteUI);
+
+                srcRow.append(sel, confirmBtn, cancelBtn3);
+              });
+              srcRow.appendChild(pickBtn);
+            }
+          }
+          citeSection.appendChild(srcRow);
+
+          // Freeform citation text row.
+          const textRow = document.createElement('div');
+          textRow.className = 'research-cite-row';
+          const textLabel = document.createElement('span');
+          textLabel.className = 'research-cite-label';
+          textLabel.textContent = 'Note:';
+          textRow.appendChild(textLabel);
+
+          if (archivedFlag) {
+            const val = document.createElement('span');
+            val.className = 'research-cite-text-value';
+            val.textContent = item.citation_text || '—';
+            textRow.appendChild(val);
+          } else {
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'research-cite-text-input';
+            inp.placeholder = 'Author, publication, date, etc. (optional)';
+            inp.value = item.citation_text || '';
+            let saveTimer = null;
+            inp.addEventListener('input', () => {
+              clearTimeout(saveTimer);
+              saveTimer = setTimeout(async () => {
+                try {
+                  const updated = await window.revival.research.setCitation(item.id, {
+                    citation_text: inp.value,
+                    citation_source_id: item.citation_source_id,
+                  });
+                  Object.assign(item, updated);
+                  if (reloadRef.fn) await reloadRef.fn();
+                } catch { /* non-fatal */ }
+              }, 600);
+            });
+            textRow.appendChild(inp);
+          }
+          citeSection.appendChild(textRow);
+        }
+
+        renderCiteUI();
+        urlSection.after(citeSection);
       },
     });
   })(),

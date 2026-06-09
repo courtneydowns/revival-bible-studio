@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('revival', {
     archive: (id) => ipcRenderer.invoke('sourceMaterial:archive', id),
     restore: (id) => ipcRenderer.invoke('sourceMaterial:restore', id),
     setFileMeta: (id, meta) => ipcRenderer.invoke('sourceMaterial:setFileMeta', id, meta),
+    listResearchCitations: (id) => ipcRenderer.invoke('sourceMaterial:listResearchCitations', id),
   },
   documents: {
     list: () => ipcRenderer.invoke('documents:list'),
@@ -99,6 +100,7 @@ contextBridge.exposeInMainWorld('revival', {
     archive: (id) => ipcRenderer.invoke('research:archive', id),
     restore: (id) => ipcRenderer.invoke('research:restore', id),
     setExternalUrl: (id, url) => ipcRenderer.invoke('research:setExternalUrl', id, url),
+    setCitation: (id, citation) => ipcRenderer.invoke('research:setCitation', id, citation),
   },
   characters: {
     list: () => ipcRenderer.invoke('characters:list'),

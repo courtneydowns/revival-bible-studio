@@ -4923,11 +4923,16 @@
       .badge-research-unused { color: #888; border-color: #888; }
       .research-used-filter-bar {
         display: flex;
+        flex-direction: column;
         gap: 4px;
-        flex-wrap: wrap;
         padding: 6px 0 4px;
         border-bottom: 1px solid var(--border);
         margin-bottom: 6px;
+      }
+      .research-filter-row {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
       }
       .research-used-filter-btn {
         font-size: 11px;
@@ -4942,6 +4947,28 @@
       .research-used-filter-btn.active { font-weight: 600; color: var(--text); border-color: var(--muted); }
       .research-used-filter-btn-linked.active { color: #4a9b6f; border-color: #4a9b6f; }
       .research-used-filter-btn-unused.active { color: #888; border-color: #888; }
+      .research-cite-filter-btn-cited.active { color: #5a8fd6; border-color: #5a8fd6; }
+      .research-cite-filter-btn-uncited.active { color: #c09a2a; border-color: #c09a2a; }
+      /* PRESEARCH-CITE — citation preview line on list items */
+      .research-cite-preview { font-size: 0.78em; color: #5a8fd6; margin-top: 2px; font-style: italic; }
+      /* PRESEARCH-CITE — citation detail section */
+      .research-cite-section { margin: 10px 0; padding: 8px 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 0.82em; }
+      .research-cite-head { font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.9em; }
+      .research-cite-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+      .research-cite-label { color: var(--muted); min-width: 44px; }
+      .research-cite-source-linked { color: #5a8fd6; font-weight: 500; }
+      .research-cite-source-empty { color: var(--muted); }
+      .research-cite-source-select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-size: 0.9em; flex: 1; min-width: 140px; }
+      .research-cite-text-input { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-size: 0.9em; flex: 1; min-width: 140px; }
+      .research-cite-text-value { color: var(--text); }
+      /* PRESEARCH-CITE — Source Material "cited by research" back-reference panel */
+      .sm-cite-back-section { margin: 10px 0; padding: 8px 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 0.82em; }
+      .sm-cite-back-head { font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.9em; }
+      .sm-cite-back-empty { color: var(--muted); font-style: italic; }
+      .sm-cite-back-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+      .sm-cite-back-item { display: flex; flex-direction: column; gap: 2px; padding: 4px 6px; border-left: 2px solid #5a8fd6; }
+      .sm-cite-back-title { color: var(--text); font-weight: 500; }
+      .sm-cite-back-note { color: var(--muted); font-size: 0.9em; font-style: italic; }
 
       /* PAUDIT-5 — Source Material file meta section */
       .sm-file-meta-section { margin: 10px 0; padding: 8px 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 0.82em; }
