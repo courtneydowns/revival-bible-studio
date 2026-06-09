@@ -5832,8 +5832,8 @@ function buildNeedsAttentionPanel(container) {
     head.appendChild(refreshBtn);
     wrap.appendChild(head);
 
-    const { tier1Questions, stalledConflicts, pendingProposals, blockingQuestions = [], outlineEpisodes = [] } = data;
-    const total = tier1Questions.length + stalledConflicts.length + pendingProposals.length + blockingQuestions.length + outlineEpisodes.length;
+    const { tier1Questions, stalledConflicts, pendingProposals, blockingQuestions = [], outlineEpisodes = [], blockingConflicts = [] } = data;
+    const total = tier1Questions.length + stalledConflicts.length + pendingProposals.length + blockingQuestions.length + outlineEpisodes.length + blockingConflicts.length;
 
     if (total === 0) {
       const empty = document.createElement('p');
@@ -5956,6 +5956,41 @@ function buildNeedsAttentionPanel(container) {
         const subEl = document.createElement('div');
         subEl.className = 'na-item-age';
         subEl.textContent = 'Status: Outline';
+        btn.append(titleEl, subEl);
+        grid.appendChild(btn);
+      }
+      cat.appendChild(grid);
+      wrap.appendChild(cat);
+    }
+
+    // PCONFLICT-SEV: Blocking conflicts always surface regardless of staleness.
+    if (blockingConflicts.length > 0) {
+      const cat = document.createElement('div');
+      cat.className = 'na-category';
+      const catHead = document.createElement('div');
+      catHead.className = 'na-category-head';
+      const catLabel = document.createElement('span');
+      catLabel.className = 'na-category-label';
+      catLabel.textContent = 'Blocking conflicts';
+      const badge = document.createElement('span');
+      badge.className = 'na-count-badge';
+      badge.textContent = String(blockingConflicts.length);
+      catHead.append(catLabel, badge);
+      cat.appendChild(catHead);
+      const grid = document.createElement('div');
+      grid.className = 'na-items';
+      for (const item of blockingConflicts) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'na-item';
+        btn.title = 'Go to Conflicts';
+        btn.addEventListener('click', () => route('Conflicts'));
+        const titleEl = document.createElement('div');
+        titleEl.className = 'na-item-title';
+        titleEl.textContent = item.title || '(untitled)';
+        const subEl = document.createElement('div');
+        subEl.className = 'na-item-age';
+        subEl.textContent = 'Severity: Blocking';
         btn.append(titleEl, subEl);
         grid.appendChild(btn);
       }
@@ -10971,26 +11006,151 @@ const CONTENT_RENDERERS = {
       },
     });
   })(),
-  // Conflicts: lightweight filter (Editorial Filter + North Star only).
-  'Conflicts': makeEntryWorkspace({
-    apiName: 'conflicts',
-    entityKind: 'conflicts',
-    draftPrefix: 'conflicts',
-    addLabel: 'Log Conflict',
-    sectionClass: 'ws-conflicts',
-    titlePlaceholder: 'What contradicts what?',
-    bodyPlaceholder: 'The two sides in tension, and where each comes from (optional)',
-    detailExtra(rightCol, item, archivedFlag) {
-      const callbacks = {};
-      if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
-        entityKind: 'conflicts',
-        workspaceName: 'Conflicts',
-        lightweight: true,
+  // Conflicts: PCONFLICT-SEV — severity filter/badge/selector wrapped in IIFE
+  // so severityFilter state is shared across list filter and detail panel.
+  'Conflicts': (() => {
+    const CONFLICT_SEV_OPTIONS = [
+      { value: 'minor',       label: 'Minor' },
+      { value: 'significant', label: 'Significant' },
+      { value: 'blocking',    label: 'Blocking' },
+    ];
+    const CONFLICT_SEV_LABEL = Object.fromEntries(
+      CONFLICT_SEV_OPTIONS.map((o) => [o.value, o.label])
+    );
+
+    // null = show all; a severity string = filter to that severity.
+    let severityFilter = null;
+    const reloadRef = { fn: null };
+
+    function mountConflictSevMeta(container, item, reload) {
+      const section = document.createElement('div');
+      section.className = 'conflict-sev-section';
+
+      const label = document.createElement('span');
+      label.className = 'conflict-sev-label';
+      label.textContent = 'Severity:';
+      section.appendChild(label);
+
+      const btnGroup = document.createElement('div');
+      btnGroup.className = 'conflict-sev-selector';
+
+      const noneBtn = document.createElement('button');
+      noneBtn.type = 'button';
+      noneBtn.className = 'conflict-sev-btn';
+      if (!item.severity) noneBtn.classList.add('active');
+      noneBtn.textContent = 'Unset';
+      noneBtn.addEventListener('click', async () => {
+        if (!item.severity) return;
+        try {
+          await window.revival.conflicts.setSeverity(item.id, null);
+          await reload();
+        } catch { /* non-fatal */ }
       });
-      const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'conflicts');
-      callbacks.refreshHistory = refresh;
-    },
-  }),
+      btnGroup.appendChild(noneBtn);
+
+      for (const opt of CONFLICT_SEV_OPTIONS) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `conflict-sev-btn conflict-sev-btn-${opt.value}`;
+        if (item.severity === opt.value) btn.classList.add('active');
+        btn.textContent = opt.label;
+        btn.addEventListener('click', async () => {
+          if (item.severity === opt.value) return;
+          try {
+            await window.revival.conflicts.setSeverity(item.id, opt.value);
+            await reload();
+          } catch { /* non-fatal */ }
+        });
+        btnGroup.appendChild(btn);
+      }
+
+      section.appendChild(btnGroup);
+      container.appendChild(section);
+    }
+
+    return makeEntryWorkspace({
+      apiName: 'conflicts',
+      entityKind: 'conflicts',
+      draftPrefix: 'conflicts',
+      addLabel: 'Log Conflict',
+      sectionClass: 'ws-conflicts',
+      titlePlaceholder: 'What contradicts what?',
+      bodyPlaceholder: 'The two sides in tension, and where each comes from (optional)',
+
+      matchesExtra(item) {
+        return severityFilter === null || item.severity === severityFilter;
+      },
+
+      isFilterActive() {
+        return severityFilter !== null;
+      },
+
+      listItemExtra(btn, item, archivedFlag) {
+        if (archivedFlag || !item.severity) return;
+        const titleRow = btn.querySelector('.tc-list-title');
+        if (!titleRow) return;
+        const badge = document.createElement('span');
+        badge.className = `tc-list-badge badge-conflict-sev-${item.severity}`;
+        badge.textContent = CONFLICT_SEV_LABEL[item.severity] || item.severity;
+        titleRow.insertBefore(badge, titleRow.lastChild);
+      },
+
+      showViewTop(rightCol, item, archivedFlag) {
+        if (!archivedFlag) {
+          mountConflictSevMeta(rightCol, item, async () => {
+            if (reloadRef.fn) await reloadRef.fn();
+          });
+        }
+      },
+
+      detailExtra(rightCol, item, archivedFlag) {
+        const callbacks = {};
+        if (!archivedFlag) mountFlanaganFilter(rightCol, item, callbacks, {
+          entityKind: 'conflicts',
+          workspaceName: 'Conflicts',
+          lightweight: true,
+        });
+        const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'conflicts');
+        callbacks.refreshHistory = refresh;
+      },
+
+      leftColExtra(leftCol, rightCol, ctx) {
+        reloadRef.fn = ctx.reloadList;
+
+        const filterBar = document.createElement('div');
+        filterBar.className = 'conflict-sev-filter-bar';
+
+        function renderFilterBar() {
+          filterBar.innerHTML = '';
+          const allBtn = document.createElement('button');
+          allBtn.type = 'button';
+          allBtn.className = 'conflict-sev-filter-btn' + (severityFilter === null ? ' active' : '');
+          allBtn.textContent = 'All';
+          allBtn.addEventListener('click', () => {
+            severityFilter = null;
+            renderFilterBar();
+            ctx.reloadList();
+          });
+          filterBar.appendChild(allBtn);
+
+          for (const opt of CONFLICT_SEV_OPTIONS) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `conflict-sev-filter-btn conflict-sev-filter-btn-${opt.value}` + (severityFilter === opt.value ? ' active' : '');
+            btn.textContent = opt.label;
+            btn.addEventListener('click', () => {
+              severityFilter = opt.value;
+              renderFilterBar();
+              ctx.reloadList();
+            });
+            filterBar.appendChild(btn);
+          }
+        }
+        renderFilterBar();
+        leftCol.insertBefore(filterBar, ctx.addBtn);
+      },
+    });
+  })(),
   // Decisions (PDECISION-STATUS): lightweight filter + Open/Tentative/Final status badges.
   // Wrapped in an IIFE so statusFilter state is shared across list filter and detail
   // panel hooks without leaking into the outer scope (same pattern as Characters/Episodes).

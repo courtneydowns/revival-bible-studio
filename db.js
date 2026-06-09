@@ -1796,6 +1796,17 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '054_pconflict_sev',
+    up(db) {
+      // PCONFLICT-SEV — Minor/Significant/Blocking severity on conflict entries.
+      // User-set; null = unset. Blocking conflicts surface in Needs Attention
+      // regardless of staleness threshold.
+      db.exec(`
+        ALTER TABLE conflicts ADD COLUMN severity TEXT CHECK(severity IN ('minor','significant','blocking'));
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -2049,6 +2060,17 @@ openQuestions.setBlocking = (id, { is_blocking = false, blocking_target = null, 
 };
 
 const conflicts = makeEntryRepo('conflicts');
+
+// PCONFLICT-SEV — set severity on a conflict entry.
+conflicts.setSeverity = function(id, severity) {
+  const VALID = new Set(['minor', 'significant', 'blocking']);
+  const val = VALID.has(severity) ? severity : null;
+  getDb()
+    .prepare('UPDATE conflicts SET severity = ?, updated_at = ? WHERE id = ?')
+    .run(val, new Date().toISOString(), id);
+  return conflicts.get(id);
+};
+
 const decisions = makeEntryRepo('decisions');
 
 // PDECISION-STATUS — set decision_status on a decision entry.
@@ -2985,11 +3007,20 @@ const dashboard = {
 
     const stalledConflicts = db
       .prepare(
-        `SELECT id, title, created_at FROM conflicts
+        `SELECT id, title, created_at, severity FROM conflicts
           WHERE archived_at IS NULL AND created_at < ?
           ORDER BY created_at ASC`
       )
       .all(cutoff(conflictDays));
+
+    // PCONFLICT-SEV: Blocking conflicts always surface regardless of staleness.
+    const blockingConflicts = db
+      .prepare(
+        `SELECT id, title, created_at, severity FROM conflicts
+          WHERE archived_at IS NULL AND severity = 'blocking'
+          ORDER BY created_at ASC`
+      )
+      .all();
 
     const pendingProposals = db
       .prepare(
@@ -3017,7 +3048,7 @@ const dashboard = {
       )
       .all();
 
-    return { tier1Questions, stalledConflicts, pendingProposals, blockingQuestions, outlineEpisodes };
+    return { tier1Questions, stalledConflicts, pendingProposals, blockingQuestions, outlineEpisodes, blockingConflicts };
   },
   // PHOME: the three nav badge counts. Unsorted = total active items; Canon
   // Review = proposals still awaiting a decision (pending); Open Questions =

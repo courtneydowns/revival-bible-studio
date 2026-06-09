@@ -476,12 +476,13 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ## Conflicts enhancements
 
-### PCONFLICT-SEV — Conflict severity badge
+### PCONFLICT-SEV — Conflict severity badge ✓
 - Add **Minor / Significant / Blocking** severity field to every Conflicts entry — user-set
 - Visible as a badge on list items and detail panel
 - Filterable in Conflicts list
 - Blocking conflicts surface in the Needs Attention panel
 - **Smoke:** Set severity on three conflicts; filter by Blocking, confirm results; set one to Blocking, confirm it appears in Needs Attention panel
+- **Done:** migration `054_pconflict_sev`, `conflicts.setSeverity`, severity selector on detail panel (`showViewTop`), severity filter bar in left column (`leftColExtra`), list item badge (`listItemExtra`), `blockingConflicts` in `needsAttention` + Needs Attention panel section.
 
 ---
 

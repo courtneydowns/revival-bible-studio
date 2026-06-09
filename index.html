@@ -4418,6 +4418,68 @@
       .decision-filter-btn-tentative.active { color: #4a90d9; border-color: #4a90d9; }
       .decision-filter-btn-final.active     { color: #4d9e6d; border-color: #4d9e6d; }
 
+      /* PCONFLICT-SEV — Conflict severity badges on list items */
+      .badge-conflict-sev-minor       { color: #888;    border-color: #888; }
+      .badge-conflict-sev-significant { color: #c9862a; border-color: #c9862a; }
+      .badge-conflict-sev-blocking    { color: #c0654a; border-color: rgba(192, 101, 74, 0.5); background: rgba(192, 101, 74, 0.08); }
+
+      /* PCONFLICT-SEV — Severity selector on detail panel */
+      .conflict-sev-section {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding: 10px 0 8px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 12px;
+        font-size: 13px;
+      }
+      .conflict-sev-label {
+        color: var(--muted);
+        font-size: 12px;
+        min-width: 56px;
+        flex-shrink: 0;
+      }
+      .conflict-sev-selector { display: flex; gap: 4px; flex-wrap: wrap; }
+      .conflict-sev-btn {
+        font-size: 11px;
+        padding: 3px 10px;
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        cursor: pointer;
+        color: var(--muted);
+      }
+      .conflict-sev-btn:hover { color: var(--text); border-color: var(--muted); }
+      .conflict-sev-btn.active { font-weight: 600; color: var(--text); border-color: var(--muted); }
+      .conflict-sev-btn-minor.active       { color: #888;    border-color: #888; }
+      .conflict-sev-btn-significant.active { color: #c9862a; border-color: #c9862a; }
+      .conflict-sev-btn-blocking.active    { color: #c0654a; border-color: #c0654a; }
+
+      /* PCONFLICT-SEV — Severity filter bar in left column */
+      .conflict-sev-filter-bar {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+        padding: 6px 0 4px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 6px;
+      }
+      .conflict-sev-filter-btn {
+        font-size: 11px;
+        padding: 2px 8px;
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        cursor: pointer;
+        color: var(--muted);
+      }
+      .conflict-sev-filter-btn:hover { color: var(--text); border-color: var(--muted); }
+      .conflict-sev-filter-btn.active { font-weight: 600; color: var(--text); border-color: var(--muted); }
+      .conflict-sev-filter-btn-minor.active       { color: #888;    border-color: #888; }
+      .conflict-sev-filter-btn-significant.active { color: #c9862a; border-color: #c9862a; }
+      .conflict-sev-filter-btn-blocking.active    { color: #c0654a; border-color: #c0654a; }
+
       /* PAUDIT-5 — Source Material file meta section */
       .sm-file-meta-section { margin: 10px 0; padding: 8px 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 0.82em; }
       .sm-file-meta-head { font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.9em; }

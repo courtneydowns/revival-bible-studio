@@ -53,6 +53,7 @@ contextBridge.exposeInMainWorld('revival', {
     delete: (id) => ipcRenderer.invoke('conflicts:delete', id),
     archive: (id) => ipcRenderer.invoke('conflicts:archive', id),
     restore: (id) => ipcRenderer.invoke('conflicts:restore', id),
+    setSeverity: (id, severity) => ipcRenderer.invoke('conflicts:setSeverity', id, severity),
   },
   decisions: {
     list: () => ipcRenderer.invoke('decisions:list'),

@@ -114,6 +114,7 @@ function registerIpc() {
   ipcMain.handle('conflicts:delete', (_event, id) => { const r = db.conflicts.delete(id); recordEvent('Conflicts', 'deleted'); return r; });
   ipcMain.handle('conflicts:archive', (_event, id) => { const r = db.conflicts.archive(id); recordEvent('Conflicts', 'archived'); return r; });
   ipcMain.handle('conflicts:restore', (_event, id) => db.conflicts.restore(id));
+  ipcMain.handle('conflicts:setSeverity', (_event, id, severity) => db.conflicts.setSeverity(id, severity));
 
   ipcMain.handle('decisions:list', () => db.decisions.list());
   ipcMain.handle('decisions:listArchived', () => db.decisions.listArchived());
