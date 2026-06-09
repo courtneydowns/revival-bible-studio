@@ -107,7 +107,7 @@
 | **PQUIET Quiet devastation tracker** | **CLI** | New tracker + dashboard view + seeded data |
 | **PLOCKED-SPECIFICS Locked specifics panel** | **VS Code ext** | Reference panel on existing workspace pages |
 | **PEPISODE-CONT AI episode continuity checker** | **CLI** | New AI module, cross-entry reads |
-| **PRESEARCH-CITE Research source citation** | **VS Code ext** | Source field on existing Research entry |
+| ~~**PRESEARCH-CITE Research source citation**~~ ✅ | **VS Code ext** | Source field on existing Research entry |
 | **PEMPTY-STATE Empty state + onboarding** | **VS Code ext** | Empty state copy + first-session guide |
 | **PHEALTH App health indicator** | **VS Code ext** | Read-only panel in Settings |
 | **PCONFIG-BACKUP Config backup/restore** | **VS Code ext** | Export/import config in Settings |

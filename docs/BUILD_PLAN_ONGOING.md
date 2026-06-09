@@ -714,13 +714,14 @@ Extends the existing episode continuity checker. Do not remove or alter existing
 
 ## Research citation
 
-### PRESEARCH-CITE — Research source citation
+### PRESEARCH-CITE — Research source citation ✅
 - Source field on Research entries: freeform text OR link to a Source Material entry (picker)
 - If linked to Source Material: bi-directional visibility
 - Citation visible on list item preview line
 - Filterable: filter Research by cited vs. uncited
 - Exportable: Research export includes citation
 - **Smoke:** Add a freeform citation to a Research entry, confirm visible in list; link to a Source Material entry, confirm bi-directional visibility; filter by cited, confirm only cited entries show
+- Smoke passed.
 
 ---
 
