@@ -3793,6 +3793,113 @@ function renderCanonBiblePage(section) {
     actionsRow.replaceWith(confirmRow);
   }
 
+  // PCANON-DIFF — show a before/after diff of the changed fields and require
+  // the user to confirm before the update is persisted. Only rows whose value
+  // actually changed are shown; "no changes" is surfaced as a note instead of
+  // an empty table so the user always knows why the modal appeared.
+  function showCanonSaveConfirm(before, after) {
+    return new Promise((resolve) => {
+      const overlay  = document.getElementById('canon-diff-overlay');
+      const titleEl  = document.getElementById('canon-diff-title');
+      const body     = document.getElementById('canon-diff-body');
+      const cancelBtn  = document.getElementById('canon-diff-cancel');
+      const confirmBtn = document.getElementById('canon-diff-confirm');
+
+      titleEl.textContent = `Confirm edits — "${before.title}"`;
+      body.innerHTML = '';
+
+      const rows = [
+        { label: 'Title',        get: (v) => v.title },
+        { label: 'Body',         get: (v) => v.body },
+        { label: 'Status',       get: (v) => v.canon_status },
+        { label: 'Certainty',    get: (v) => v.certainty },
+        { label: 'Confidence',   get: (v) => v.confidence },
+        { label: 'Review state', get: (v) => v.review_state },
+        { label: 'Provisional',  get: (v) => v.provisional ? 'yes' : 'no' },
+      ];
+      const cfg = typeConfig[before.entry_type];
+      if (cfg && Array.isArray(cfg.fields)) {
+        for (const f of cfg.fields) {
+          rows.push({
+            label: f.label || f.col,
+            get: (v) => (v.detail && v.detail[f.col] != null ? String(v.detail[f.col]) : ''),
+          });
+        }
+      }
+
+      function fmt(val) {
+        if (val == null) return '—';
+        const s = String(val);
+        return s === '' ? '—' : s;
+      }
+
+      const changed = rows.filter((r) => {
+        const bv = r.get(before);
+        const av = r.get(after);
+        return fmt(bv) !== fmt(av);
+      });
+
+      if (changed.length === 0) {
+        const msg = document.createElement('div');
+        msg.className = 'canon-diff-no-changes';
+        msg.textContent = 'No changes detected.';
+        body.appendChild(msg);
+      } else {
+        const table = document.createElement('table');
+        table.className = 'canon-history-diff-table';
+        const thead = table.createTHead();
+        const hr = thead.insertRow();
+        for (const t of ['Field', 'Before', 'After']) {
+          const th = document.createElement('th');
+          th.textContent = t;
+          hr.appendChild(th);
+        }
+        const tbody = table.createTBody();
+        for (const r of changed) {
+          const bv = r.get(before);
+          const av = r.get(after);
+          const tr = tbody.insertRow();
+          tr.classList.add('canon-history-diff-changed');
+          const lc = tr.insertCell();
+          lc.className = 'canon-history-diff-label';
+          lc.textContent = r.label;
+          const mark = document.createElement('span');
+          mark.className = 'canon-history-diff-mark';
+          mark.textContent = ' ⚠';
+          lc.appendChild(mark);
+          const bc = tr.insertCell();
+          bc.className = 'canon-history-diff-val';
+          bc.textContent = fmt(bv);
+          const ac = tr.insertCell();
+          ac.className = 'canon-history-diff-val';
+          ac.textContent = fmt(av);
+        }
+        body.appendChild(table);
+      }
+
+      function cleanup(result) {
+        overlay.hidden = true;
+        cancelBtn.removeEventListener('click', onCancel);
+        confirmBtn.removeEventListener('click', onConfirm);
+        overlay.removeEventListener('click', onOverlayClick);
+        document.removeEventListener('keydown', onKeyDown);
+        resolve(result);
+      }
+
+      function onCancel() { cleanup(false); }
+      function onConfirm() { cleanup(true); }
+      function onOverlayClick(ev) { if (ev.target === overlay) cleanup(false); }
+      function onKeyDown(ev) { if (ev.key === 'Escape') cleanup(false); }
+
+      cancelBtn.addEventListener('click', onCancel);
+      confirmBtn.addEventListener('click', onConfirm);
+      overlay.addEventListener('click', onOverlayClick);
+      document.addEventListener('keydown', onKeyDown);
+      overlay.hidden = false;
+      confirmBtn.focus();
+    });
+  }
+
   function makeEditCard(e) {
     const wrap = document.createElement('div');
     wrap.className = 'entry-card canon-card canon-edit-card';
@@ -3813,6 +3920,8 @@ function renderCanonBiblePage(section) {
       entry: e,
       draftSlot: `edit:${e.id}`,
       onSubmit: async (payload) => {
+        const confirmed = await showCanonSaveConfirm(e, payload);
+        if (!confirmed) return;
         await window.revival.canon.update(e.id, {
           title: payload.title,
           body: payload.body,

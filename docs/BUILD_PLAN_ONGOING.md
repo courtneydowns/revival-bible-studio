@@ -424,7 +424,7 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 - After fixing, log any cancel buttons that were wired to wrong handlers or missing handlers entirely in a comment block at the top of each file touched.
 - **Smoke:** Open and cancel the entry create form in: Unsorted, Characters, Episodes, Open Questions, Canon Bible (Edit Mode), Writing Lab. Open and cancel the archive confirmation on one entry. Open and cancel the delete confirmation on one entry. Open and cancel the Canon Review approve dialog. Open and cancel the quick-capture modal (Cmd+Shift+N). Confirm no partial data written in any case. Confirm no stale state lingers after cancel (reopening the same form shows blank/original state).
 
-- **Audit result 2026-06-08:** All cancel/close/dismiss handlers verified correct via live Playwright testing. Scope covered: Unsorted/Characters/Episodes/Open Questions/Canon Bible/Writing Lab create cancel ✓; edit cancel ✓; delete confirm cancel ✓; Canon Review approve/reject/send-back/defer confirm cancel ✓; Canon lock form cancel ✓; quick-capture modal cancel ✓; tag picker close ✓; route picker dismiss ✓; Writing Lab delete confirm cancel ✓. No wrong handlers, no missing handlers, no partial writes, no stale state on reopen. Note: Archive in regular workspaces has no confirmation dialog (immediate with undo) — no cancel button exists or is needed. Note: diff-on-save modal and Writing Lab explicit create-cancel are not yet built (future features PCANON-DIFF). No files required changes.
+- **Audit result 2026-06-08:** All cancel/close/dismiss handlers verified correct via live Playwright testing. Scope covered: Unsorted/Characters/Episodes/Open Questions/Canon Bible/Writing Lab create cancel ✓; edit cancel ✓; delete confirm cancel ✓; Canon Review approve/reject/send-back/defer confirm cancel ✓; Canon lock form cancel ✓; quick-capture modal cancel ✓; tag picker close ✓; route picker dismiss ✓; Writing Lab delete confirm cancel ✓. No wrong handlers, no missing handlers, no partial writes, no stale state on reopen. Note: Archive in regular workspaces has no confirmation dialog (immediate with undo) — no cancel button exists or is needed. Note: diff-on-save modal built as PCANON-DIFF (done 2026-06-09). Writing Lab explicit create-cancel not yet built (future feature). No files required changes.
 
 - **Smoke passed 2026-06-08.**
 
@@ -460,10 +460,11 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 - Filterable in Canon Bible browse
 - **Smoke passed 2026-06-09.**
 
-### PCANON-DIFF — Canon edit diff on save
+### PCANON-DIFF — Canon edit diff on save ✓ DONE 2026-06-09
 - When saving an edit to a canon entry in Edit Mode, show a before/after diff before the save completes
 - User must confirm the diff before changes persist
 - **Smoke:** Edit a canon entry, confirm diff appears before save; confirm save completes on confirmation; confirm cancel aborts the change
+- **Audit result 2026-06-09:** Implemented and verified via live Playwright testing. `showCanonSaveConfirm(before, after)` in renderer.js intercepts `makeEditCard.onSubmit`; shows `#canon-diff-overlay` modal with before/after table of changed fields only (reuses `.canon-history-diff-*` styles). Cancel/Escape/overlay-click aborts; "Save changes" proceeds. All three smoke cases passed.
 
 ### PCANON-AFFECTED — Affected-by reverse lookup on superseded entries
 - When viewing a retired or superseded canon entry, a collapsed read-only panel lists all downstream entries (Characters, Episodes, Decisions) that were linked to it at time of retirement

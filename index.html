@@ -1755,6 +1755,32 @@
       .cp-success { font-size: 12px; color: #7ec89e; }
       .cp-success[hidden] { display: none; }
 
+      /* PCANON-DIFF — save-confirmation diff modal */
+      .canon-diff-modal {
+        width: 600px;
+        display: flex;
+        flex-direction: column;
+        max-height: 75vh;
+      }
+      .canon-diff-body {
+        padding: 14px;
+        overflow-y: auto;
+        flex: 1;
+      }
+      .canon-diff-no-changes {
+        color: var(--muted);
+        font-size: 13px;
+        font-style: italic;
+      }
+      .canon-diff-foot {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        padding: 12px 14px;
+        border-top: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+
       /* SVG graph — full-width because the left column is hidden in relational view */
       .char-graph-container {
         flex: 1;
@@ -4571,6 +4597,21 @@
             </div>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- PCANON-DIFF — diff confirmation modal shown before persisting a canon edit.
+         Populated and shown by showCanonSaveConfirm() in renderer.js. -->
+    <div id="canon-diff-overlay" class="cp-overlay" hidden>
+      <div class="cp-modal canon-diff-modal" role="dialog" aria-modal="true" aria-labelledby="canon-diff-title">
+        <header class="cp-head">
+          <span id="canon-diff-title" class="cp-head-title">Confirm edits</span>
+        </header>
+        <div id="canon-diff-body" class="canon-diff-body"></div>
+        <div class="canon-diff-foot">
+          <button id="canon-diff-cancel" type="button" class="btn-secondary">Cancel</button>
+          <button id="canon-diff-confirm" type="button" class="btn-primary">Save changes</button>
+        </div>
       </div>
     </div>
 
