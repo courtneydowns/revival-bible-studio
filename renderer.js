@@ -4225,6 +4225,8 @@ function renderCanonBiblePage(section) {
               card, e, false, cbFfCallbacks, 'canon_entries'
             );
             cbFfCallbacks.refreshHistory = cbFfRefresh;
+            // PLOCKED-SPECIFICS — all locked specifics on canon entries in Edit Mode.
+            mountLockedSpecificsPanel(card);
           }
           list.appendChild(card);
         }
@@ -5428,6 +5430,8 @@ function renderCanonReviewPage(section, workspaceName) {
       rightCol, crProposalItem, false, crFfCallbacks, 'canon_proposals'
     );
     crFfCallbacks.refreshHistory = crFfRefresh;
+    // PLOCKED-SPECIFICS — all locked specifics on Canon Review proposals.
+    mountLockedSpecificsPanel(rightCol);
 
     conflictCheckBtn.addEventListener('click', async () => {
       conflictCheckBtn.disabled = true;
@@ -9234,6 +9238,8 @@ function renderWritingLabPage(section) {
         rightCol, item, archivedAtStart, wlFfCallbacks, 'writing_lab'
       );
       wlFfCallbacks.refreshHistory = wlFfRefresh;
+      // PLOCKED-SPECIFICS — all locked specifics on Writing Lab drafts.
+      if (!archivedAtStart) mountLockedSpecificsPanel(rightCol);
     }
 
     // PPOL2b-12 — linked-entries indicator (same passive pattern as other workspaces).
@@ -12169,6 +12175,190 @@ function mountQuietDevastationPanel(rightCol, item) {
   rightCol.appendChild(section);
 }
 
+// PLOCKED-SPECIFICS — data and panel factory.
+// Eight non-negotiable locked items from THE_FLANAGAN_MASTER, surfaced as a
+// collapsed reference panel on Characters, Episodes, Writing Lab, Canon Bible
+// Edit Mode, and Canon Review proposals.
+const LOCKED_SPECIFICS = [
+  {
+    key: 'physical_markers',
+    label: 'Physical Markers — LOCKED (T-015)',
+    category: 'production',
+    characterRelevant: true,
+    body:
+      'TWO markers only. No third. No exceptions.\n' +
+      'Primary: pupil response anomaly (Phase 1+). Pupils don\'t respond to light correctly — dilation too slow, too wide, or oscillating. Only visible through close contact. Retroactively visible from the pilot on rewatch.\n' +
+      'Secondary: vascular discoloration (Phase 3 only). Faint discoloration along forearm veins at injection sites. Looks exactly like track marks.\n' +
+      '"The eyes" is a performance/writers\'-room register of the two locked markers — not a third clinical marker.',
+  },
+  {
+    key: 'mirror_motif',
+    label: 'Mirror Motif — LOCKED (T-227)',
+    category: 'production',
+    characterRelevant: true,
+    body:
+      'Mirrors are NOT the site of revelation — they are the site where wrongness is invisible to the person who has become it.\n' +
+      '— Infected look in the mirror and see what they expect. Placid recognition is the horror.\n' +
+      '— Megan uses the mirror as a recovery practice of self-witness (Step 4 made visual).\n' +
+      '— Caroline is the only character whose reflection matches the truth.\n' +
+      'Non-negotiables: no diagnostic reveal, no score, no slow zooms, no flinching, no mirror in S1E1 as a marker plant.',
+  },
+  {
+    key: 'virus_not_metaphor',
+    label: 'Virus Is Not a Metaphor',
+    category: 'thematic',
+    characterRelevant: false,
+    body:
+      'STANDING RULE: The virus is NOT a metaphor for addiction. It is a structural rhyme without equivalence — engineered to make visible what addiction always was, what it always did, and what society chose not to see.\n' +
+      'Write the rhyme; do not collapse it into "the virus is addiction." The distinction is load-bearing and is the reason the show can hold both registers without either consuming the other.',
+  },
+  {
+    key: 'spirituality',
+    label: 'Spirituality Principle',
+    category: 'thematic',
+    characterRelevant: false,
+    body:
+      'NA and AA are spiritual programs. The spirituality is treated with complete ambiguity and zero judgment — which means it is treated as real. The higher-power concept, the prayers, the step language, the closing rituals are not ironic, not coded as false comfort. They work.\n' +
+      'A transitioned character\'s "you\'re in my thoughts and prayers" is completely true — what remains of them means it. Play it straight. No ironic distance.',
+  },
+  {
+    key: 'found_family',
+    label: 'Found Family Principle',
+    category: 'thematic',
+    characterRelevant: true,
+    body:
+      'The recovery community is Revival\'s found family — central dramatic and thematic architecture, not backdrop. The found family must be functional: people genuinely help each other.\n' +
+      'The horror doesn\'t come from the community failing to work — it comes from the community working exactly as intended while the virus uses that functioning as its pathway.',
+  },
+  {
+    key: 'jordan_no_arrest',
+    label: "Jordan's No-Arrest Rule",
+    category: 'character',
+    characterRelevant: true,
+    body:
+      'Jordan Hale receives no arrest treatment under any circumstances.\n' +
+      'His race lives in specificity and texture, never in commentary.\n' +
+      'His surname is Hale (not Watkins — that is Renee\'s surname, reflecting single-mother status).',
+  },
+  {
+    key: 'closing_line',
+    label: 'Closing Line — LOCKED',
+    category: 'narrative',
+    characterRelevant: false,
+    body:
+      'The last spoken word of the series is "trying."\n' +
+      'Locked closing line: "I tried. I\'m still trying." — lands on "trying" as ordered.',
+  },
+  {
+    key: 'recovery_authenticity',
+    label: 'Recovery Authenticity Mandate',
+    category: 'craft',
+    characterRelevant: false,
+    body:
+      'The writer\'s lived recovery experience is authoritative on recovery psychology, meeting culture, NA traditions, and addiction — a standing rule across all work.\n' +
+      'NA and AA language is specific and earned: use it correctly or not at all. People in recovery are never types, cautionary tales, or vessels for addiction. They are people who have addiction. Write people. When uncertain about recovery authenticity — ask. Never approximate.',
+  },
+];
+
+// Collapsed reference panel showing locked specifics from THE_FLANAGAN_MASTER.
+// isCharactersEntry: true → show only character-relevant specifics by default
+// (physical markers, mirror motif, found family, Jordan's no-arrest rule).
+function mountLockedSpecificsPanel(container, { isCharactersEntry = false } = {}) {
+  const CATEGORY_LABELS = {
+    production: 'Production',
+    thematic:   'Thematic',
+    character:  'Character',
+    narrative:  'Narrative',
+    craft:      'Craft',
+  };
+
+  const section = document.createElement('details');
+  section.className = 'locked-specs-section';
+
+  const sum = document.createElement('summary');
+  sum.className = 'locked-specs-summary';
+  sum.textContent = 'Locked Specifics';
+  section.appendChild(sum);
+
+  const body = document.createElement('div');
+  body.className = 'locked-specs-body';
+  section.appendChild(body);
+
+  let activeFilter = 'all';
+
+  const filterBar = document.createElement('div');
+  filterBar.className = 'locked-specs-filter-bar';
+
+  const itemsEl = document.createElement('div');
+  itemsEl.className = 'locked-specs-items';
+
+  function renderItems() {
+    itemsEl.innerHTML = '';
+    const visible = LOCKED_SPECIFICS.filter(s => {
+      if (isCharactersEntry && !s.characterRelevant) return false;
+      if (activeFilter !== 'all' && s.category !== activeFilter) return false;
+      return true;
+    });
+    if (visible.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'locked-specs-empty';
+      empty.textContent = 'No locked specifics match this filter.';
+      itemsEl.appendChild(empty);
+      return;
+    }
+    for (const spec of visible) {
+      const item = document.createElement('details');
+      item.className = 'locked-specs-item';
+
+      const itemSum = document.createElement('summary');
+      itemSum.className = 'locked-specs-item-summary';
+
+      const catBadge = document.createElement('span');
+      catBadge.className = `locked-specs-cat-badge locked-specs-cat-${spec.category}`;
+      catBadge.textContent = CATEGORY_LABELS[spec.category] || spec.category;
+
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'locked-specs-item-title';
+      titleSpan.textContent = spec.label;
+
+      itemSum.append(catBadge, titleSpan);
+      item.appendChild(itemSum);
+
+      const content = document.createElement('div');
+      content.className = 'locked-specs-item-body';
+      content.textContent = spec.body;
+      item.appendChild(content);
+
+      itemsEl.appendChild(item);
+    }
+  }
+
+  function renderFilter() {
+    filterBar.innerHTML = '';
+    const cats = isCharactersEntry
+      ? [{ key: 'all', label: 'All' }, { key: 'production', label: 'Production' }, { key: 'thematic', label: 'Thematic' }, { key: 'character', label: 'Character' }]
+      : [{ key: 'all', label: 'All' }, { key: 'production', label: 'Production' }, { key: 'thematic', label: 'Thematic' }, { key: 'character', label: 'Character' }, { key: 'narrative', label: 'Narrative' }, { key: 'craft', label: 'Craft' }];
+    for (const cat of cats) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'locked-specs-filter-btn' + (activeFilter === cat.key ? ' active' : '');
+      btn.textContent = cat.label;
+      btn.addEventListener('click', () => {
+        activeFilter = cat.key;
+        renderFilter();
+        renderItems();
+      });
+      filterBar.appendChild(btn);
+    }
+  }
+
+  body.append(filterBar, itemsEl);
+  renderFilter();
+  renderItems();
+
+  container.appendChild(section);
+}
+
 // PEPISODE-PREVON — collapsed "Previously on" panel on an episode detail.
 // Shows all locked non-retired canon entries with locked_at before this
 // episode's created_at. One-click generate; exportable as plain text.
@@ -14066,6 +14256,8 @@ const CONTENT_RENDERERS = {
         });
         const { refresh } = mountFlanaganHistory(rightCol, item, archivedFlag, callbacks, 'characters');
         callbacks.refreshHistory = refresh;
+        // PLOCKED-SPECIFICS — character-relevant locked specifics only.
+        if (!archivedFlag) mountLockedSpecificsPanel(rightCol, { isCharactersEntry: true });
       },
 
       leftColExtra(leftCol, rightCol, ctx) {
@@ -14395,6 +14587,8 @@ const CONTENT_RENDERERS = {
         if (!archivedFlag) mountQuietDevastationPanel(rightCol, item);
         // PEPISODE-PREVON — "Previously on" collapsed canon snapshot.
         if (!archivedFlag) mountPreviouslyOnPanel(rightCol, item);
+        // PLOCKED-SPECIFICS — all locked specifics.
+        if (!archivedFlag) mountLockedSpecificsPanel(rightCol);
       },
 
       leftColExtra(leftCol, rightCol, ctx) {

@@ -621,12 +621,13 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ## Locked specifics panel
 
-### PLOCKED-SPECIFICS — Locked specifics reference panel
+### PLOCKED-SPECIFICS — Locked specifics reference panel ✅
 - Passive reference panel surfacing non-negotiable locked items from THE_FLANAGAN_MASTER
 - Locked specifics included: two physical markers (T-015), mirror motif (T-227), virus-is-not-a-metaphor rule, Spirituality Principle, Found Family Principle, Jordan's no-arrest rule, closing line, Recovery Authenticity Mandate
 - **Where it surfaces:** Characters entries (character-relevant only), Episodes entries, Writing Lab drafts, Canon Bible entries in Edit Mode, Canon Review proposals
 - Displayed as collapsed reference panel — not modal, not blocking. Always available, never intrusive.
 - Filterable: show only specifics relevant to the entry's characters/themes
+- **Implementation:** `LOCKED_SPECIFICS` array + `mountLockedSpecificsPanel(container, {isCharactersEntry})` in renderer.js. Characters: shows only `characterRelevant: true` items (Physical Markers, Mirror Motif, Found Family, Jordan's No-Arrest Rule) with Production/Thematic/Character filter chips. All other surfaces: all 8 specifics, all 5 category chips. Each specific is a nested `<details>` with a category badge. CSS in index.html `.locked-specs-*`.
 - **Smoke:** Open a Characters entry, confirm locked specifics panel present and collapsed; expand it, confirm relevant specifics shown; open a Writing Lab draft, confirm panel present; confirm panel does NOT appear on Source Material or Settings
 
 ---
