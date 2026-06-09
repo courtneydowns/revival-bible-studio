@@ -84,18 +84,18 @@
 | **PAUDIT-3 Canon Bible popout + Decisions back-link** | **VS Code ext** ✅ | Two plain UI omissions — trigger button + source_question_id render |
 | **PAUDIT-4 P46-B analysis lock fix** | **VS Code ext** ✅ | Add resolved_by_decision_id as second lock condition |
 | **PAUDIT-5 Omitted UI fields + Brainstorm archived threads** | **VS Code ext / CLI** ✅ | WL status bar, Source Material fields, OQ category, Unsorted route action, Canon Review attribution link, Brainstorm archived threads |
-| **PAUDIT-6 Research external_url + OQ tier setter** | **VS Code ext** | Two DB columns with no UI — Research URL field, OQ tier set/edit |
-| **PAUDIT-7 Command palette regression fix** | **CLI** | Restore Cmd+K to working state — regression from a later phase |
-| **PAUDIT-8 Dead IPC cleanup** | **CLI** | Remove dead bridges from main.js + preload.js; run after PAUDIT-5 |
-| **PPOL-CANCEL Cancel/dismiss/close button fix** | **CLI** | App-wide cancel handler audit — multi-file touches across all workspaces |
-| **PDECISION-STATUS Decision status badges** | **VS Code ext** | New field on existing Decision entry component |
-| **PDECISION-PROMOTE Decisions → Canon Review** | **VS Code ext** | New action on existing Decision detail panel |
-| **PCANON-CONFIDENCE Canon entry confidence level** | **VS Code ext** | New field on existing canon entry component |
-| **PCANON-DIFF Canon edit diff on save** | **VS Code ext** | Diff modal wired into existing Edit Mode save flow |
-| **PCANON-AFFECTED Affected-by reverse lookup** | **VS Code ext** | Collapsed panel on existing retired/superseded entry view |
-| **PCONFLICT-SEV Conflict severity badge** | **VS Code ext** | New field on existing Conflicts entry component |
-| **PSTALE Stale item nudges** | **CLI** | Staleness logic + badge aging, touches nav + all workspaces |
-| **POQ-DEPENDS Open Question dependencies** | **VS Code ext** | Dependency field + block indicator on existing Open Questions entry |
+| **PAUDIT-6 Research external_url + OQ tier setter** | **VS Code ext** ✅ | Two DB columns with no UI — Research URL field, OQ tier set/edit |
+| **PAUDIT-7 Command palette regression fix** | **CLI** ✅ | Restore Cmd+K to working state — regression from a later phase |
+| **PAUDIT-8 Dead IPC cleanup** | **CLI** ✅ | Remove dead bridges from main.js + preload.js; run after PAUDIT-5 |
+| **PPOL-CANCEL Cancel/dismiss/close button fix** | **CLI** ✅ | App-wide cancel handler audit — multi-file touches across all workspaces |
+| **PDECISION-STATUS Decision status badges** | **VS Code ext** ✅ | New field on existing Decision entry component |
+| **PDECISION-PROMOTE Decisions → Canon Review** | **VS Code ext** ✅ | New action on existing Decision detail panel |
+| **PCANON-CONFIDENCE Canon entry confidence level** | **VS Code ext** ✅ | New field on existing canon entry component |
+| **PCANON-DIFF Canon edit diff on save** | **VS Code ext** ✅ | Diff modal wired into existing Edit Mode save flow |
+| **PCANON-AFFECTED Affected-by reverse lookup** | **VS Code ext** ✅ | Collapsed panel on existing retired/superseded entry view |
+| **PCONFLICT-SEV Conflict severity badge** | **VS Code ext** ✅ | New field on existing Conflicts entry component |
+| **PSTALE Stale item nudges** | **CLI** ✅ | Staleness logic + badge aging, touches nav + all workspaces |
+| **POQ-DEPENDS Open Question dependencies** | **VS Code ext** ✅ | Dependency field + block indicator on existing Open Questions entry |
 | **PWLAB-SECTIONS Writing Lab section markers** | **VS Code ext** | Section marker insertion + jump-to list on existing Writing Lab page |
 | **PWLAB-CANON-COMPARE Draft vs. canon comparison** | **CLI** | New AI action wired into Writing Lab, reads full canon |
 | **PEPISODE-PREVON "Previously on" snapshot** | **VS Code ext** | Generated panel on existing Episode detail |

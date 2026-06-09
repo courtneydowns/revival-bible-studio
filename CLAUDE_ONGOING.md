@@ -54,6 +54,7 @@ Local-first creative/editorial workspace for the **Revival project only**. Not a
 - **Entry scratchpad:** every entry across all workspaces has a lightweight freeform scratchpad section, collapsed by default. Not autosaved to body, not canon, not routable. For thinking out loud only.
 - **Session resume:** on launch, the app surfaces the last entry the user had open, not just Home. Zero clicks to get back into flow.
 - **Workspace activity indicator:** subtle recency signal on each nav item showing when you were last active in that workspace. Not a badge count — visual only. Aids reorientation at session start.
+- **Stale item nudges:** nav badges show count + age of oldest unresolved item ("3 · 45d"). List items not touched beyond their threshold show a subtle age marker. Thresholds configurable in Settings (defaults: 14d Tier-1 questions, 30d conflicts, 7d Canon Review). Never auto-resolves anything — surfacing only.
 - **Cancel / dismiss / close buttons:** every modal, form, dialog, confirmation, and overlay must have a working cancel/dismiss/close handler that (1) dismisses the UI element, (2) discards unsaved changes without touching the data layer, and (3) returns focus to the prior view without stale state or partial writes. This is a hard UI requirement — do not ship a phase with broken cancel buttons.
 
 ---
@@ -166,6 +167,7 @@ Do not invent new top-level workspaces.
 ## Open Questions workspace
 
 - Questions can be marked as **dependent on** another Open Question. Surfaces as a soft block indicator in the list. Prevents answering Q2 before Q1 is resolved without realizing it.
+- Questions have a **tier field:** Tier 1 / Tier 2 / Tier 3. User-set on create and edit. Tier escalation (promote Tier-2 → Tier-1) is a separate action with confirmation, logged in question history.
 
 ---
 
@@ -180,6 +182,7 @@ Do not invent new top-level workspaces.
 ## Research workspace
 
 - Each Research entry shows a **"Used in" indicator** — a passive flag showing if the entry has been linked or routed anywhere. Surfaces orphaned research that was never applied.
+- Each Research entry has an **external_url field** — display and editable in the detail panel. Shown on list item preview line if populated.
 
 ---
 
@@ -222,7 +225,7 @@ The Flanagan filter feature applies THE_FLANAGAN_MASTER document as an analytica
 - Saved analyses attach to the Open Questions entry.
 - Each record tagged with scan mode + Flanagan document version used.
 - Collapsed history section on the entry, same pattern as archive sections.
-- Analyses lock (read-only) when the question is resolved/closed.
+- Analyses lock (read-only) when the question is resolved/closed or promoted to a Decision via `resolved_by_decision_id`.
 - "Reopen with new context" action flags a saved analysis as stale and queues re-run (user-triggered only).
 
 **Routing + tags (P46-C — complete):**
@@ -236,11 +239,6 @@ The Flanagan filter feature applies THE_FLANAGAN_MASTER document as an analytica
 
 These features are in `docs/FEATURE_BACKLOG_ONGOING.md` and `docs/BUILD_PLAN_ONGOING.md`. Do not implement any of these without an explicit build instruction. Listed here so Claude Code does not contradict them in design decisions.
 
-- **PAUDIT-6:** Research external_url field + OQ tier setter — two DB columns with no UI.
-- **PAUDIT-7:** Command palette regression fix — restore Cmd+K to working state.
-- **PAUDIT-8:** Dead IPC cleanup — remove dead bridges from main.js + preload.js.
-- **PPOL-CANCEL:** App-wide cancel/dismiss/close button fix — audit and repair all cancel handlers.
-- **PSTALE:** Nav badge aging, staleness indicators on list items, configurable thresholds in Settings.
 - **PDRAFT-LOCK:** Characters and Episodes get a "locked for this draft" state distinct from archive.
 - **PARC-A / PARC-B:** Character arc tracker — written timeline (list) and visual timeline (horizontal scroll). Read-only, generated from existing data. Character status field feeds these views.
 - **PEPISODE-STRUCT:** Per-episode structure checklist (Flanagan Master episodic rules) + optional AI evaluation.
@@ -254,15 +252,8 @@ These features are in `docs/FEATURE_BACKLOG_ONGOING.md` and `docs/BUILD_PLAN_ONG
 - **PFLAN-EXPAND:** Flanagan Filter expands to Brainstorm, Writing Lab, Characters, Episodes, Canon Review, Canon Bible (Edit Mode), Conflicts (lightweight), Decisions (lightweight). Fifth mode: Production Check (Tier 3 only).
 - **PAI-WIRE:** AI features wire to each other — P44→P41, P42→P43, P46→P41, P45→P43. All user-triggered, no automatic routing.
 - **PDOC-WIRE:** Documents becomes first-class — Chat-attachable, highlight-extract-route target, linkable to Characters/Episodes, Flanagan Filter, Canon proposal path.
-- **PDECISION-STATUS:** Decision status badges — Open / Tentative / Final. User-set.
-- **PDECISION-PROMOTE:** Decisions workspace gets "Promote to Canon Review" action. Creates Canon Review proposal pre-filled with decision content + back-link to source Decision. Link-don't-copy.
-- **PCANON-CONFIDENCE:** Canon entry confidence level — Confirmed / Probable / Speculative. Passive badge, no workflow gate.
-- **PCANON-DIFF:** "What changed" diff shown on Edit Mode save before confirming. Prevents accidental canon mutation.
-- **PCANON-AFFECTED:** "Affected by" reverse lookup on retired/superseded entries — shows downstream entries linked at time of retirement.
-- **PCONFLICT-SEV:** Conflict severity badge — Minor / Significant / Blocking. Blocking surfaces in Needs Attention.
 - **PWLAB-CANON-COMPARE:** Writing Lab draft vs. canon comparison — on-demand AI check against full Canon Bible. Routes flags to Conflicts or Open Questions.
 - **PWLAB-SECTIONS:** Scene/section markers in Writing Lab drafts — named anchors for navigation within long drafts.
-- **PEPISODE-STATUS:** Episode status field — Outline / Draft / Locked. Filters list. Feeds Needs Attention.
 - **PEPISODE-PREVON:** "Previously on" canon snapshot — one-click read-only summary of canon facts locked as of the prior episode. Generated from existing data.
 - **PRESEARCH-USED:** "Used in" indicator on Research entries — passive flag if the entry has been linked or routed anywhere.
 - **PSCATCHPAD:** Entry-level scratchpad — freeform, collapsed by default, not canon, not routable.
@@ -273,8 +264,35 @@ These features are in `docs/FEATURE_BACKLOG_ONGOING.md` and `docs/BUILD_PLAN_ONG
 - **PKEYSHEET:** Cmd+? keyboard shortcut cheat sheet — non-modal overlay, dismissable.
 - **PPALETTE-RECENTS:** Last 5 opened entries at top of Cmd+K palette before typing.
 - **PROUTE-HISTORY:** "Send to" picker history — last 3 destinations at top of route picker.
-- **POQ-DEPENDS:** Open Question dependency links — mark one question as depending on another. Soft block indicator in list.
 - **PPOL3:** Print/PDF export for single entries: Source Material, Brainstorm, Research, Writing Lab, Open Questions analysis history.
+- **PBLOCK-LABEL / PBLOCK-CROSS / PBLOCK-RESOLVE-PROMPT / PBLOCK-DASHBOARD / PBLOCK-HISTORY:** Blocking specificity labels, cross-workspace blocking relationships, resolution prompts, blocking dashboard on Home, blocking history on entries.
+- **PAI-STATUS-SUGGEST:** AI-suggested status values on Decisions, OQ, Brainstorm, Episodes entries.
+- **PAI-ENTRY-ROUTE-SUGGEST:** AI-suggested workspace routing on entry creation (quick-capture + Unsorted).
+- **PAI-TAG-SUGGEST-EDIT:** AI tag suggestions with pre-apply editing. Requires PAI-TAGS.
+- **PAI-BLOCK-SUGGEST:** AI-suggested blocking relationships between Open Questions. Requires POQ-DEPENDS ✅.
+- **PAI-RELATIONSHIP-SUGGEST:** AI-suggested cross-workspace links — candidate entries with rationale, user confirms each.
+- **PAI-METADATA-AUDIT:** AI metadata audit — batch scan for missing fields, per-field confirmation before writing.
+- **PAI-CONFIDENCE-SUGGEST:** AI-suggested confidence level on canon entries. Requires PCANON-CONFIDENCE ✅.
+- **PCHAT-SEARCH:** Chat history search by keyword, click-through to matched message.
+- **PCHAT-EXPORT:** Chat plain-text export (.txt or .md), distinct from PCHAT-ROUTE.
+- **PPOL2b-SEARCH:** Inline text filter on all 13 workspace left-column lists.
+- **PDRAFT-LOCK:** Character/Episode "locked for this draft" state, distinct from Canon Bible locking.
+- **PSESSION-LOG:** Auto-generated session work log — entries created/approved/archived/analyses run, grouped by workspace. Audit trail only, exportable.
+- **PUNDO:** App-level Cmd+Z undo for destructive actions (archive, delete, resolve, approve, reject). Session-only history, last 20 actions.
+- **PWLAB-VERSIONS:** Writing Lab draft versioning — manual save, named versions, side-by-side diff, restore.
+- **PBLOCK:** Open Questions blocking flag + tier escalation + promote-to-Decision.
+- **PBRAIN-STRUCT:** Brainstorm internal structure — threads/clusters, "developed into" links, status badges.
+- **PCHAT-ATTACH:** Chat attachment expansion — Canon Bible, Characters, Episodes, Documents attachable to Chat.
+- **PCHAR-STATUS:** Character status field — Active / Recurring / Departed / Deceased.
+- **PEPISODE-STATUS:** Episode status field — Outline / Draft / Locked. Feeds Needs Attention.
+- **PDECISION-STATUS:** Decision status badges — Open / Tentative / Final.
+- **PDECISION-PROMOTE:** Decisions → Canon Review one-click promotion.
+- **PCANON-CONFIDENCE:** Canon entry confidence level — Confirmed / Probable / Speculative.
+- **PCANON-DIFF:** Diff modal on Edit Mode save before confirming.
+- **PCANON-AFFECTED:** Affected-by reverse lookup on retired/superseded canon entries.
+- **PCONFLICT-SEV:** Conflict severity badge — Minor / Significant / Blocking.
+- **PSTALE:** Stale item nudges — nav badge aging, list item age markers, configurable thresholds.
+- **POQ-DEPENDS:** Open Question dependency links.
 
 ---
 

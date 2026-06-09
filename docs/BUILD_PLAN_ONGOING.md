@@ -389,6 +389,7 @@ PKEY was marked ✅ complete and the command palette (Cmd+K) previously worked, 
 - Restore Cmd+K command palette to working state matching the original PKEY spec: jump to any workspace, recent entries, actions; full keyboard navigation; tab through list items, Enter to open
 - Do not add new functionality — restore only
 - **Smoke:** Cmd+K opens palette; type a workspace name, confirm it appears; press Enter, confirm navigation; tab through results with keyboard; Escape closes palette.
+- **Smoke passed.**
 
 ### PAUDIT-8 — Dead IPC cleanup ✅
 **Tool:** CLI
@@ -414,7 +415,7 @@ Remove dead IPC bridges confirmed by the audit as having no renderer callers. Mu
 
 ## Cancel button fix (app-wide)
 
-### PPOL-CANCEL — Cancel / dismiss / close button fix
+### PPOL-CANCEL — Cancel / dismiss / close button fix ✅
 **Tool:** CLI
 Cancel buttons do not work reliably in virtually every modal, form, dialog, and edit state across the app.
 
@@ -432,11 +433,12 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ## Status fields (continued)
 
-### PDECISION-STATUS — Decision status badges ✅ DONE
+### PDECISION-STATUS — Decision status badges ✅
 - Add **Open / Tentative / Final** status field to every Decision entry
 - Visible as a badge on list items and detail panel
 - Filterable in Decisions list
 - **Smoke:** Set status on three decisions; filter by Final, confirm only Final decisions show; confirm badge visible in list and detail panel
+- **Smoke passed.**
 
 ---
 
@@ -460,11 +462,12 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 - Filterable in Canon Bible browse
 - **Smoke passed 2026-06-09.**
 
-### PCANON-DIFF — Canon edit diff on save ✓ DONE 2026-06-09
+### PCANON-DIFF — Canon edit diff on save ✅
 - When saving an edit to a canon entry in Edit Mode, show a before/after diff before the save completes
 - User must confirm the diff before changes persist
 - **Smoke:** Edit a canon entry, confirm diff appears before save; confirm save completes on confirmation; confirm cancel aborts the change
 - **Audit result 2026-06-09:** Implemented and verified via live Playwright testing. `showCanonSaveConfirm(before, after)` in renderer.js intercepts `makeEditCard.onSubmit`; shows `#canon-diff-overlay` modal with before/after table of changed fields only (reuses `.canon-history-diff-*` styles). Cancel/Escape/overlay-click aborts; "Save changes" proceeds. All three smoke cases passed.
+- **Smoke passed.**
 
 ### PCANON-AFFECTED — Affected-by reverse lookup on superseded entries ✅
 - When viewing a retired or superseded canon entry, a collapsed read-only panel lists all downstream entries (Characters, Episodes, Decisions) that were linked to it at time of retirement
@@ -476,13 +479,14 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ## Conflicts enhancements
 
-### PCONFLICT-SEV — Conflict severity badge ✓
+### PCONFLICT-SEV — Conflict severity badge ✅
 - Add **Minor / Significant / Blocking** severity field to every Conflicts entry — user-set
 - Visible as a badge on list items and detail panel
 - Filterable in Conflicts list
 - Blocking conflicts surface in the Needs Attention panel
 - **Smoke:** Set severity on three conflicts; filter by Blocking, confirm results; set one to Blocking, confirm it appears in Needs Attention panel
 - **Done:** migration `054_pconflict_sev`, `conflicts.setSeverity`, severity selector on detail panel (`showViewTop`), severity filter bar in left column (`leftColExtra`), list item badge (`listItemExtra`), `blockingConflicts` in `needsAttention` + Needs Attention panel section.
+- **Smoke passed.**
 
 ---
 
