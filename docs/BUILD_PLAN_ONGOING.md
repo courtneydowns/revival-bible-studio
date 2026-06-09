@@ -569,14 +569,15 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ## Character arc tracker
 
-### PARC-A — Character arc tracker: written timeline
+### PARC-A — Character arc tracker: written timeline ✅
 - Episode-by-episode structured list per character
 - Shows: canon facts locked at this point in their arc, open questions unresolved at this point, decisions affecting them
 - Reads character status field
 - Read-only display generated from existing data — no new data entry
 - Updates automatically as canon and episode entries change
 - Filterable by character, season, arc status
-- **Smoke:** Seed canon entries and episode entries for one character across S1; confirm written timeline generates correctly; make a canon change, confirm timeline updates
+- **Implementation:** `characters.arcTimeline(charId)` in db.js returns episodes + per-episode canon facts (locked_at ≤ episode.created_at), linked OQs (unresolved at that point via cross_workspace_attachments), and linked decisions. IPC: `characters:arcTimeline`. UI: `setupCharArcTracker` toggle button in Characters left column — hides left col, shows full-width arc panel with character selector dropdown, status filter chips, season filter chips (auto-detected from episode titles), and episode rows (collapsible details). Also fixed pre-existing syntax error: `mountDraftLockPanel` was inside `CONTENT_RENDERERS` object literal; moved to top-level.
+- **Smoke passed 2026-06-09.**
 
 ### PARC-B — Character arc tracker: visual timeline
 - Horizontal scroll, season/episode markers on X axis

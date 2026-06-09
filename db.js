@@ -1829,6 +1829,23 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '056_pdraft_lock',
+    up(db) {
+      // PDRAFT-LOCK — per-entry draft lock for Characters and Episodes.
+      // draft_locked_at: ISO timestamp when locked (null = not locked).
+      // draft_lock_for:  named draft/season this was locked for.
+      // draft_lock_note: note recorded at unlock time.
+      db.exec(`
+        ALTER TABLE characters_workspace ADD COLUMN draft_locked_at TEXT;
+        ALTER TABLE characters_workspace ADD COLUMN draft_lock_for  TEXT;
+        ALTER TABLE characters_workspace ADD COLUMN draft_lock_note TEXT;
+        ALTER TABLE episodes_workspace   ADD COLUMN draft_locked_at TEXT;
+        ALTER TABLE episodes_workspace   ADD COLUMN draft_lock_for  TEXT;
+        ALTER TABLE episodes_workspace   ADD COLUMN draft_lock_note TEXT;
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -2353,6 +2370,112 @@ episodes.setStatus = function(id, status) {
     .prepare('UPDATE episodes_workspace SET ep_status = ?, updated_at = ? WHERE id = ?')
     .run(status || null, new Date().toISOString(), id);
   return episodes.get(id);
+};
+
+// PDRAFT-LOCK — Characters: lock and unlock for a named draft/season.
+characters.draftLock = function(id, forName) {
+  const now = new Date().toISOString();
+  getDb()
+    .prepare(
+      'UPDATE characters_workspace SET draft_locked_at = ?, draft_lock_for = ?, draft_lock_note = NULL, updated_at = ? WHERE id = ?'
+    )
+    .run(now, forName || null, now, id);
+  return characters.get(id);
+};
+characters.draftUnlock = function(id, note) {
+  const now = new Date().toISOString();
+  getDb()
+    .prepare(
+      'UPDATE characters_workspace SET draft_locked_at = NULL, draft_lock_for = NULL, draft_lock_note = ?, updated_at = ? WHERE id = ?'
+    )
+    .run(note || null, now, id);
+  return characters.get(id);
+};
+
+// PDRAFT-LOCK — Episodes: lock and unlock for a named draft/season.
+episodes.draftLock = function(id, forName) {
+  const now = new Date().toISOString();
+  getDb()
+    .prepare(
+      'UPDATE episodes_workspace SET draft_locked_at = ?, draft_lock_for = ?, draft_lock_note = NULL, updated_at = ? WHERE id = ?'
+    )
+    .run(now, forName || null, now, id);
+  return episodes.get(id);
+};
+episodes.draftUnlock = function(id, note) {
+  const now = new Date().toISOString();
+  getDb()
+    .prepare(
+      'UPDATE episodes_workspace SET draft_locked_at = NULL, draft_lock_for = NULL, draft_lock_note = ?, updated_at = ? WHERE id = ?'
+    )
+    .run(note || null, now, id);
+  return episodes.get(id);
+};
+
+// PARC-A — Character arc tracker: written timeline.
+// Returns the character plus an episode-by-episode list. For each episode,
+// three sets are pre-filtered to that point in time:
+//   canon_facts  — locked non-retired canon entries with locked_at ≤ episode.created_at
+//   open_questions — OQs linked to this character (via CWA) that were open at that point
+//   decisions    — decisions linked to this character (via CWA) created at or before that point
+characters.arcTimeline = function(charId) {
+  const db2 = getDb();
+  const char = db2
+    .prepare('SELECT id, title, char_status FROM characters_workspace WHERE id = ?')
+    .get(charId);
+  if (!char) throw new Error('Character not found.');
+
+  const allEpisodes = db2
+    .prepare(
+      `SELECT id, title, created_at, ep_status
+       FROM episodes_workspace
+       WHERE archived_at IS NULL
+       ORDER BY created_at ASC, id ASC`
+    )
+    .all();
+
+  const linkedOQs = db2
+    .prepare(
+      `SELECT oq.id, oq.title, oq.created_at, oq.archived_at, oq.tier
+       FROM open_questions oq
+       JOIN cross_workspace_attachments cwa
+         ON cwa.source_kind = 'open_questions' AND cwa.source_id = oq.id
+       WHERE cwa.host_kind = 'characters' AND cwa.host_id = ?`
+    )
+    .all(charId);
+
+  const linkedDecisions = db2
+    .prepare(
+      `SELECT d.id, d.title, d.created_at, d.decision_status
+       FROM decisions d
+       JOIN cross_workspace_attachments cwa
+         ON cwa.source_kind = 'decisions' AND cwa.source_id = d.id
+       WHERE cwa.host_kind = 'characters' AND cwa.host_id = ?
+         AND d.archived_at IS NULL`
+    )
+    .all(charId);
+
+  const allLockedCanon = db2
+    .prepare(
+      `SELECT id, title, entry_type, locked_at, confidence
+       FROM canon_entries
+       WHERE locked = 1 AND retired = 0
+       ORDER BY locked_at ASC, id ASC`
+    )
+    .all();
+
+  const rows = allEpisodes.map((ep) => ({
+    episode: ep,
+    canon_facts: allLockedCanon.filter((c) => c.locked_at <= ep.created_at),
+    open_questions: linkedOQs.filter(
+      (oq) =>
+        oq.created_at <= ep.created_at &&
+        (oq.archived_at === null || oq.archived_at > ep.created_at)
+    ),
+    decisions: linkedDecisions.filter((d) => d.created_at <= ep.created_at),
+  }));
+
+  return { character: char, rows };
 };
 
 // PEPISODE-PREVON — "Previously on" canon snapshot.

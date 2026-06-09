@@ -108,7 +108,10 @@ contextBridge.exposeInMainWorld('revival', {
     delete: (id) => ipcRenderer.invoke('characters:delete', id),
     archive: (id) => ipcRenderer.invoke('characters:archive', id),
     restore: (id) => ipcRenderer.invoke('characters:restore', id),
-    setStatus: (id, status) => ipcRenderer.invoke('characters:setStatus', id, status),
+    setStatus:   (id, status)  => ipcRenderer.invoke('characters:setStatus', id, status),
+    draftLock:   (id, forName) => ipcRenderer.invoke('characters:draftLock', id, forName),
+    draftUnlock: (id, note)    => ipcRenderer.invoke('characters:draftUnlock', id, note),
+    arcTimeline: (id)          => ipcRenderer.invoke('characters:arcTimeline', id),
   },
   // P37 — directed typed edges between characters (workspace-level)
   characterRelationships: {
@@ -127,7 +130,9 @@ contextBridge.exposeInMainWorld('revival', {
     delete: (id) => ipcRenderer.invoke('episodes:delete', id),
     archive: (id) => ipcRenderer.invoke('episodes:archive', id),
     restore: (id) => ipcRenderer.invoke('episodes:restore', id),
-    setStatus: (id, status) => ipcRenderer.invoke('episodes:setStatus', id, status),
+    setStatus:   (id, status)  => ipcRenderer.invoke('episodes:setStatus', id, status),
+    draftLock:   (id, forName) => ipcRenderer.invoke('episodes:draftLock', id, forName),
+    draftUnlock: (id, note)    => ipcRenderer.invoke('episodes:draftUnlock', id, note),
     previouslyOn: (id) => ipcRenderer.invoke('episodes:previouslyOn', id),
     previouslyOnExport: (id) => ipcRenderer.invoke('episodes:previouslyOnExport', id),
   },

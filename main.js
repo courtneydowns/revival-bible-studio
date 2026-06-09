@@ -164,6 +164,11 @@ function registerIpc() {
   ipcMain.handle('characters:archive', (_event, id) => { const r = db.characters.archive(id); recordEvent('Characters', 'archived'); return r; });
   ipcMain.handle('characters:restore', (_event, id) => db.characters.restore(id));
   ipcMain.handle('characters:setStatus', (_event, id, status) => db.characters.setStatus(id, status));
+  // PDRAFT-LOCK — Characters draft lock/unlock.
+  ipcMain.handle('characters:draftLock',   (_event, id, forName) => db.characters.draftLock(id, forName));
+  ipcMain.handle('characters:draftUnlock', (_event, id, note)    => db.characters.draftUnlock(id, note));
+  // PARC-A — Character arc tracker: written timeline.
+  ipcMain.handle('characters:arcTimeline', (_event, id) => db.characters.arcTimeline(id));
 
   // P37 — character relationship edges (workspace-level, not canon)
   ipcMain.handle('characterRelationships:listAll', () =>
@@ -187,6 +192,9 @@ function registerIpc() {
   ipcMain.handle('episodes:archive', (_event, id) => { const r = db.episodes.archive(id); recordEvent('Episodes', 'archived'); return r; });
   ipcMain.handle('episodes:restore', (_event, id) => db.episodes.restore(id));
   ipcMain.handle('episodes:setStatus', (_event, id, status) => db.episodes.setStatus(id, status));
+  // PDRAFT-LOCK — Episodes draft lock/unlock.
+  ipcMain.handle('episodes:draftLock',   (_event, id, forName) => db.episodes.draftLock(id, forName));
+  ipcMain.handle('episodes:draftUnlock', (_event, id, note)    => db.episodes.draftUnlock(id, note));
   // PEPISODE-PREVON — "Previously on" canon snapshot.
   ipcMain.handle('episodes:previouslyOn', (_e, id) => db.episodes.previouslyOn(id));
   ipcMain.handle('episodes:previouslyOnExport', (_e, id) => {

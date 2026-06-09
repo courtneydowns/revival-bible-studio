@@ -1361,7 +1361,13 @@ function makeEntryWorkspace(config) {
       editBtn.type = 'button';
       editBtn.className = 'btn-secondary';
       editBtn.textContent = pendingDraft ? 'Resume editing' : 'Edit';
-      editBtn.addEventListener('click', () => showEdit(item));
+      // PDRAFT-LOCK: block edits when entry is draft-locked.
+      if (config.isItemDraftLocked && config.isItemDraftLocked(item)) {
+        editBtn.disabled = true;
+        editBtn.title = 'Unlock this entry to edit';
+      } else {
+        editBtn.addEventListener('click', () => showEdit(item));
+      }
       actions.appendChild(editBtn);
 
       if (pendingDraft) {
@@ -9516,6 +9522,397 @@ function setupCharRelationalView(leftCol, rightCol, ctx) {
   });
 }
 
+// PARC-A — Character arc tracker: written timeline.
+// "Arc Timeline" toggle button sits in the Characters left column.
+// When active, hides the left column and renders the timeline in the right panel
+// (same pattern as the Relational View above).
+function setupCharArcTracker(leftCol, rightCol, ctx) {
+  const { list, setSelectedId, reloadList } = ctx;
+
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'btn-secondary char-arc-toggle';
+  toggle.textContent = 'Arc Timeline';
+  leftCol.insertBefore(toggle, list);
+
+  let arcViewMode = false;
+
+  function exitArcView() {
+    arcViewMode = false;
+    toggle.classList.remove('active');
+    leftCol.style.display = '';
+    reloadList();
+  }
+
+  // Parse a season number from an episode title (e.g. "S1E3 …" → 1, "Season 2" → 2).
+  function parseSeason(title) {
+    const m = (title || '').match(/\bS(\d+)E\d+/i) || (title || '').match(/\bSeason\s+(\d+)/i);
+    return m ? parseInt(m[1], 10) : null;
+  }
+
+  async function enterArcView() {
+    arcViewMode = true;
+    toggle.classList.add('active');
+    leftCol.style.display = 'none';
+
+    rightCol.innerHTML = '';
+
+    const container = document.createElement('div');
+    container.className = 'arc-container';
+    rightCol.appendChild(container);
+
+    // Load character list for the selector.
+    let allChars = [];
+    try { allChars = await window.revival.characters.list(); } catch { /* no-op */ }
+
+    let selectedCharId = allChars.length ? allChars[0].id : null;
+    let arcStatusFilter = null; // null = all; 'active' | 'recurring' | 'departed' | 'deceased'
+    let seasonFilter = null;    // null = all; integer season number
+
+    // --- Header row ---
+    const header = document.createElement('div');
+    header.className = 'arc-header';
+    container.appendChild(header);
+
+    const backBtn = document.createElement('button');
+    backBtn.type = 'button';
+    backBtn.className = 'btn-secondary arc-back';
+    backBtn.textContent = '← Back';
+    backBtn.addEventListener('click', exitArcView);
+    header.appendChild(backBtn);
+
+    const titleEl = document.createElement('span');
+    titleEl.className = 'arc-title';
+    titleEl.textContent = 'Character Arc Timeline';
+    header.appendChild(titleEl);
+
+    const charSelect = document.createElement('select');
+    charSelect.className = 'arc-char-select';
+    charSelect.setAttribute('aria-label', 'Select character');
+    header.appendChild(charSelect);
+
+    // --- Filter row ---
+    const filterRow = document.createElement('div');
+    filterRow.className = 'arc-filters';
+    container.appendChild(filterRow);
+
+    // --- Timeline area ---
+    const timelineEl = document.createElement('div');
+    container.appendChild(timelineEl);
+
+    const ARC_STATUS_OPTIONS = [
+      { value: 'active',    label: 'Active' },
+      { value: 'recurring', label: 'Recurring' },
+      { value: 'departed',  label: 'Departed' },
+      { value: 'deceased',  label: 'Deceased' },
+    ];
+    const ARC_STATUS_LABEL = Object.fromEntries(ARC_STATUS_OPTIONS.map((o) => [o.value, o.label]));
+
+    function rebuildCharSelect() {
+      charSelect.innerHTML = '';
+      const visible = arcStatusFilter
+        ? allChars.filter((c) => c.char_status === arcStatusFilter)
+        : allChars;
+      if (!visible.length) {
+        const opt = document.createElement('option');
+        opt.textContent = '(no characters)';
+        charSelect.appendChild(opt);
+        selectedCharId = null;
+        return;
+      }
+      for (const c of visible) {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.title + (c.char_status ? ` (${ARC_STATUS_LABEL[c.char_status] || c.char_status})` : '');
+        if (c.id === selectedCharId) opt.selected = true;
+        charSelect.appendChild(opt);
+      }
+      // If previous selection is no longer in the filtered set, reset.
+      if (!visible.find((c) => c.id === selectedCharId)) {
+        selectedCharId = visible[0].id;
+        charSelect.value = selectedCharId;
+      } else {
+        charSelect.value = selectedCharId;
+      }
+    }
+
+    function renderFilterRow(detectedSeasons) {
+      filterRow.innerHTML = '';
+
+      // Arc status filter chips.
+      const statusLabel = document.createElement('span');
+      statusLabel.className = 'arc-filter-label';
+      statusLabel.textContent = 'Status:';
+      filterRow.appendChild(statusLabel);
+
+      const allBtn = document.createElement('button');
+      allBtn.type = 'button';
+      allBtn.className = 'arc-filter-btn' + (arcStatusFilter === null ? ' active' : '');
+      allBtn.textContent = 'All';
+      allBtn.addEventListener('click', () => {
+        arcStatusFilter = null;
+        rebuildCharSelect();
+        renderFilterRow(detectedSeasons);
+        renderTimeline();
+      });
+      filterRow.appendChild(allBtn);
+
+      for (const opt of ARC_STATUS_OPTIONS) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'arc-filter-btn' + (arcStatusFilter === opt.value ? ' active' : '');
+        btn.textContent = opt.label;
+        btn.addEventListener('click', () => {
+          arcStatusFilter = opt.value;
+          rebuildCharSelect();
+          renderFilterRow(detectedSeasons);
+          renderTimeline();
+        });
+        filterRow.appendChild(btn);
+      }
+
+      // Season filter chips — only shown if any episode has a season number.
+      if (detectedSeasons && detectedSeasons.length > 0) {
+        const sep = document.createElement('span');
+        sep.style.cssText = 'width:1px;background:var(--border);align-self:stretch;margin:0 4px;';
+        filterRow.appendChild(sep);
+
+        const sLabel = document.createElement('span');
+        sLabel.className = 'arc-filter-label';
+        sLabel.textContent = 'Season:';
+        filterRow.appendChild(sLabel);
+
+        const sAll = document.createElement('button');
+        sAll.type = 'button';
+        sAll.className = 'arc-filter-btn' + (seasonFilter === null ? ' active' : '');
+        sAll.textContent = 'All';
+        sAll.addEventListener('click', () => { seasonFilter = null; renderFilterRow(detectedSeasons); renderTimeline(); });
+        filterRow.appendChild(sAll);
+
+        for (const s of detectedSeasons) {
+          const sb = document.createElement('button');
+          sb.type = 'button';
+          sb.className = 'arc-filter-btn' + (seasonFilter === s ? ' active' : '');
+          sb.textContent = `S${s}`;
+          sb.addEventListener('click', () => { seasonFilter = s; renderFilterRow(detectedSeasons); renderTimeline(); });
+          filterRow.appendChild(sb);
+        }
+      }
+    }
+
+    async function renderTimeline() {
+      timelineEl.innerHTML = '';
+
+      if (!selectedCharId) {
+        const empty = document.createElement('div');
+        empty.className = 'arc-empty';
+        empty.textContent = 'No characters to display.';
+        timelineEl.appendChild(empty);
+        return;
+      }
+
+      let data;
+      try {
+        data = await window.revival.characters.arcTimeline(selectedCharId);
+      } catch (err) {
+        const errEl = document.createElement('div');
+        errEl.className = 'arc-empty';
+        errEl.textContent = `Could not load arc: ${err.message || err}`;
+        timelineEl.appendChild(errEl);
+        return;
+      }
+
+      const { character, rows } = data;
+
+      // Detect seasons for the filter bar.
+      const seasonSet = new Set();
+      for (const { episode: ep } of rows) {
+        const s = parseSeason(ep.title);
+        if (s !== null) seasonSet.add(s);
+      }
+      const detectedSeasons = [...seasonSet].sort((a, b) => a - b);
+
+      // Re-render filter row with season info.
+      renderFilterRow(detectedSeasons);
+
+      // Character status badge next to title in arc panel.
+      let charStatusBadge = '';
+      if (character.char_status) {
+        charStatusBadge = ` · ${ARC_STATUS_LABEL[character.char_status] || character.char_status}`;
+      }
+      titleEl.textContent = `Arc Timeline · ${character.title}${charStatusBadge}`;
+
+      // Apply season filter.
+      const filteredRows = seasonFilter !== null
+        ? rows.filter(({ episode: ep }) => parseSeason(ep.title) === seasonFilter)
+        : rows;
+
+      if (!filteredRows.length) {
+        const empty = document.createElement('div');
+        empty.className = 'arc-empty';
+        empty.textContent = rows.length
+          ? 'No episodes match the current filter.'
+          : 'No episodes in the database yet.';
+        timelineEl.appendChild(empty);
+        return;
+      }
+
+      for (const { episode: ep, canon_facts, open_questions, decisions } of filteredRows) {
+        const details = document.createElement('details');
+        details.className = 'arc-ep-row';
+
+        const summary = document.createElement('summary');
+        summary.className = 'arc-ep-summary';
+
+        const epTitle = document.createElement('span');
+        epTitle.className = 'arc-ep-title';
+        epTitle.textContent = ep.title || '(untitled)';
+        summary.appendChild(epTitle);
+
+        if (ep.ep_status) {
+          const epBadge = document.createElement('span');
+          epBadge.className = 'arc-ep-status';
+          epBadge.textContent = ep.ep_status.charAt(0).toUpperCase() + ep.ep_status.slice(1);
+          summary.appendChild(epBadge);
+        }
+
+        const counts = document.createElement('span');
+        counts.className = 'arc-ep-counts';
+        counts.innerHTML =
+          `<span>${canon_facts.length} canon</span>` +
+          `<span>${open_questions.length} open Qs</span>` +
+          `<span>${decisions.length} decisions</span>`;
+        summary.appendChild(counts);
+
+        details.appendChild(summary);
+
+        const body = document.createElement('div');
+        body.className = 'arc-ep-body';
+
+        // Canon facts section.
+        const canonSect = document.createElement('div');
+        const canonHdr = document.createElement('div');
+        canonHdr.className = 'arc-section-title';
+        canonHdr.textContent = `Canon facts locked at this point (${canon_facts.length})`;
+        canonSect.appendChild(canonHdr);
+        if (canon_facts.length === 0) {
+          const none = document.createElement('span');
+          none.className = 'arc-none';
+          none.textContent = 'None yet.';
+          canonSect.appendChild(none);
+        } else {
+          const ul = document.createElement('div');
+          ul.className = 'arc-item-list';
+          for (const c of canon_facts) {
+            const item = document.createElement('div');
+            item.className = 'arc-item';
+            item.textContent = c.title || '(untitled)';
+            const typeTag = document.createElement('span');
+            typeTag.className = 'arc-item-type';
+            typeTag.textContent = c.entry_type.replace(/_/g, ' ');
+            item.appendChild(typeTag);
+            if (c.confidence) {
+              const confBadge = document.createElement('span');
+              confBadge.className = 'arc-item-badge';
+              confBadge.style.background = c.confidence === 'confirmed' ? '#2a6b3c22' : c.confidence === 'probable' ? '#a07d1e22' : '#6b2a2a22';
+              confBadge.style.color = c.confidence === 'confirmed' ? '#2a6b3c' : c.confidence === 'probable' ? '#a07d1e' : '#6b2a2a';
+              confBadge.textContent = c.confidence;
+              item.appendChild(confBadge);
+            }
+            ul.appendChild(item);
+          }
+          canonSect.appendChild(ul);
+        }
+        body.appendChild(canonSect);
+
+        // Open questions section.
+        const oqSect = document.createElement('div');
+        const oqHdr = document.createElement('div');
+        oqHdr.className = 'arc-section-title';
+        oqHdr.textContent = `Open questions at this point (${open_questions.length})`;
+        oqSect.appendChild(oqHdr);
+        if (open_questions.length === 0) {
+          const none = document.createElement('span');
+          none.className = 'arc-none';
+          none.textContent = 'None.';
+          oqSect.appendChild(none);
+        } else {
+          const ul = document.createElement('div');
+          ul.className = 'arc-item-list';
+          for (const oq of open_questions) {
+            const item = document.createElement('div');
+            item.className = 'arc-item';
+            item.textContent = oq.title || '(untitled)';
+            if (oq.tier) {
+              const tBadge = document.createElement('span');
+              tBadge.className = 'arc-item-badge';
+              tBadge.style.background = '#9b7fd622';
+              tBadge.style.color = '#9b7fd6';
+              tBadge.textContent = `T${oq.tier}`;
+              item.appendChild(tBadge);
+            }
+            ul.appendChild(item);
+          }
+          oqSect.appendChild(ul);
+        }
+        body.appendChild(oqSect);
+
+        // Decisions section.
+        const decSect = document.createElement('div');
+        const decHdr = document.createElement('div');
+        decHdr.className = 'arc-section-title';
+        decHdr.textContent = `Decisions at this point (${decisions.length})`;
+        decSect.appendChild(decHdr);
+        if (decisions.length === 0) {
+          const none = document.createElement('span');
+          none.className = 'arc-none';
+          none.textContent = 'None.';
+          decSect.appendChild(none);
+        } else {
+          const ul = document.createElement('div');
+          ul.className = 'arc-item-list';
+          for (const d of decisions) {
+            const item = document.createElement('div');
+            item.className = 'arc-item';
+            item.textContent = d.title || '(untitled)';
+            if (d.decision_status) {
+              const dBadge = document.createElement('span');
+              dBadge.className = 'arc-item-badge';
+              dBadge.style.background = d.decision_status === 'final' ? '#2a6b3c22' : '#a07d1e22';
+              dBadge.style.color = d.decision_status === 'final' ? '#2a6b3c' : '#a07d1e';
+              dBadge.textContent = d.decision_status;
+              item.appendChild(dBadge);
+            }
+            ul.appendChild(item);
+          }
+          decSect.appendChild(ul);
+        }
+        body.appendChild(decSect);
+
+        details.appendChild(body);
+        timelineEl.appendChild(details);
+      }
+    }
+
+    // Wire character selector.
+    charSelect.addEventListener('change', () => {
+      selectedCharId = parseInt(charSelect.value, 10);
+      seasonFilter = null;
+      renderTimeline();
+    });
+
+    // Initial render.
+    rebuildCharSelect();
+    renderFilterRow([]);
+    await renderTimeline();
+  }
+
+  toggle.addEventListener('click', () => {
+    if (arcViewMode) exitArcView();
+    else enterArcView();
+  });
+}
+
 // Mounts the "Relationships" section in a character's detail panel.
 // Shows existing relationships and an "Add Relationship" form.
 async function mountCharRelationships(container, charId) {
@@ -11149,6 +11546,116 @@ function mountPreviouslyOnPanel(rightCol, item) {
   rightCol.appendChild(section);
 }
 
+// PDRAFT-LOCK — shared draft-lock panel for Characters and Episodes detail views.
+// apiName: 'characters' | 'episodes'
+// reload: async fn that refreshes the detail panel after a lock/unlock.
+function mountDraftLockPanel(container, item, reload, apiName) {
+  const api = window.revival[apiName];
+  const section = document.createElement('div');
+  section.className = 'draft-lock-section';
+
+  const label = document.createElement('span');
+  label.className = 'draft-lock-label';
+  label.textContent = 'Draft lock:';
+  section.appendChild(label);
+
+  if (item.draft_locked_at) {
+    // --- Locked state ---
+    const badge = document.createElement('span');
+    badge.className = 'draft-lock-badge';
+    badge.textContent = 'Locked';
+    section.appendChild(badge);
+
+    if (item.draft_lock_for) {
+      const forSpan = document.createElement('span');
+      forSpan.className = 'draft-lock-for';
+      forSpan.textContent = `for ${item.draft_lock_for}`;
+      section.appendChild(forSpan);
+    }
+
+    const unlockBtn = document.createElement('button');
+    unlockBtn.type = 'button';
+    unlockBtn.className = 'btn-secondary';
+    unlockBtn.style.fontSize = '11px';
+    unlockBtn.style.padding = '2px 10px';
+    unlockBtn.textContent = 'Unlock';
+    unlockBtn.addEventListener('click', () => {
+      section.innerHTML = '';
+      section.appendChild(label.cloneNode(true));
+
+      const confirmDiv = document.createElement('div');
+      confirmDiv.className = 'draft-lock-unlock-confirm';
+
+      const promptText = document.createElement('span');
+      promptText.style.color = 'var(--muted)';
+      promptText.style.fontSize = '12px';
+      promptText.textContent = 'Unlock this entry for editing?';
+      confirmDiv.appendChild(promptText);
+
+      const row = document.createElement('div');
+      row.className = 'draft-lock-unlock-row';
+
+      const noteInput = document.createElement('input');
+      noteInput.type = 'text';
+      noteInput.className = 'draft-lock-note-input';
+      noteInput.placeholder = 'Unlock note (optional)';
+      row.appendChild(noteInput);
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.type = 'button';
+      confirmBtn.className = 'btn-primary';
+      confirmBtn.style.fontSize = '11px';
+      confirmBtn.style.padding = '2px 10px';
+      confirmBtn.textContent = 'Confirm unlock';
+      confirmBtn.addEventListener('click', async () => {
+        confirmBtn.disabled = true;
+        try {
+          await api.draftUnlock(item.id, noteInput.value.trim() || null);
+          await reload();
+        } catch { confirmBtn.disabled = false; }
+      });
+      row.appendChild(confirmBtn);
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'btn-secondary';
+      cancelBtn.style.fontSize = '11px';
+      cancelBtn.style.padding = '2px 10px';
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.addEventListener('click', () => reload());
+      row.appendChild(cancelBtn);
+
+      confirmDiv.appendChild(row);
+      section.appendChild(confirmDiv);
+    });
+    section.appendChild(unlockBtn);
+  } else {
+    // --- Unlocked state ---
+    const forInput = document.createElement('input');
+    forInput.type = 'text';
+    forInput.className = 'draft-lock-input';
+    forInput.placeholder = 'Lock for... (e.g. S1 Draft 1)';
+    section.appendChild(forInput);
+
+    const lockBtn = document.createElement('button');
+    lockBtn.type = 'button';
+    lockBtn.className = 'btn-secondary';
+    lockBtn.style.fontSize = '11px';
+    lockBtn.style.padding = '2px 10px';
+    lockBtn.textContent = 'Lock for draft';
+    lockBtn.addEventListener('click', async () => {
+      lockBtn.disabled = true;
+      try {
+        await api.draftLock(item.id, forInput.value.trim() || null);
+        await reload();
+      } catch { lockBtn.disabled = false; }
+    });
+    section.appendChild(lockBtn);
+  }
+
+  container.appendChild(section);
+}
+
 const CONTENT_RENDERERS = {
   'Home': renderHomePage,
   'Writing Lab': renderWritingLabPage,
@@ -12657,6 +13164,7 @@ const CONTENT_RENDERERS = {
       },
     });
   })(),
+
   // Characters (P26+P37+PCHAR-STATUS): CRUD lifecycle + relational view + status field.
   // Wrapped in an IIFE so statusFilter state is shared across list filter and detail
   // panel hooks without leaking into the outer scope (same pattern as Brainstorm).
@@ -12739,10 +13247,22 @@ const CONTENT_RENDERERS = {
         return statusFilter !== null;
       },
 
+      isItemDraftLocked(item) {
+        return !!item.draft_locked_at;
+      },
+
       listItemExtra(btn, item, archivedFlag) {
-        if (archivedFlag || !item.char_status) return;
+        if (archivedFlag) return;
         const titleRow = btn.querySelector('.tc-list-title');
         if (!titleRow) return;
+        // PDRAFT-LOCK badge: shown before status badge so it's leftmost.
+        if (item.draft_locked_at) {
+          const dlBadge = document.createElement('span');
+          dlBadge.className = 'tc-list-badge badge-draft-locked';
+          dlBadge.textContent = 'Draft-locked';
+          titleRow.insertBefore(dlBadge, titleRow.lastChild);
+        }
+        if (!item.char_status) return;
         const badge = document.createElement('span');
         badge.className = `tc-list-badge badge-char-${item.char_status}`;
         badge.textContent = CHAR_STATUS_LABEL[item.char_status] || item.char_status;
@@ -12754,6 +13274,10 @@ const CONTENT_RENDERERS = {
           mountCharStatusMeta(rightCol, item, async () => {
             if (reloadRef.fn) await reloadRef.fn();
           });
+          // PDRAFT-LOCK panel: shown after status, before actions row.
+          mountDraftLockPanel(rightCol, item, async () => {
+            if (reloadRef.fn) await reloadRef.fn();
+          }, 'characters');
         }
       },
 
@@ -12809,6 +13333,7 @@ const CONTENT_RENDERERS = {
         leftCol.insertBefore(filterBar, ctx.addBtn);
 
         setupCharRelationalView(leftCol, rightCol, ctx);
+        setupCharArcTracker(leftCol, rightCol, ctx);
       },
     });
   })(),
@@ -12893,10 +13418,22 @@ const CONTENT_RENDERERS = {
         return statusFilter !== null;
       },
 
+      isItemDraftLocked(item) {
+        return !!item.draft_locked_at;
+      },
+
       listItemExtra(btn, item, archivedFlag) {
-        if (archivedFlag || !item.ep_status) return;
+        if (archivedFlag) return;
         const titleRow = btn.querySelector('.tc-list-title');
         if (!titleRow) return;
+        // PDRAFT-LOCK badge: shown before status badge so it's leftmost.
+        if (item.draft_locked_at) {
+          const dlBadge = document.createElement('span');
+          dlBadge.className = 'tc-list-badge badge-draft-locked';
+          dlBadge.textContent = 'Draft-locked';
+          titleRow.insertBefore(dlBadge, titleRow.lastChild);
+        }
+        if (!item.ep_status) return;
         const badge = document.createElement('span');
         badge.className = `tc-list-badge badge-ep-${item.ep_status}`;
         badge.textContent = EP_STATUS_LABEL[item.ep_status] || item.ep_status;
@@ -12908,6 +13445,10 @@ const CONTENT_RENDERERS = {
           mountEpStatusMeta(rightCol, item, async () => {
             if (reloadRef.fn) await reloadRef.fn();
           });
+          // PDRAFT-LOCK panel: shown after status, before actions row.
+          mountDraftLockPanel(rightCol, item, async () => {
+            if (reloadRef.fn) await reloadRef.fn();
+          }, 'episodes');
         }
       },
 

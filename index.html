@@ -1606,6 +1606,152 @@
         border-color: #9b7fd6;
         color: #9b7fd6;
       }
+
+      /* PARC-A — Character arc tracker */
+      .char-arc-toggle {
+        width: 100%;
+        margin-bottom: 8px;
+        text-align: left;
+        font-size: 12px;
+      }
+      .char-arc-toggle.active {
+        border-color: #9b7fd6;
+        color: #9b7fd6;
+      }
+      .arc-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 20px 24px;
+        overflow-y: auto;
+        max-width: 860px;
+      }
+      .arc-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+      }
+      .arc-back { font-size: 12px; padding: 4px 10px; flex-shrink: 0; }
+      .arc-title {
+        font-size: 15px;
+        font-weight: 600;
+        flex-shrink: 0;
+      }
+      .arc-char-select {
+        font-size: 12px;
+        padding: 3px 8px;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        background: var(--panel);
+        color: var(--text);
+        cursor: pointer;
+      }
+      .arc-filters {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+      }
+      .arc-filter-label {
+        font-size: 11px;
+        color: var(--muted);
+        align-self: center;
+        margin-right: 2px;
+      }
+      .arc-filter-btn {
+        font-size: 11px;
+        padding: 2px 9px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--text);
+        cursor: pointer;
+      }
+      .arc-filter-btn.active {
+        background: #9b7fd6;
+        border-color: #9b7fd6;
+        color: #fff;
+      }
+      .arc-status-badge {
+        font-size: 10px;
+        padding: 1px 7px;
+        border-radius: 10px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        color: var(--muted);
+        margin-left: 6px;
+        vertical-align: middle;
+      }
+      .arc-empty {
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+        padding: 60px 20px;
+      }
+      .arc-ep-row {
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        margin-bottom: 10px;
+        overflow: hidden;
+      }
+      .arc-ep-summary {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 14px;
+        cursor: pointer;
+        list-style: none;
+        background: var(--panel);
+        user-select: none;
+      }
+      .arc-ep-summary::-webkit-details-marker { display: none; }
+      .arc-ep-row[open] .arc-ep-summary {
+        border-bottom: 1px solid var(--border);
+      }
+      .arc-ep-title { font-size: 13px; font-weight: 600; flex: 1; }
+      .arc-ep-status {
+        font-size: 10px;
+        padding: 1px 7px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--muted);
+      }
+      .arc-ep-counts { font-size: 11px; color: var(--muted); display: flex; gap: 10px; }
+      .arc-ep-body { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+      .arc-section-title {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 4px;
+      }
+      .arc-item-list { display: flex; flex-direction: column; gap: 4px; }
+      .arc-item {
+        font-size: 12px;
+        color: var(--text);
+        padding: 3px 8px;
+        background: var(--bg);
+        border-radius: 4px;
+        border: 1px solid var(--border);
+      }
+      .arc-item-type {
+        font-size: 10px;
+        color: var(--muted);
+        margin-left: 6px;
+      }
+      .arc-item-badge {
+        font-size: 10px;
+        padding: 1px 6px;
+        border-radius: 8px;
+        margin-left: 6px;
+        vertical-align: middle;
+      }
+      .arc-none { font-size: 12px; color: var(--muted); font-style: italic; }
+
       /* Relationships section in character detail panel */
       .char-rel-section {
         margin-top: 16px;
@@ -4411,6 +4557,69 @@
       .ep-filter-btn-outline.active { color: #c9862a; border-color: #c9862a; }
       .ep-filter-btn-draft.active   { color: #4a90d9; border-color: #4a90d9; }
       .ep-filter-btn-locked.active  { color: #4d9e6d; border-color: #4d9e6d; }
+
+      /* PDRAFT-LOCK — Draft lock panel on Characters/Episodes detail */
+      .draft-lock-section {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding: 8px 0 8px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 10px;
+        font-size: 13px;
+      }
+      .draft-lock-label {
+        color: var(--muted);
+        font-size: 12px;
+        min-width: 76px;
+        flex-shrink: 0;
+      }
+      .draft-lock-badge {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid #9b6dcc;
+        color: #9b6dcc;
+        font-weight: 600;
+      }
+      .draft-lock-for {
+        font-size: 12px;
+        color: var(--muted);
+        font-style: italic;
+      }
+      .draft-lock-input {
+        font-size: 12px;
+        padding: 3px 8px;
+        background: var(--input-bg, var(--bg));
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        color: var(--text);
+        width: 160px;
+      }
+      .draft-lock-unlock-confirm {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        padding: 6px 0 2px;
+        font-size: 12px;
+      }
+      .draft-lock-unlock-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .draft-lock-note-input {
+        font-size: 12px;
+        padding: 3px 8px;
+        background: var(--input-bg, var(--bg));
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        color: var(--text);
+        width: 200px;
+      }
+      .badge-draft-locked { color: #9b6dcc; border-color: #9b6dcc; }
 
       /* PDECISION-STATUS — Decision status badges on list items */
       .badge-decision-open      { color: #c9862a; border-color: #c9862a; }
