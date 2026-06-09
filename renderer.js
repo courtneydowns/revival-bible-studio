@@ -9246,6 +9246,8 @@ function renderWritingLabPage(section) {
       wlFfCallbacks.refreshHistory = wlFfRefresh;
       // PLOCKED-SPECIFICS — all locked specifics on Writing Lab drafts.
       if (!archivedAtStart) mountLockedSpecificsPanel(rightCol);
+      // PEPISODE-CONT-2B — continuity check for Writing Lab drafts.
+      if (!archivedAtStart) mountWlabContinuityPanel(rightCol, item);
     }
 
     // PPOL2b-12 — linked-entries indicator (same passive pattern as other workspaces).
@@ -12766,6 +12768,337 @@ function mountEpisodeContinuityPanel(rightCol, item) {
   rightCol.appendChild(section);
 }
 
+// PEPISODE-CONT-2B — Writing Lab draft continuity check.
+// Reads draft body + locked canon + optional comparison episode.
+// Same flag UI as mountEpisodeContinuityPanel.
+function mountWlabContinuityPanel(rightCol, item) {
+  const section = document.createElement('details');
+  section.className = 'ep-cont-section';
+
+  const sum = document.createElement('summary');
+  sum.className = 'ep-cont-summary';
+  sum.textContent = 'Continuity Check';
+  section.appendChild(sum);
+
+  const panelBody = document.createElement('div');
+  panelBody.className = 'ep-cont-body';
+  section.appendChild(panelBody);
+
+  // Episode picker — same pattern as mountEpisodeContinuityPanel.
+  const pickerRow = document.createElement('div');
+  pickerRow.className = 'ep-cont-picker-row';
+  const pickerLabel = document.createElement('label');
+  pickerLabel.className = 'ep-cont-picker-label';
+  pickerLabel.textContent = 'Compare against episode (optional):';
+  const pickerSelect = document.createElement('select');
+  pickerSelect.className = 'ep-cont-picker-select';
+  const noneOpt = document.createElement('option');
+  noneOpt.value = '';
+  noneOpt.textContent = '— none —';
+  pickerSelect.appendChild(noneOpt);
+  pickerRow.append(pickerLabel, pickerSelect);
+  panelBody.appendChild(pickerRow);
+
+  window.revival.episodes.list().then((eps) => {
+    for (const ep of eps) {
+      const opt = document.createElement('option');
+      opt.value = ep.id;
+      opt.textContent = ep.title || `Episode #${ep.id}`;
+      pickerSelect.appendChild(opt);
+    }
+  }).catch(() => {});
+
+  const contentArea = document.createElement('div');
+  panelBody.appendChild(contentArea);
+
+  function renderIdle() {
+    contentArea.innerHTML = '';
+    const runBtn = document.createElement('button');
+    runBtn.type = 'button';
+    runBtn.className = 'btn-secondary ep-cont-run-btn';
+    runBtn.textContent = 'Run continuity check';
+    runBtn.addEventListener('click', () => runCheck());
+    contentArea.appendChild(runBtn);
+  }
+
+  async function runCheck() {
+    contentArea.innerHTML = '';
+    const checking = document.createElement('p');
+    checking.className = 'ep-cont-status';
+    checking.textContent = 'Checking continuity…';
+    contentArea.appendChild(checking);
+
+    const model = (typeof chatModelSelect !== 'undefined' && chatModelSelect.value)
+      ? chatModelSelect.value : 'claude-sonnet-4-6';
+    const rawVal = pickerSelect.value;
+    const compareEpisodeId = rawVal ? parseInt(rawVal, 10) : null;
+
+    try {
+      const res = await window.revival.claude.wlabContinuityCheck(item.id, model, compareEpisodeId);
+      contentArea.innerHTML = '';
+
+      if (res.skipped) {
+        const msg = document.createElement('p');
+        msg.className = 'ep-cont-status';
+        msg.textContent = 'Add draft body text before running the continuity check.';
+        contentArea.appendChild(msg);
+        appendRerunBtn();
+        return;
+      }
+
+      const meta = document.createElement('p');
+      meta.className = 'ep-cont-status';
+      const parts = [];
+      if (res.compareEpisodeTitle) parts.push(`comparison: ${res.compareEpisodeTitle}`);
+      const canonPart = res.checkedCount - (res.compareEpisodeTitle ? 1 : 0);
+      if (canonPart > 0) parts.push(`${canonPart} canon entr${canonPart === 1 ? 'y' : 'ies'}`);
+      meta.textContent = res.flags.length === 0
+        ? `No issues found (checked: ${parts.join(', ') || 'nothing'}).`
+        : `${res.flags.length} issue${res.flags.length === 1 ? '' : 's'} found (checked: ${parts.join(', ')}).`;
+      contentArea.appendChild(meta);
+
+      renderFlags(contentArea, res.flags, item.title || 'Untitled');
+      appendRerunBtn();
+    } catch (err) {
+      contentArea.innerHTML = '';
+      const errEl = document.createElement('p');
+      errEl.className = 'ep-cont-status';
+      const cleanErr = (err.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+      errEl.textContent = `Error: ${cleanErr || 'Continuity check failed.'}`;
+      contentArea.appendChild(errEl);
+      appendRerunBtn();
+    }
+  }
+
+  function appendRerunBtn() {
+    const rerun = document.createElement('button');
+    rerun.type = 'button';
+    rerun.className = 'btn-secondary ep-cont-run-btn';
+    rerun.textContent = 'Run again';
+    rerun.addEventListener('click', () => runCheck());
+    contentArea.appendChild(rerun);
+  }
+
+  renderIdle();
+  rightCol.appendChild(section);
+}
+
+// PEPISODE-CONT-2B — Characters continuity check.
+// Reads character body + status + linked episodes + locked canon.
+// No picker — linked episodes are discovered automatically.
+function mountCharContinuityPanel(rightCol, item) {
+  const section = document.createElement('details');
+  section.className = 'ep-cont-section';
+
+  const sum = document.createElement('summary');
+  sum.className = 'ep-cont-summary';
+  sum.textContent = 'Continuity Check';
+  section.appendChild(sum);
+
+  const panelBody = document.createElement('div');
+  panelBody.className = 'ep-cont-body';
+  section.appendChild(panelBody);
+
+  const contentArea = document.createElement('div');
+  panelBody.appendChild(contentArea);
+
+  function renderIdle() {
+    contentArea.innerHTML = '';
+    const runBtn = document.createElement('button');
+    runBtn.type = 'button';
+    runBtn.className = 'btn-secondary ep-cont-run-btn';
+    runBtn.textContent = 'Run continuity check';
+    runBtn.addEventListener('click', () => runCheck());
+    contentArea.appendChild(runBtn);
+  }
+
+  async function runCheck() {
+    contentArea.innerHTML = '';
+    const checking = document.createElement('p');
+    checking.className = 'ep-cont-status';
+    checking.textContent = 'Checking continuity…';
+    contentArea.appendChild(checking);
+
+    const model = (typeof chatModelSelect !== 'undefined' && chatModelSelect.value)
+      ? chatModelSelect.value : 'claude-sonnet-4-6';
+
+    try {
+      const res = await window.revival.claude.charContinuityCheck(item.id, model);
+      contentArea.innerHTML = '';
+
+      if (res.skipped) {
+        const msg = document.createElement('p');
+        msg.className = 'ep-cont-status';
+        msg.textContent = 'Add character body text before running the continuity check.';
+        contentArea.appendChild(msg);
+        appendRerunBtn();
+        return;
+      }
+
+      const meta = document.createElement('p');
+      meta.className = 'ep-cont-status';
+      const parts = [];
+      if (res.linkedEpisodesCount > 0)
+        parts.push(`${res.linkedEpisodesCount} linked episode${res.linkedEpisodesCount === 1 ? '' : 's'}`);
+      const canonPart = res.checkedCount - (res.linkedEpisodesCount || 0);
+      if (canonPart > 0) parts.push(`${canonPart} canon entr${canonPart === 1 ? 'y' : 'ies'}`);
+      meta.textContent = res.flags.length === 0
+        ? `No issues found (checked: ${parts.join(', ') || 'nothing'}).`
+        : `${res.flags.length} issue${res.flags.length === 1 ? '' : 's'} found (checked: ${parts.join(', ')}).`;
+      contentArea.appendChild(meta);
+
+      renderFlags(contentArea, res.flags, item.title || 'Untitled');
+      appendRerunBtn();
+    } catch (err) {
+      contentArea.innerHTML = '';
+      const errEl = document.createElement('p');
+      errEl.className = 'ep-cont-status';
+      const cleanErr = (err.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+      errEl.textContent = `Error: ${cleanErr || 'Continuity check failed.'}`;
+      contentArea.appendChild(errEl);
+      appendRerunBtn();
+    }
+  }
+
+  function appendRerunBtn() {
+    const rerun = document.createElement('button');
+    rerun.type = 'button';
+    rerun.className = 'btn-secondary ep-cont-run-btn';
+    rerun.textContent = 'Run again';
+    rerun.addEventListener('click', () => runCheck());
+    contentArea.appendChild(rerun);
+  }
+
+  renderIdle();
+  rightCol.appendChild(section);
+}
+
+// Shared flag-card renderer for all continuity check panels.
+// Appends dismissable/routable flag cards to contentArea.
+function renderFlags(contentArea, flags, entryTitle) {
+  for (const f of flags) {
+    const card = document.createElement('div');
+    card.className = 'ep-cont-flag';
+
+    const typeLabel = document.createElement('span');
+    typeLabel.className = `ep-cont-flag-type ep-cont-type-${f.flagType}`;
+    typeLabel.textContent = { timeline: 'Timeline', character_state: 'Character', arc_break: 'Arc' }[f.flagType] || f.flagType;
+
+    const citation = document.createElement('div');
+    citation.className = 'ep-cont-flag-citation';
+    citation.appendChild(typeLabel);
+    citation.appendChild(document.createTextNode(` — ${f.sourceTitle}`));
+
+    const reason = document.createElement('p');
+    reason.className = 'ep-cont-flag-reason';
+    reason.textContent = f.reason;
+
+    card.append(citation, reason);
+
+    if (f.location) {
+      const loc = document.createElement('p');
+      loc.className = 'ep-cont-flag-loc';
+      loc.textContent = `In entry: "${f.location}"`;
+      card.appendChild(loc);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'ep-cont-flag-actions';
+
+    const routeConflictBtn = document.createElement('button');
+    routeConflictBtn.type = 'button';
+    routeConflictBtn.className = 'btn-secondary';
+    routeConflictBtn.style.cssText = 'font-size:11px;padding:2px 8px;';
+    routeConflictBtn.textContent = 'Route to Conflicts';
+
+    const routeOqBtn = document.createElement('button');
+    routeOqBtn.type = 'button';
+    routeOqBtn.className = 'btn-secondary';
+    routeOqBtn.style.cssText = 'font-size:11px;padding:2px 8px;';
+    routeOqBtn.textContent = 'Route to Open Questions';
+
+    const dismissBtn = document.createElement('button');
+    dismissBtn.type = 'button';
+    dismissBtn.className = 'btn-secondary';
+    dismissBtn.style.cssText = 'font-size:11px;padding:2px 8px;';
+    dismissBtn.textContent = 'Dismiss';
+
+    actions.append(routeConflictBtn, routeOqBtn, dismissBtn);
+    card.appendChild(actions);
+
+    const flagBody =
+      `Source: ${f.sourceKind} — ${f.sourceTitle}` +
+      (f.sourceId ? ` (#${f.sourceId})` : '') +
+      `\n\n${f.reason}` +
+      (f.location ? `\n\nIn entry: "${f.location}"` : '') +
+      `\n\nEntry: "${entryTitle}"`;
+
+    routeConflictBtn.addEventListener('click', async () => {
+      routeConflictBtn.disabled = true;
+      routeOqBtn.disabled = true;
+      dismissBtn.disabled = true;
+      try {
+        await window.revival.conflicts.create({
+          title: `Continuity: ${f.sourceTitle}`,
+          body: flagBody,
+        });
+        actions.innerHTML = '';
+        const routed = document.createElement('span');
+        routed.className = 'ep-cont-flag-routed';
+        routed.textContent = 'Routed to Conflicts.';
+        actions.appendChild(routed);
+      } catch (err) {
+        routeConflictBtn.disabled = false;
+        routeOqBtn.disabled = false;
+        dismissBtn.disabled = false;
+        const cleanErr = (err.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+        const errEl = document.createElement('span');
+        errEl.className = 'ep-cont-flag-error';
+        errEl.textContent = cleanErr || 'Failed to create conflict.';
+        actions.appendChild(errEl);
+      }
+    });
+
+    routeOqBtn.addEventListener('click', async () => {
+      routeConflictBtn.disabled = true;
+      routeOqBtn.disabled = true;
+      dismissBtn.disabled = true;
+      try {
+        await window.revival.openQuestions.create({
+          title: `Continuity question: ${f.sourceTitle}`,
+          body: flagBody,
+        });
+        actions.innerHTML = '';
+        const routed = document.createElement('span');
+        routed.className = 'ep-cont-flag-routed';
+        routed.textContent = 'Routed to Open Questions.';
+        actions.appendChild(routed);
+      } catch (err) {
+        routeConflictBtn.disabled = false;
+        routeOqBtn.disabled = false;
+        dismissBtn.disabled = false;
+        const cleanErr = (err.message || '').replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '');
+        const errEl = document.createElement('span');
+        errEl.className = 'ep-cont-flag-error';
+        errEl.textContent = cleanErr || 'Failed to create open question.';
+        actions.appendChild(errEl);
+      }
+    });
+
+    dismissBtn.addEventListener('click', () => {
+      card.remove();
+      if (contentArea.querySelectorAll('.ep-cont-flag').length === 0) {
+        const msg = document.createElement('p');
+        msg.className = 'ep-cont-status';
+        msg.textContent = 'All flags dismissed.';
+        contentArea.appendChild(msg);
+      }
+    });
+
+    contentArea.appendChild(card);
+  }
+}
+
 // PDRAFT-LOCK — shared draft-lock panel for Characters and Episodes detail views.
 // apiName: 'characters' | 'episodes'
 // reload: async fn that refreshes the detail panel after a lock/unlock.
@@ -14515,6 +14848,8 @@ const CONTENT_RENDERERS = {
         callbacks.refreshHistory = refresh;
         // PLOCKED-SPECIFICS — character-relevant locked specifics only.
         if (!archivedFlag) mountLockedSpecificsPanel(rightCol, { isCharactersEntry: true });
+        // PEPISODE-CONT-2B — continuity check for character entries.
+        if (!archivedFlag) mountCharContinuityPanel(rightCol, item);
       },
 
       leftColExtra(leftCol, rightCol, ctx) {

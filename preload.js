@@ -238,6 +238,12 @@ contextBridge.exposeInMainWorld('revival', {
     // PEPISODE-CONT-2A — compareEpisodeId is optional; null = no comparison.
     episodeContinuityCheck: (episodeId, model, compareEpisodeId) =>
       ipcRenderer.invoke('claude:episodeContinuityCheck', episodeId, model, compareEpisodeId),
+    // PEPISODE-CONT-2B — Writing Lab draft continuity check (vs. canon + optional episode).
+    wlabContinuityCheck: (draftId, model, compareEpisodeId) =>
+      ipcRenderer.invoke('claude:wlabContinuityCheck', draftId, model, compareEpisodeId),
+    // PEPISODE-CONT-2B — Characters continuity check (vs. linked episodes + canon).
+    charContinuityCheck: (charId, model) =>
+      ipcRenderer.invoke('claude:charContinuityCheck', charId, model),
     // P45 — AI import assistant: type suggestions + duplicate flags.
     importAssist: (entries, model) =>
       ipcRenderer.invoke('claude:importAssist', entries, model),
