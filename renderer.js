@@ -1133,12 +1133,17 @@ function makeEntryWorkspace(config) {
     wrap.className = 'tc-empty';
     const t = document.createElement('div');
     t.className = 'tc-empty-title';
-    t.textContent = 'Nothing selected';
     const h = document.createElement('div');
     h.className = 'tc-empty-hint';
-    h.textContent = activeItems.length === 0
-      ? `Click “+ ${addLabel}” to create your first entry.`
-      : 'Pick an entry on the left, or click + to add a new one.';
+    if (activeItems.length === 0 && config.emptyTitle) {
+      t.textContent = config.emptyTitle;
+      h.textContent = config.emptyHint || `Click “+ ${addLabel}” to add your first entry.`;
+    } else {
+      t.textContent = 'Nothing selected';
+      h.textContent = activeItems.length === 0
+        ? `Click “+ ${addLabel}” to create your first entry.`
+        : 'Pick an entry on the left, or click + to add a new one.';
+    }
     wrap.append(t, h);
     rightCol.appendChild(wrap);
   }
@@ -5730,6 +5735,7 @@ function renderCanonReviewPage(section, workspaceName) {
 // dismissals are persisted in localStorage so a dismissed suggestion stays
 // dismissed across restarts (it never reappears, even if its count changes).
 const DISMISSED_SUGGESTIONS_KEY = 'revival.home.dismissedSuggestions';
+const FIRST_SESSION_GUIDE_KEY = 'revival.home.firstSessionGuideDismissed';
 // How many Next Step cards show at once, and the hard ceiling on recent-activity
 // cards. Both keep Home from ever needing to scroll; recent is also trimmed to
 // whatever space is left after Next steps + Workspaces.
@@ -6142,6 +6148,67 @@ function renderHomePage(section) {
       return;
     }
     loading.remove();
+
+    // PEMPTY-STATE: first-session guide — shown once on first launch, dismissed
+    // permanently via localStorage. Non-modal, inline at the top of Home.
+    if (!localStorage.getItem(FIRST_SESSION_GUIDE_KEY)) {
+      const guide = document.createElement('div');
+      guide.className = 'first-session-guide';
+
+      const guideHead = document.createElement('div');
+      guideHead.className = 'first-session-guide-head';
+
+      const guideTitle = document.createElement('div');
+      guideTitle.className = 'first-session-guide-title';
+      guideTitle.textContent = 'Getting started';
+      guideHead.appendChild(guideTitle);
+
+      const dismissBtn = document.createElement('button');
+      dismissBtn.type = 'button';
+      dismissBtn.className = 'first-session-guide-dismiss';
+      dismissBtn.textContent = 'Dismiss';
+      dismissBtn.addEventListener('click', () => {
+        localStorage.setItem(FIRST_SESSION_GUIDE_KEY, '1');
+        guide.remove();
+      });
+      guideHead.appendChild(dismissBtn);
+      guide.appendChild(guideHead);
+
+      const guideBody = document.createElement('p');
+      guideBody.className = 'first-session-guide-body';
+      guideBody.textContent = 'Suggested start sequence — work through these in order:';
+      guide.appendChild(guideBody);
+
+      const steps = [
+        { label: 'Settings', detail: 'Add your API key and write your always-on Project Rules.' },
+        { label: 'Source Material', detail: 'Upload the scripts, pitch decks, and reference docs that Chat can pull from.' },
+        { label: 'Canon Bible', detail: 'Add your first locked canon entries — show facts the room agrees on.' },
+        { label: 'Open Questions', detail: 'Log every unresolved question so nothing falls through the cracks.' },
+      ];
+
+      const stepList = document.createElement('ol');
+      stepList.className = 'first-session-steps';
+      for (const step of steps) {
+        const li = document.createElement('li');
+        li.className = 'first-session-step';
+
+        const stepBtn = document.createElement('button');
+        stepBtn.type = 'button';
+        stepBtn.className = 'first-session-step-link';
+        stepBtn.textContent = step.label;
+        stepBtn.addEventListener('click', () => route(step.label));
+
+        const stepDetail = document.createElement('span');
+        stepDetail.className = 'first-session-step-detail';
+        stepDetail.textContent = ` — ${step.detail}`;
+
+        li.append(stepBtn, stepDetail);
+        stepList.appendChild(li);
+      }
+      guide.appendChild(stepList);
+
+      section.appendChild(guide);
+    }
 
     // PHOME-NEEDS: Needs Attention panel — primary actionable section.
     buildNeedsAttentionPanel(section);
@@ -13222,6 +13289,8 @@ const CONTENT_RENDERERS = {
     entityKind: 'unsorted',
     draftPrefix: 'unsorted',
     addLabel: 'Add to Unsorted',
+    emptyTitle: 'Capture first, route later',
+    emptyHint: 'Drop anything here — excerpts, highlights, raw observations. Use "Route to…" to send each item to the right workspace.',
     // PAUDIT-5 — "Route to…" action. Unsorted is a routing queue; every entry
     // needs a one-click path to a destination workspace. Same destinations as
     // highlight-extract-route minus Unsorted itself.
@@ -13309,6 +13378,8 @@ const CONTENT_RENDERERS = {
     entityKind: 'source_material',
     draftPrefix: 'source_material',
     addLabel: 'Add Source',
+    emptyTitle: 'Your reference library',
+    emptyHint: 'Add scripts, pitch docs, reference episodes, or research papers so you can attach them in Chat.',
     allowFileUpload: true,
     // Keep the Chat drawer's active-sources chips in sync when sources change
     // (delete cascades the attachment; archive flags it). loadActiveSources is
@@ -13457,6 +13528,8 @@ const CONTENT_RENDERERS = {
     entityKind: 'documents',
     draftPrefix: 'documents',
     addLabel: 'Add Document',
+    emptyTitle: 'Long-form documents',
+    emptyHint: 'Store series bibles, spec sheets, and any long-form writing that lives outside the Writing Lab drafts.',
     detailExtra(rightCol, item, archivedFlag) {
       if (!archivedFlag) mountProposeCanonSection(rightCol, item, 'documents');
       const callbacks = {};
@@ -13479,6 +13552,8 @@ const CONTENT_RENDERERS = {
       entityKind: 'open_questions',
       draftPrefix: 'open_questions',
       addLabel: 'Add Question',
+      emptyTitle: 'Track what\'s unresolved',
+      emptyHint: 'Log every question the writers haven\'t answered yet — they surface in Needs Attention until closed.',
       staleThresholdDays: () => getNeedsThresholds().tier1QuestionDays,
 
       matchesExtra(item) {
@@ -13760,6 +13835,8 @@ const CONTENT_RENDERERS = {
       entityKind: 'conflicts',
       draftPrefix: 'conflicts',
       addLabel: 'Log Conflict',
+      emptyTitle: 'Flag continuity problems',
+      emptyHint: 'Record anything that contradicts itself — plot holes, timeline breaks, character inconsistencies. Surface them before they compound.',
       sectionClass: 'ws-conflicts',
       titlePlaceholder: 'What contradicts what?',
       bodyPlaceholder: 'The two sides in tension, and where each comes from (optional)',
@@ -13907,6 +13984,8 @@ const CONTENT_RENDERERS = {
       entityKind: 'decisions',
       draftPrefix: 'decisions',
       addLabel: 'Record Decision',
+      emptyTitle: 'What\'s settled',
+      emptyHint: 'Record major creative choices so they\'re never re-litigated. Every decision here becomes a wall the room can point to.',
       titlePlaceholder: 'What was decided?',
       bodyPlaceholder: 'The decision, and why it was settled this way (optional)',
 
@@ -14340,6 +14419,8 @@ const CONTENT_RENDERERS = {
       entityKind: 'brainstorm',
       draftPrefix: 'brainstorm',
       addLabel: 'Add Idea',
+      emptyTitle: 'Rough ideas, no filter',
+      emptyHint: 'Capture anything before it evaporates — threads, sparks, what-ifs. Route the keepers to the right workspace when they\'re ready.',
       titlePlaceholder: 'What is the idea?',
       bodyPlaceholder: 'Where it might go, what sparked it (optional)',
 
@@ -14615,6 +14696,8 @@ const CONTENT_RENDERERS = {
       entityKind: 'research',
       draftPrefix: 'research',
       addLabel: 'Add Research',
+      emptyTitle: 'Evidence and findings',
+      emptyHint: 'Log research notes and cite the source so you always know where each fact came from.',
       sectionClass: 'ws-research',
       titlePlaceholder: 'What was researched?',
       bodyPlaceholder: 'Findings, and where they came from — source/link (optional)',
@@ -15044,6 +15127,8 @@ const CONTENT_RENDERERS = {
       entityKind: 'characters',
       draftPrefix: 'characters',
       addLabel: 'Add Character',
+      emptyTitle: 'Your character bible',
+      emptyHint: 'Build a profile for every character — role, arc, open threads. Link them to episodes and decisions as the show develops.',
       sectionClass: 'ws-characters',
       titlePlaceholder: 'Character name',
       bodyPlaceholder: 'Who they are — role, traits, arc, open threads (optional)',
@@ -15374,6 +15459,8 @@ const CONTENT_RENDERERS = {
       entityKind: 'episodes',
       draftPrefix: 'episodes',
       addLabel: 'Add Episode',
+      emptyTitle: 'Episode-by-episode tracking',
+      emptyHint: 'Outline each episode, track what\'s locked and what\'s in flux, and link to characters and decisions.',
       sectionClass: 'ws-episodes',
       titlePlaceholder: 'Episode title',
       bodyPlaceholder: 'Outline, scene list, beats, draft notes (optional)',

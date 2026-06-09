@@ -129,7 +129,7 @@ Research entries get a structured source field.
 
 ---
 
-## PEMPTY-STATE — Empty state + onboarding
+## PEMPTY-STATE — Empty state + onboarding ✓ complete
 
 First-launch and empty workspace experience.
 

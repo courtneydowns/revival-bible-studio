@@ -727,7 +727,7 @@ Extends the existing episode continuity checker. Do not remove or alter existing
 
 ## Empty state + onboarding
 
-### PEMPTY-STATE — Empty state + onboarding
+### PEMPTY-STATE — Empty state + onboarding ✓
 - Empty state copy for every workspace: what it's for, what to do first
 - First-session guide: non-modal walkthrough available from Home on first launch
 - Suggested start sequence: Settings (API key + Project Rules) → Source Material → Canon Bible → Open Questions

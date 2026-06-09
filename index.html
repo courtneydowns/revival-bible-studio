@@ -2681,6 +2681,73 @@
       }
       .suggestion-dismiss:hover { background: var(--hover); color: var(--text); }
 
+      /* PEMPTY-STATE: first-session guide */
+      .first-session-guide {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--accent);
+        border-radius: 7px;
+        padding: 12px 14px 14px;
+        margin-bottom: 20px;
+      }
+      .first-session-guide-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 6px;
+      }
+      .first-session-guide-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        letter-spacing: 0.01em;
+      }
+      .first-session-guide-dismiss {
+        font: inherit;
+        font-size: 12px;
+        color: var(--muted);
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 2px 9px;
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+      .first-session-guide-dismiss:hover { border-color: var(--accent); color: var(--text); background: var(--hover); }
+      .first-session-guide-body {
+        font-size: 13px;
+        color: var(--muted);
+        margin: 0 0 8px;
+      }
+      .first-session-steps {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .first-session-step {
+        font-size: 13px;
+        color: var(--text);
+      }
+      .first-session-step-link {
+        font: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--accent);
+        background: none;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      .first-session-step-link:hover { opacity: 0.8; }
+      .first-session-step-detail {
+        color: var(--muted);
+      }
+
       .home-counts {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));

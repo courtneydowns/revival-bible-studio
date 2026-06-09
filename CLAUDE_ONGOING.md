@@ -245,7 +245,6 @@ These features are in `docs/FEATURE_BACKLOG_ONGOING.md` and `docs/BUILD_PLAN_ONG
 - **PLOCKED-SPECIFICS:** Collapsed reference panel on Characters, Episodes, Writing Lab, Canon Bible (Edit Mode), Canon Review — surfaces locked non-negotiables from THE_FLANAGAN_MASTER.
 - **PEPISODE-CONT:** AI episode continuity checker — on-demand, flags arc/timeline inconsistencies, routes to Conflicts/Open Questions. Reads character status field.
 - **PRESEARCH-CITE:** Research entries get a source citation field, linkable to Source Material.
-- **PEMPTY-STATE:** Empty state copy on all workspaces + first-session guide on Home (dismissable, non-recurring).
 - **PHEALTH:** App health panel in Settings — migration count, SQLite size, record counts, orphan detection + cleanup.
 - **PCONFIG-BACKUP:** Config export/import in Settings (Project Rules, thresholds, user tags — no API key).
 - **PFLAN-EXPAND:** Flanagan Filter expands to Brainstorm, Writing Lab, Characters, Episodes, Canon Review, Canon Bible (Edit Mode), Conflicts (lightweight), Decisions (lightweight). Fifth mode: Production Check (Tier 3 only).
