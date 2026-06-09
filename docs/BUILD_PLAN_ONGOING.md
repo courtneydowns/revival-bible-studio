@@ -608,7 +608,7 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ## Quiet devastation tracker
 
-### PQUIET — Quiet devastation tracker
+### PQUIET — Quiet devastation tracker ✅
 - Per-episode status: No candidate / Candidate identified / Locked
 - Four pre-seeded locked quiet devastations from THE_FLANAGAN_MASTER (Episodes 1, 4, 6, 8) — seeded at migration, not editable
 - Add candidate: link to Writing Lab draft, scene note, or freeform description

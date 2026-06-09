@@ -5869,8 +5869,8 @@ function buildNeedsAttentionPanel(container) {
     head.appendChild(refreshBtn);
     wrap.appendChild(head);
 
-    const { tier1Questions, stalledConflicts, pendingProposals, blockingQuestions = [], outlineEpisodes = [], blockingConflicts = [] } = data;
-    const total = tier1Questions.length + stalledConflicts.length + pendingProposals.length + blockingQuestions.length + outlineEpisodes.length + blockingConflicts.length;
+    const { tier1Questions, stalledConflicts, pendingProposals, blockingQuestions = [], outlineEpisodes = [], blockingConflicts = [], episodesNoQd = [] } = data;
+    const total = tier1Questions.length + stalledConflicts.length + pendingProposals.length + blockingQuestions.length + outlineEpisodes.length + blockingConflicts.length + episodesNoQd.length;
 
     if (total === 0) {
       const empty = document.createElement('p');
@@ -5993,6 +5993,41 @@ function buildNeedsAttentionPanel(container) {
         const subEl = document.createElement('div');
         subEl.className = 'na-item-age';
         subEl.textContent = 'Status: Outline';
+        btn.append(titleEl, subEl);
+        grid.appendChild(btn);
+      }
+      cat.appendChild(grid);
+      wrap.appendChild(cat);
+    }
+
+    // PQUIET: episodes linked to a QD tracker row but with no candidate yet.
+    if (episodesNoQd && episodesNoQd.length > 0) {
+      const cat = document.createElement('div');
+      cat.className = 'na-category';
+      const catHead = document.createElement('div');
+      catHead.className = 'na-category-head';
+      const catLabel = document.createElement('span');
+      catLabel.className = 'na-category-label';
+      catLabel.textContent = 'Episodes without a quiet devastation candidate';
+      const badge = document.createElement('span');
+      badge.className = 'na-count-badge';
+      badge.textContent = String(episodesNoQd.length);
+      catHead.append(catLabel, badge);
+      cat.appendChild(catHead);
+      const grid = document.createElement('div');
+      grid.className = 'na-items';
+      for (const ep of episodesNoQd) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'na-item';
+        btn.title = 'Go to Episodes';
+        btn.addEventListener('click', () => route('Episodes'));
+        const titleEl = document.createElement('div');
+        titleEl.className = 'na-item-title';
+        titleEl.textContent = ep.title || '(untitled)';
+        const subEl = document.createElement('div');
+        subEl.className = 'na-item-age';
+        subEl.textContent = 'No QD candidate';
         btn.append(titleEl, subEl);
         grid.appendChild(btn);
       }
@@ -11910,6 +11945,230 @@ function mountEpisodeStructPanel(rightCol, item) {
   rightCol.appendChild(section);
 }
 
+// PQUIET — Quiet devastation tracker panel on episode detail.
+// Parses the series-wide ep_num (1–24) from the episode title (S1E1–S3E8).
+// Seeded entries (eps 1, 4, 6, 8) are locked and read-only.
+// Others can have a candidate added (freeform + optional Writing Lab link)
+// and then locked.
+function parseSeriesEpNum(title) {
+  const m = (title || '').match(/\bS(\d+)E(\d+)/i);
+  if (!m) return null;
+  const s = parseInt(m[1], 10);
+  const e = parseInt(m[2], 10);
+  if (s >= 1 && s <= 3 && e >= 1 && e <= 8) return (s - 1) * 8 + e;
+  return null;
+}
+
+function mountQuietDevastationPanel(rightCol, item) {
+  const section = document.createElement('details');
+  section.className = 'qd-section';
+
+  const sum = document.createElement('summary');
+  sum.className = 'qd-summary';
+  sum.textContent = 'Quiet Devastation';
+  section.appendChild(sum);
+
+  const body = document.createElement('div');
+  body.className = 'qd-body';
+  section.appendChild(body);
+
+  const epNum = parseSeriesEpNum(item.title);
+
+  if (epNum === null) {
+    const msg = document.createElement('p');
+    msg.className = 'qd-no-epnum';
+    msg.textContent = 'Add an episode code (e.g. S1E3) to your title to track quiet devastation for this episode.';
+    body.appendChild(msg);
+    rightCol.appendChild(section);
+    return;
+  }
+
+  let qdRow = null;
+  let allDrafts = [];
+
+  function statusLabel(s) {
+    if (s === 'no_candidate')         return 'No candidate';
+    if (s === 'candidate_identified') return 'Candidate identified';
+    if (s === 'locked')               return 'Locked';
+    return s;
+  }
+
+  function statusClass(s) {
+    if (s === 'candidate_identified') return 'qd-status-candidate';
+    if (s === 'locked')               return 'qd-status-locked';
+    return 'qd-status-none';
+  }
+
+  function renderBody() {
+    body.innerHTML = '';
+    if (!qdRow) {
+      const err = document.createElement('p');
+      err.className = 'qd-error';
+      err.textContent = 'Could not load quiet devastation data.';
+      body.appendChild(err);
+      return;
+    }
+
+    // Status badge
+    const statusRow = document.createElement('div');
+    statusRow.className = 'qd-status-row';
+    const badge = document.createElement('span');
+    badge.className = `qd-status-badge ${statusClass(qdRow.status)}`;
+    badge.textContent = statusLabel(qdRow.status);
+    statusRow.appendChild(badge);
+    if (qdRow.is_seeded) {
+      const seedBadge = document.createElement('span');
+      seedBadge.className = 'qd-seeded-badge';
+      seedBadge.textContent = 'Flanagan (locked)';
+      statusRow.appendChild(seedBadge);
+    }
+    body.appendChild(statusRow);
+
+    // Seeded text (read-only for locked seeded entries)
+    if (qdRow.is_seeded && qdRow.seeded_text) {
+      const textEl = document.createElement('p');
+      textEl.className = 'qd-seeded-text';
+      textEl.textContent = qdRow.seeded_text;
+      body.appendChild(textEl);
+      return;
+    }
+
+    // User-locked (non-seeded)
+    if (qdRow.status === 'locked') {
+      if (qdRow.description) {
+        const descEl = document.createElement('p');
+        descEl.className = 'qd-locked-desc';
+        descEl.textContent = qdRow.description;
+        body.appendChild(descEl);
+      }
+      if (qdRow.writing_lab_title) {
+        const wlEl = document.createElement('p');
+        wlEl.className = 'qd-locked-wl';
+        wlEl.textContent = `Writing Lab: ${qdRow.writing_lab_title}`;
+        body.appendChild(wlEl);
+      }
+      return;
+    }
+
+    // Candidate identified — show editable form
+    if (qdRow.status === 'candidate_identified') {
+      renderCandidateForm(true);
+      return;
+    }
+
+    // No candidate — show add form
+    renderCandidateForm(false);
+  }
+
+  function renderCandidateForm(hasExisting) {
+    const form = document.createElement('div');
+    form.className = 'qd-form';
+
+    const descLabel = document.createElement('label');
+    descLabel.className = 'qd-field-label';
+    descLabel.textContent = 'Scene note or description';
+    const descArea = document.createElement('textarea');
+    descArea.className = 'qd-desc-input';
+    descArea.rows = 3;
+    descArea.placeholder = 'Describe the quiet devastation moment…';
+    if (hasExisting && qdRow.description) descArea.value = qdRow.description;
+    form.append(descLabel, descArea);
+
+    // Writing Lab picker
+    const wlLabel = document.createElement('label');
+    wlLabel.className = 'qd-field-label';
+    wlLabel.textContent = 'Link Writing Lab draft (optional)';
+    const wlSelect = document.createElement('select');
+    wlSelect.className = 'qd-wl-select';
+    const blankOpt = document.createElement('option');
+    blankOpt.value = '';
+    blankOpt.textContent = '— none —';
+    wlSelect.appendChild(blankOpt);
+    for (const d of allDrafts) {
+      const opt = document.createElement('option');
+      opt.value = String(d.id);
+      opt.textContent = d.title || '(untitled)';
+      if (hasExisting && qdRow.writing_lab_id === d.id) opt.selected = true;
+      wlSelect.appendChild(opt);
+    }
+    form.append(wlLabel, wlSelect);
+
+    const btnRow = document.createElement('div');
+    btnRow.className = 'qd-btn-row';
+
+    const saveLabel = hasExisting ? 'Update candidate' : 'Save candidate';
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'btn-secondary qd-save-btn';
+    saveBtn.textContent = saveLabel;
+    const saveStatus = document.createElement('span');
+    saveStatus.className = 'qd-save-status';
+
+    saveBtn.addEventListener('click', async () => {
+      const desc = descArea.value.trim();
+      const wlId = wlSelect.value ? parseInt(wlSelect.value, 10) : null;
+      saveBtn.disabled = true;
+      saveStatus.textContent = 'Saving…';
+      try {
+        await window.revival.quietDevastations.setCandidate(epNum, { description: desc, writingLabId: wlId });
+        qdRow = await window.revival.quietDevastations.getByEpNum(epNum);
+        saveStatus.textContent = '';
+        renderBody();
+      } catch (err) {
+        saveStatus.textContent = err.message || 'Save failed.';
+        saveBtn.disabled = false;
+      }
+    });
+
+    btnRow.append(saveBtn, saveStatus);
+
+    if (hasExisting) {
+      const lockBtn = document.createElement('button');
+      lockBtn.type = 'button';
+      lockBtn.className = 'btn-secondary qd-lock-btn';
+      lockBtn.textContent = 'Lock';
+      lockBtn.title = 'Mark this quiet devastation final and read-only';
+      lockBtn.addEventListener('click', async () => {
+        if (!confirm('Lock this quiet devastation? It will become read-only.')) return;
+        lockBtn.disabled = true;
+        try {
+          await window.revival.quietDevastations.lock(epNum);
+          qdRow = await window.revival.quietDevastations.getByEpNum(epNum);
+          renderBody();
+        } catch (err) {
+          lockBtn.disabled = false;
+          const errEl = document.createElement('span');
+          errEl.className = 'qd-save-status';
+          errEl.textContent = err.message || 'Lock failed.';
+          btnRow.appendChild(errEl);
+        }
+      });
+      btnRow.appendChild(lockBtn);
+    }
+
+    form.appendChild(btnRow);
+    body.appendChild(form);
+  }
+
+  async function load() {
+    try {
+      [qdRow, allDrafts] = await Promise.all([
+        window.revival.quietDevastations.getByEpNum(epNum),
+        window.revival.writingLab.list(),
+      ]);
+      if (qdRow) {
+        window.revival.quietDevastations.linkEpisode(epNum, item.id).catch(() => {});
+      }
+    } catch {
+      qdRow = null;
+    }
+    renderBody();
+  }
+
+  load();
+  rightCol.appendChild(section);
+}
+
 // PEPISODE-PREVON — collapsed "Previously on" panel on an episode detail.
 // Shows all locked non-retired canon entries with locked_at before this
 // episode's created_at. One-click generate; exportable as plain text.
@@ -13916,6 +14175,160 @@ const CONTENT_RENDERERS = {
       container.appendChild(section);
     }
 
+    // PQUIET — QD dashboard: all 24 episodes in a 3×8 grid.
+    // Toggled by a button in leftColExtra alongside the status filter.
+    function setupQdDashboard(leftCol, rightCol, ctx) {
+      let qdMode = false;
+
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'btn-secondary qd-dashboard-toggle';
+      toggle.textContent = 'QD Dashboard';
+      leftCol.insertBefore(toggle, ctx.addBtn);
+
+      function exitQdMode() {
+        qdMode = false;
+        toggle.classList.remove('active');
+        leftCol.style.display = '';
+        ctx.reloadList();
+      }
+
+      async function enterQdMode() {
+        qdMode = true;
+        toggle.classList.add('active');
+        leftCol.style.display = 'none';
+        rightCol.innerHTML = '';
+
+        const container = document.createElement('div');
+        container.className = 'qd-dashboard-container';
+
+        const header = document.createElement('div');
+        header.className = 'qd-dashboard-header';
+
+        const title = document.createElement('span');
+        title.className = 'qd-dashboard-title';
+        title.textContent = 'Quiet Devastation — All 24 Episodes';
+        header.appendChild(title);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'btn-ghost qd-dashboard-close';
+        closeBtn.textContent = '✕ Close';
+        closeBtn.addEventListener('click', exitQdMode);
+        header.appendChild(closeBtn);
+
+        container.appendChild(header);
+
+        // Legend
+        const legend = document.createElement('div');
+        legend.className = 'qd-legend';
+        const LEGEND = [
+          { cls: 'qd-status-none',      label: 'No candidate' },
+          { cls: 'qd-status-candidate', label: 'Candidate identified' },
+          { cls: 'qd-status-locked',    label: 'Locked' },
+        ];
+        for (const l of LEGEND) {
+          const pip = document.createElement('span');
+          pip.className = `qd-legend-pip ${l.cls}`;
+          const txt = document.createElement('span');
+          txt.className = 'qd-legend-label';
+          txt.textContent = l.label;
+          legend.append(pip, txt);
+        }
+        container.appendChild(legend);
+
+        const loadingEl = document.createElement('p');
+        loadingEl.className = 'placeholder';
+        loadingEl.textContent = 'Loading…';
+        container.appendChild(loadingEl);
+        rightCol.appendChild(container);
+
+        let rows;
+        try {
+          rows = await window.revival.quietDevastations.getAll();
+        } catch {
+          loadingEl.textContent = 'Could not load quiet devastation data.';
+          return;
+        }
+        loadingEl.remove();
+
+        const byEpNum = new Map(rows.map((r) => [r.ep_num, r]));
+
+        // 3 seasons × 8 episodes grid
+        for (let season = 1; season <= 3; season++) {
+          const seasonBlock = document.createElement('div');
+          seasonBlock.className = 'qd-season-block';
+
+          const seasonLabel = document.createElement('div');
+          seasonLabel.className = 'qd-season-label';
+          seasonLabel.textContent = `Season ${season}`;
+          seasonBlock.appendChild(seasonLabel);
+
+          const grid = document.createElement('div');
+          grid.className = 'qd-season-grid';
+
+          for (let epInSeason = 1; epInSeason <= 8; epInSeason++) {
+            const epNum = (season - 1) * 8 + epInSeason;
+            const row = byEpNum.get(epNum);
+            const status = row ? row.status : 'no_candidate';
+
+            const cell = document.createElement('div');
+            cell.className = `qd-cell ${status === 'no_candidate' ? 'qd-status-none' : status === 'candidate_identified' ? 'qd-status-candidate' : 'qd-status-locked'}`;
+
+            const epCode = document.createElement('span');
+            epCode.className = 'qd-cell-code';
+            epCode.textContent = `E${epInSeason}`;
+            cell.appendChild(epCode);
+
+            if (row && row.is_seeded) {
+              const seedPip = document.createElement('span');
+              seedPip.className = 'qd-cell-seeded-pip';
+              seedPip.title = 'Pre-seeded (Flanagan)';
+              cell.appendChild(seedPip);
+            }
+
+            const statusEl = document.createElement('span');
+            statusEl.className = 'qd-cell-status';
+            if (status === 'no_candidate')         statusEl.textContent = 'No candidate';
+            else if (status === 'candidate_identified') statusEl.textContent = 'Candidate';
+            else                                    statusEl.textContent = 'Locked';
+            cell.appendChild(statusEl);
+
+            // Show description preview if set
+            const previewText = row && (row.seeded_text || row.description);
+            if (previewText) {
+              const preview = document.createElement('span');
+              preview.className = 'qd-cell-preview';
+              preview.textContent = previewText.length > 60 ? previewText.slice(0, 58) + '…' : previewText;
+              cell.appendChild(preview);
+            }
+
+            if (row && row.writing_lab_title) {
+              const wlPip = document.createElement('span');
+              wlPip.className = 'qd-cell-wl';
+              wlPip.textContent = `Draft: ${row.writing_lab_title}`;
+              cell.appendChild(wlPip);
+            }
+
+            grid.appendChild(cell);
+          }
+
+          seasonBlock.appendChild(grid);
+          container.appendChild(seasonBlock);
+        }
+      }
+
+      toggle.addEventListener('click', () => {
+        if (qdMode) exitQdMode();
+        else enterQdMode();
+      });
+
+      // Exit QD mode when the user navigates away via list item click
+      ctx.list.addEventListener('click', () => {
+        if (qdMode) exitQdMode();
+      });
+    }
+
     return makeEntryWorkspace({
       apiName: 'episodes',
       entityKind: 'episodes',
@@ -13978,6 +14391,8 @@ const CONTENT_RENDERERS = {
         callbacks.refreshHistory = refresh;
         // PEPISODE-STRUCT — structure checklist (5 Flanagan items).
         if (!archivedFlag) mountEpisodeStructPanel(rightCol, item);
+        // PQUIET — quiet devastation tracker.
+        if (!archivedFlag) mountQuietDevastationPanel(rightCol, item);
         // PEPISODE-PREVON — "Previously on" collapsed canon snapshot.
         if (!archivedFlag) mountPreviouslyOnPanel(rightCol, item);
       },
@@ -14017,6 +14432,9 @@ const CONTENT_RENDERERS = {
         }
         renderFilterBar();
         leftCol.insertBefore(filterBar, ctx.addBtn);
+
+        // PQUIET — QD dashboard toggle button.
+        setupQdDashboard(leftCol, rightCol, ctx);
       },
     });
   })(),

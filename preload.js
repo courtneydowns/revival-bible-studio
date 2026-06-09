@@ -140,6 +140,15 @@ contextBridge.exposeInMainWorld('revival', {
     structSetChecked: (id, key, val) => ipcRenderer.invoke('episodes:structSetChecked', id, key, val),
     structSetOverride:(id, key, val) => ipcRenderer.invoke('episodes:structSetOverride', id, key, val),
   },
+  // PQUIET — Quiet devastation tracker.
+  quietDevastations: {
+    getAll:                  ()                    => ipcRenderer.invoke('quietDevastations:getAll'),
+    getByEpNum:              (epNum)               => ipcRenderer.invoke('quietDevastations:getByEpNum', epNum),
+    linkEpisode:             (epNum, episodeId)    => ipcRenderer.invoke('quietDevastations:linkEpisode', epNum, episodeId),
+    setCandidate:            (epNum, data)         => ipcRenderer.invoke('quietDevastations:setCandidate', epNum, data),
+    lock:                    (epNum)               => ipcRenderer.invoke('quietDevastations:lock', epNum),
+    episodesWithoutCandidate: ()                   => ipcRenderer.invoke('quietDevastations:episodesWithoutCandidate'),
+  },
   writingLab: {
     list: () => ipcRenderer.invoke('writingLab:list'),
     listArchived: () => ipcRenderer.invoke('writingLab:listArchived'),

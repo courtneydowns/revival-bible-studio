@@ -233,6 +233,14 @@ function registerIpc() {
     return { filePath };
   });
 
+  // PQUIET — Quiet devastation tracker.
+  ipcMain.handle('quietDevastations:getAll', () => db.quietDevastations.getAll());
+  ipcMain.handle('quietDevastations:getByEpNum', (_e, epNum) => db.quietDevastations.getByEpNum(epNum));
+  ipcMain.handle('quietDevastations:linkEpisode', (_e, epNum, episodeId) => db.quietDevastations.linkEpisode(epNum, episodeId));
+  ipcMain.handle('quietDevastations:setCandidate', (_e, epNum, data) => db.quietDevastations.setCandidate(epNum, data));
+  ipcMain.handle('quietDevastations:lock', (_e, epNum) => db.quietDevastations.lock(epNum));
+  ipcMain.handle('quietDevastations:episodesWithoutCandidate', () => db.quietDevastations.episodesWithoutCandidate());
+
   ipcMain.handle('writingLab:list', () => db.writingLab.list());
   ipcMain.handle('writingLab:listArchived', () => db.writingLab.listArchived());
   ipcMain.handle('writingLab:create', (_event, entry) => { const r = db.writingLab.create(entry); recordEvent('Writing Lab', 'created'); return r; });

@@ -1869,6 +1869,63 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '058_pquiet',
+    up(db) {
+      // PQUIET — Quiet devastation tracker.
+      // ep_num: series-wide episode number 1–24 (3 seasons × 8 episodes).
+      //   S1E1=1 … S1E8=8, S2E1=9 … S2E8=16, S3E1=17 … S3E8=24.
+      // episode_id: optional FK to episodes_workspace (linked when user opens the panel).
+      // is_seeded: 1 for the four locked Flanagan entries; their seeded_text is read-only.
+      // status: no_candidate → candidate_identified → locked.
+      const now = new Date().toISOString();
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS episode_quiet_devastations (
+          id              INTEGER PRIMARY KEY,
+          ep_num          INTEGER NOT NULL,
+          episode_id      INTEGER REFERENCES episodes_workspace(id) ON DELETE SET NULL,
+          description     TEXT,
+          writing_lab_id  INTEGER REFERENCES writing_lab_drafts(id) ON DELETE SET NULL,
+          status          TEXT NOT NULL DEFAULT 'no_candidate'
+                               CHECK(status IN ('no_candidate','candidate_identified','locked')),
+          is_seeded       INTEGER NOT NULL DEFAULT 0,
+          seeded_text     TEXT,
+          created_at      TEXT NOT NULL,
+          updated_at      TEXT NOT NULL,
+          UNIQUE(ep_num)
+        );
+      `);
+
+      const seedSeeded = db.prepare(`
+        INSERT OR IGNORE INTO episode_quiet_devastations
+          (ep_num, status, is_seeded, seeded_text, created_at, updated_at)
+        VALUES (?, 'locked', 1, ?, ?, ?)
+      `);
+      const seedBlank = db.prepare(`
+        INSERT OR IGNORE INTO episode_quiet_devastations
+          (ep_num, status, is_seeded, created_at, updated_at)
+        VALUES (?, 'no_candidate', 0, ?, ?)
+      `);
+
+      const SEEDED = {
+        1: 'Megan drives home after the parking lot. The Narcan pen is on the passenger seat. She doesn\'t touch it. She drives past her exit, past the next one, finally pulls into a church parking lot that is not her church and sits until she can breathe. No dialogue. No score. Just the engine cooling.',
+        4: 'Ray sees the pattern in the dispatch log before Megan explains it. He doesn\'t tell her he sees it. The scene is about something else — supply inventory, scheduling. We watch him not say it. His reasons are everything.',
+        6: 'Jordan shows Megan his Step 4 inventory. She reads it. We watch her face, and the question announces itself for the first time: how much of this is him?',
+        8: 'Megan goes back to a meeting — not her meeting, a different group\'s church basement she has never been to. She sits in the back. A person she doesn\'t know gets a 30-day keytag. Everybody claps. Megan claps. She does not explain why she is crying. The show does not explain it either.',
+      };
+
+      const tx = db.transaction(() => {
+        for (let n = 1; n <= 24; n++) {
+          if (SEEDED[n]) {
+            seedSeeded.run(n, SEEDED[n], now, now);
+          } else {
+            seedBlank.run(n, now, now);
+          }
+        }
+      });
+      tx();
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -2562,6 +2619,80 @@ const episodeStruct = {
       VALUES (?, ?, COALESCE((SELECT checked FROM episode_struct_checklist WHERE episode_id=? AND item_key=?), 0), ?, ?)
       ON CONFLICT(episode_id, item_key) DO UPDATE SET user_override = excluded.user_override, updated_at = excluded.updated_at
     `).run(episodeId, itemKey, episodeId, itemKey, override === null ? null : (override ? 1 : 0), now);
+  },
+};
+
+// PQUIET — Quiet devastation tracker.
+// ep_num is the series-wide number (1–24). Seeded rows for eps 1, 4, 6, 8 are
+// locked and read-only. All other rows start as 'no_candidate' and progress to
+// 'candidate_identified' (user adds info) or 'locked' (user confirms final).
+const quietDevastations = {
+  getAll() {
+    const db2 = getDb();
+    return db2.prepare(`
+      SELECT qd.*, wl.title AS writing_lab_title
+      FROM episode_quiet_devastations qd
+      LEFT JOIN writing_lab_drafts wl ON wl.id = qd.writing_lab_id
+      ORDER BY qd.ep_num ASC
+    `).all();
+  },
+
+  getByEpNum(epNum) {
+    const db2 = getDb();
+    return db2.prepare(`
+      SELECT qd.*, wl.title AS writing_lab_title
+      FROM episode_quiet_devastations qd
+      LEFT JOIN writing_lab_drafts wl ON wl.id = qd.writing_lab_id
+      WHERE qd.ep_num = ?
+    `).get(epNum) || null;
+  },
+
+  // Link a workspace episode to a QD row (called when user opens the episode panel).
+  linkEpisode(epNum, episodeId) {
+    const db2 = getDb();
+    db2.prepare(`
+      UPDATE episode_quiet_devastations SET episode_id = ?, updated_at = ?
+      WHERE ep_num = ? AND (episode_id IS NULL OR episode_id = ?)
+    `).run(episodeId, new Date().toISOString(), epNum, episodeId);
+  },
+
+  // Save/update candidate info and set status to candidate_identified.
+  setCandidate(epNum, { description, writingLabId }) {
+    const db2 = getDb();
+    const row = db2.prepare('SELECT is_seeded, status FROM episode_quiet_devastations WHERE ep_num = ?').get(epNum);
+    if (!row) throw new Error('Episode not found.');
+    if (row.is_seeded) throw new Error('Seeded quiet devastations are not editable.');
+    if (row.status === 'locked') throw new Error('Locked quiet devastations are not editable.');
+    const now = new Date().toISOString();
+    db2.prepare(`
+      UPDATE episode_quiet_devastations
+      SET description = ?, writing_lab_id = ?, status = 'candidate_identified', updated_at = ?
+      WHERE ep_num = ?
+    `).run(description || null, writingLabId || null, now, epNum);
+  },
+
+  // Lock a candidate — final, read-only from then on.
+  lock(epNum) {
+    const db2 = getDb();
+    const row = db2.prepare('SELECT is_seeded, status FROM episode_quiet_devastations WHERE ep_num = ?').get(epNum);
+    if (!row) throw new Error('Episode not found.');
+    if (row.is_seeded) throw new Error('Seeded entries are already locked.');
+    if (row.status === 'locked') return; // idempotent
+    if (row.status !== 'candidate_identified') throw new Error('Add a candidate before locking.');
+    db2.prepare(`
+      UPDATE episode_quiet_devastations SET status = 'locked', updated_at = ? WHERE ep_num = ?
+    `).run(new Date().toISOString(), epNum);
+  },
+
+  // For Needs Attention: active workspace episodes whose ep_num has no candidate yet.
+  episodesWithoutCandidate() {
+    return getDb().prepare(`
+      SELECT ew.id, ew.title, ew.ep_status
+      FROM episodes_workspace ew
+      JOIN episode_quiet_devastations qd ON qd.episode_id = ew.id
+      WHERE ew.archived_at IS NULL AND qd.status = 'no_candidate'
+      ORDER BY qd.ep_num ASC
+    `).all();
   },
 };
 
@@ -3380,7 +3511,18 @@ const dashboard = {
       )
       .all();
 
-    return { tier1Questions, stalledConflicts, pendingProposals, blockingQuestions, outlineEpisodes, blockingConflicts };
+    // PQUIET: surface workspace episodes whose QD entry is still 'no_candidate'.
+    const episodesNoQd = db
+      .prepare(
+        `SELECT ew.id, ew.title, ew.ep_status
+         FROM episodes_workspace ew
+         JOIN episode_quiet_devastations qd ON qd.episode_id = ew.id
+         WHERE ew.archived_at IS NULL AND qd.status = 'no_candidate'
+         ORDER BY qd.ep_num ASC`
+      )
+      .all();
+
+    return { tier1Questions, stalledConflicts, pendingProposals, blockingQuestions, outlineEpisodes, blockingConflicts, episodesNoQd };
   },
   // PHOME: the three nav badge counts. Unsorted = total active items; Canon
   // Review = proposals still awaiting a decision (pending); Open Questions =
@@ -6114,6 +6256,7 @@ module.exports = {
   characterRelationships,
   episodes,
   episodeStruct,
+  quietDevastations,
   writingLab,
   chats,
   chatSources,

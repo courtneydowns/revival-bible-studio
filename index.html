@@ -5196,6 +5196,174 @@
         white-space: pre-wrap;
         line-height: 1.4;
       }
+
+      /* PQUIET — Quiet devastation tracker */
+      .qd-section {
+        margin: 12px 0 0;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .qd-summary {
+        cursor: pointer;
+        padding: 8px 12px;
+        font-size: 0.88em;
+        font-weight: 600;
+        color: var(--muted);
+        user-select: none;
+        list-style: none;
+      }
+      .qd-summary::before { content: '▸ '; font-size: 0.8em; }
+      .qd-section[open] .qd-summary::before { content: '▾ '; }
+      .qd-summary:hover { color: var(--text); }
+      .qd-body {
+        padding: 10px 14px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .qd-no-epnum { font-size: 0.82em; color: var(--muted); margin: 0; }
+      .qd-error    { font-size: 0.82em; color: var(--danger, #e05c5c); margin: 0; }
+      .qd-status-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .qd-status-badge {
+        font-size: 0.75em;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 10px;
+        border: 1px solid currentColor;
+      }
+      .qd-status-none      { color: var(--muted); }
+      .qd-status-candidate { color: #d4a017; background: rgba(212,160,23,0.08); }
+      .qd-status-locked    { color: var(--success, #4caf88); background: rgba(76,175,136,0.08); }
+      .qd-seeded-badge {
+        font-size: 0.72em;
+        padding: 2px 7px;
+        border-radius: 10px;
+        background: rgba(120,120,180,0.12);
+        color: var(--muted);
+        border: 1px solid var(--border);
+      }
+      .qd-seeded-text {
+        font-size: 0.82em;
+        color: var(--text);
+        line-height: 1.5;
+        margin: 0;
+        font-style: italic;
+      }
+      .qd-locked-desc, .qd-locked-wl {
+        font-size: 0.82em;
+        color: var(--text);
+        margin: 0;
+      }
+      .qd-locked-wl { color: var(--muted); }
+      .qd-form { display: flex; flex-direction: column; gap: 8px; }
+      .qd-field-label { font-size: 0.8em; color: var(--muted); margin-bottom: 2px; }
+      .qd-desc-input {
+        width: 100%;
+        background: var(--surface-2, var(--bg));
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        color: var(--text);
+        font-size: 0.84em;
+        padding: 6px 8px;
+        resize: vertical;
+        font-family: inherit;
+      }
+      .qd-wl-select {
+        width: 100%;
+        background: var(--surface-2, var(--bg));
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        color: var(--text);
+        font-size: 0.84em;
+        padding: 5px 8px;
+      }
+      .qd-btn-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      .qd-save-btn, .qd-lock-btn { font-size: 12px; padding: 4px 12px; }
+      .qd-lock-btn { border-color: var(--success, #4caf88); color: var(--success, #4caf88); }
+      .qd-save-status { font-size: 0.78em; color: var(--muted); }
+
+      /* PQUIET — QD dashboard */
+      .qd-dashboard-toggle { font-size: 12px; margin-top: 6px; }
+      .qd-dashboard-toggle.active { background: var(--accent-dim, rgba(99,102,241,0.15)); }
+      .qd-dashboard-container {
+        padding: 16px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        overflow-y: auto;
+        height: 100%;
+      }
+      .qd-dashboard-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .qd-dashboard-title { font-size: 1em; font-weight: 600; color: var(--text); }
+      .qd-dashboard-close { font-size: 12px; }
+      .qd-legend {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        font-size: 0.8em;
+        color: var(--muted);
+      }
+      .qd-legend-pip {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        border: 1.5px solid currentColor;
+      }
+      .qd-legend-label { color: var(--muted); }
+      .qd-season-block { display: flex; flex-direction: column; gap: 8px; }
+      .qd-season-label { font-size: 0.82em; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+      .qd-season-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 6px;
+      }
+      .qd-cell {
+        border: 1.5px solid var(--border);
+        border-radius: 6px;
+        padding: 8px 6px 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-height: 70px;
+        position: relative;
+      }
+      .qd-cell.qd-status-candidate { border-color: #d4a017; }
+      .qd-cell.qd-status-locked    { border-color: var(--success, #4caf88); }
+      .qd-cell-code { font-size: 0.78em; font-weight: 700; color: var(--muted); }
+      .qd-cell.qd-status-candidate .qd-cell-code { color: #d4a017; }
+      .qd-cell.qd-status-locked    .qd-cell-code { color: var(--success, #4caf88); }
+      .qd-cell-seeded-pip {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--muted);
+        opacity: 0.5;
+      }
+      .qd-cell-status { font-size: 0.7em; color: var(--muted); }
+      .qd-cell.qd-status-candidate .qd-cell-status { color: #d4a017; }
+      .qd-cell.qd-status-locked    .qd-cell-status { color: var(--success, #4caf88); }
+      .qd-cell-preview {
+        font-size: 0.67em;
+        color: var(--muted);
+        line-height: 1.35;
+        margin-top: 2px;
+        opacity: 0.8;
+      }
+      .qd-cell-wl {
+        font-size: 0.67em;
+        color: var(--muted);
+        font-style: italic;
+      }
     </style>
   </head>
   <body>

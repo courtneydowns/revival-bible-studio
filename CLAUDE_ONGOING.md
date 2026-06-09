@@ -242,7 +242,6 @@ These features are in `docs/FEATURE_BACKLOG_ONGOING.md` and `docs/BUILD_PLAN_ONG
 - **PDRAFT-LOCK:** Characters and Episodes get a "locked for this draft" state distinct from archive.
 - **PARC-A / PARC-B:** Character arc tracker — written timeline (list) and visual timeline (horizontal scroll). Read-only, generated from existing data. Character status field feeds these views.
 - **PEPISODE-STRUCT:** Per-episode structure checklist (Flanagan Master episodic rules) + optional AI evaluation.
-- **PQUIET:** Quiet devastation tracker — per-episode status, pre-seeded locked QDs, dashboard view. Episodes without a candidate surface in Needs Attention.
 - **PLOCKED-SPECIFICS:** Collapsed reference panel on Characters, Episodes, Writing Lab, Canon Bible (Edit Mode), Canon Review — surfaces locked non-negotiables from THE_FLANAGAN_MASTER.
 - **PEPISODE-CONT:** AI episode continuity checker — on-demand, flags arc/timeline inconsistencies, routes to Conflicts/Open Questions. Reads character status field.
 - **PRESEARCH-CITE:** Research entries get a source citation field, linkable to Source Material.
