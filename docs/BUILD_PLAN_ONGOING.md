@@ -534,13 +534,14 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ## Writing Lab enhancements
 
-### PWLAB-SECTIONS — Writing Lab scene/section markers
-- User inserts named section markers within a draft body
-- Section names appear in a jump-to list on the draft detail panel
-- Click a section name to scroll to it within the draft
-- No hierarchy — flat named anchors only
-- Word count and scene/section count shown passively in status bar
-- **Smoke:** Insert three section markers; confirm jump-to list appears with all three; click each, confirm scroll; confirm section count in status bar
+### PWLAB-SECTIONS — Writing Lab section markers (redesigned) ✅
+- Toolbar button (or keyboard shortcut) → inline name prompt → named section marker inserted at cursor. No manual syntax — `--- Name ---` format is storage only, never exposed to the user.
+- Jump-to list appears in the detail panel sidebar as soon as at least one section exists. Click a name → scrolls to that section.
+- Available on: Writing Lab, Brainstorm, Documents. Not on other workspaces — entries there are typically too short to need it.
+- Section count shown passively in Writing Lab status bar (already spec'd). No status bar change needed for Brainstorm or Documents.
+- Rename and delete section markers from the jump-to list.
+- **Smoke:** Writing Lab: insert three sections via button with distinct names; confirm jump-to list appears with all three; click each, confirm scroll to correct position; confirm section count in status bar updates. Brainstorm: insert a section, confirm list appears. Documents: insert a section, confirm list appears.
+- Smoke passed.
 
 ### PWLAB-CANON-COMPARE — Writing Lab draft vs. canon comparison
 - On-demand action from any Writing Lab draft: Claude reads the draft body and surfaces details that diverge from locked canon entries
@@ -943,6 +944,16 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 ---
 
 ## Chat enhancements
+
+### PCHAT-FIND — Find in current chat
+**Tool:** VS Code ext
+- Cmd+F (or a visible find bar) opens an inline find input scoped to the current chat only
+- Type a term → jumps to and highlights the first match in the current chat thread
+- Forward / back navigation through all matches
+- Dismiss with Escape
+- Distinct from PCHAT-SEARCH (which searches across all chat history) — this is find-in-page within the open chat
+- Uses Electron `webContents.findInPage` native API
+- **Smoke:** Open a chat with known repeated content; press Cmd+F; type a term present multiple times; confirm jump to first match with highlight; navigate forward and back through matches; confirm match count shown; Escape closes find bar
 
 ### PCHAT-SEARCH — Chat history search
 **Tool:** CLI

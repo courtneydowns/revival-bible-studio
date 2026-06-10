@@ -366,15 +366,14 @@ On-demand AI check of the active Writing Lab draft against the full Canon Bible.
 
 ---
 
-## PWLAB-SECTIONS — Writing Lab scene/section markers
+## ✅ PWLAB-SECTIONS — Writing Lab scene/section markers
 
-Lightweight named dividers within a Writing Lab draft body.
+Lightweight named dividers within Writing Lab, Brainstorm, and Documents entries. Complete.
 
-- User inserts a named section marker ("--- Act Two ---") anywhere in the draft
-- Section names appear in a jump-to list on the draft detail panel
-- Click a section name to scroll to it within the draft
-- No hierarchy — flat list of named anchors only
-- Not an outline system; does not create separate entries
+- § Section toolbar button → inline name prompt → inserts `--- Name ---` at cursor (storage-only syntax, never shown raw to user)
+- Jump-to nav strip appears as soon as at least one section exists; click to scroll
+- Rename and delete from the nav strip
+- Writing Lab: section count in status bar; Brainstorm/Documents: view mode renders styled headings with jump-to anchors
 
 ---
 

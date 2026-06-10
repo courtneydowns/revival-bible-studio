@@ -2486,6 +2486,59 @@
       .wl-source-picker-item:hover { background: var(--hover); }
       .wl-source-picker-empty { padding: 10px 14px; font-size: 13px; color: var(--muted); }
 
+      /* PWLAB-SECTIONS — section jump-to strip */
+      .wl-section-nav {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+        margin-bottom: 8px; padding: 5px 10px;
+        background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+        font-size: 12px;
+      }
+      .wl-section-nav-label { color: var(--muted); font-weight: 600; flex-shrink: 0; }
+      .wl-section-chip {
+        font: inherit; font-size: 12px; color: var(--accent);
+        background: none; border: 1px solid var(--border);
+        border-radius: 10px; padding: 1px 8px; cursor: pointer;
+      }
+      .wl-section-chip:hover { border-color: var(--accent); background: var(--hover); }
+      .wl-section-chip-group { display: inline-flex; align-items: center; gap: 1px; }
+      .wl-section-chip-rename, .wl-section-chip-delete {
+        font: inherit; font-size: 11px; background: none; border: none;
+        padding: 0 3px; cursor: pointer; color: var(--muted); opacity: 0.55;
+        transition: opacity 0.1s, color 0.1s;
+      }
+      .wl-section-chip-rename:hover { opacity: 1; color: var(--text); }
+      .wl-section-chip-delete:hover { opacity: 1; color: var(--danger, #c0392b); }
+      .wl-section-insert-row {
+        display: flex; align-items: center; gap: 6px;
+        padding: 4px 10px; font-size: 12px;
+        border-bottom: 1px solid var(--border); background: var(--panel);
+      }
+      .wl-section-chip-input {
+        font: inherit; font-size: 12px;
+        border: 1px solid var(--border); border-radius: 4px;
+        background: var(--bg); color: var(--text);
+        padding: 2px 7px; width: 180px;
+      }
+      .wl-section-chip-input:focus { outline: none; border-color: var(--accent); }
+      .wl-section-chip-confirm {
+        font: inherit; font-size: 12px;
+        background: var(--accent); color: #fff; border: none;
+        border-radius: 4px; padding: 2px 10px; cursor: pointer;
+      }
+      .wl-section-chip-confirm:hover { opacity: 0.85; }
+      .wl-section-chip-cancel {
+        font: inherit; font-size: 12px;
+        background: none; border: 1px solid var(--border);
+        border-radius: 4px; padding: 2px 7px; cursor: pointer; color: var(--muted);
+      }
+      .wl-section-chip-cancel:hover { border-color: var(--accent); color: var(--text); }
+      .wl-section-anchor { display: block; margin: 1.1em 0 0.15em; }
+      .wl-section-heading {
+        display: inline-block; font-size: 10px; font-weight: 700;
+        letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted);
+        border-bottom: 1px solid var(--border); padding-bottom: 2px; padding-right: 14px;
+      }
+
       .wl-assistant {
         margin-top: 16px;
         border: 1px solid var(--border);

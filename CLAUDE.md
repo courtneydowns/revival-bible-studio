@@ -18,8 +18,10 @@ Local-first creative/editorial workspace for the **Revival project only**. Not a
 ## Build discipline
 
 - Small phases. Strict scope. No "while I'm in here" refactors or redesigns.
-- Each phase ends with: automated checks where possible + a short manual smoke checklist.
-- A phase is **not complete** until the user manually confirms the smoke test passed.
+- Each phase ends with an automated Playwright smoke pass + a brief visual spot-check.
+- **Playwright smoke (Claude Code runs this at end of every phase):** Claude Code writes and runs a Playwright script covering every item in the phase's smoke checklist. Script checks: DB writes, IPC responses, navigation, element presence, cancel handler safety. Claude Code reports pass/fail per item before asking for confirmation.
+- **Visual spot-check (user):** After Playwright reports, do a 30-second eyeball on anything marked visually-dependent (scroll position, badge appearance, layout). These cannot be reliably automated.
+- A phase is **not complete** until: (1) Playwright reports all items pass, and (2) user confirms the visual spot-check. Both required.
 - No commits to `main` and no marking a phase done without that confirmation.
 - Never start the next phase without explicit go-ahead.
 - Avoid large rewrites. Preserve simple workflow over feature complexity.
@@ -175,7 +177,7 @@ Do not invent new top-level workspaces.
 
 ## Writing Lab
 
-- Drafts can contain **scene / section markers** — lightweight named dividers within a draft body. Let the user jump to a named section within a long draft. No hierarchy, just named anchors. Not an outline system.
+- Drafts can contain **scene / section markers** — lightweight named dividers within a draft body. Let the user jump to a named section within a long draft. No hierarchy, just named anchors. Not an outline system. **§ Section** toolbar button → inline name input → inserts `--- Name ---` at cursor. Jump-to nav strip below textarea; rename and delete from the strip. Section count live in status bar. Also available in Brainstorm and Documents (edit mode has the same button + nav; view mode renders section headings with jump-to chips).
 - **Draft vs. canon comparison:** on demand, Claude reads the active draft and surfaces any details that diverge from locked canon entries. Draft-scoped (vs. episode continuity checker which is episode-scoped). Flags route to Conflicts or Open Questions. User-triggered only; never automatic.
 - Word count and scene/section count shown passively in the status bar.
 
@@ -251,7 +253,6 @@ These features are in `docs/FEATURE_BACKLOG_ONGOING.md` and `docs/BUILD_PLAN_ONG
 - **PAI-WIRE:** AI features wire to each other — P44→P41, P42→P43, P46→P41, P45→P43. All user-triggered, no automatic routing.
 - **PDOC-WIRE:** Documents becomes first-class — Chat-attachable, highlight-extract-route target, linkable to Characters/Episodes, Flanagan Filter, Canon proposal path.
 - **PWLAB-CANON-COMPARE:** Writing Lab draft vs. canon comparison — on-demand AI check against full Canon Bible. Routes flags to Conflicts or Open Questions.
-- **PWLAB-SECTIONS:** Scene/section markers in Writing Lab drafts — named anchors for navigation within long drafts.
 - **PEPISODE-PREVON:** "Previously on" canon snapshot — one-click read-only summary of canon facts locked as of the prior episode. Generated from existing data.
 - **PRESEARCH-USED:** "Used in" indicator on Research entries — passive flag if the entry has been linked or routed anywhere.
 - **PSCATCHPAD:** Entry-level scratchpad — freeform, collapsed by default, not canon, not routable.

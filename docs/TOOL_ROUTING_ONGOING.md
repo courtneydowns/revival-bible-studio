@@ -99,7 +99,7 @@
 | **PDRAFT-LOCK Character/Episode draft lock** | **VS Code ext** ✅ | Discovered complete during full-app audit 2026-06-10; IPCs, panel, badge all confirmed wired |
 | **PAUDIT-9 Canon Review back-link key + WL word count + Conflicts badge age** | **VS Code ext** ✅ | All three items already correct; no code changes needed — verified and smoked |
 | **PAUDIT-10 Writing Lab new-draft word count** | **VS Code ext** ✅ | Added else-branch status bar for new drafts; wlWordSeg/wlSectionSeg now set before first autosave |
-| **PWLAB-SECTIONS Writing Lab section markers** | **VS Code ext** | Section marker insertion + jump-to list on existing Writing Lab page |
+| **PWLAB-SECTIONS Writing Lab section markers (redesigned)** | **CLI** ✅ | Button-insert + jump-to list on Writing Lab, Brainstorm, Documents — multi-file |
 | **PWLAB-CANON-COMPARE Draft vs. canon comparison** | **CLI** | New AI action wired into Writing Lab, reads full canon |
 | **PEPISODE-PREVON "Previously on" snapshot** | **VS Code ext** | Generated panel on existing Episode detail |
 | **PRESEARCH-USED Research "Used in" indicator** | **VS Code ext** | Passive badge on existing Research list + detail |
@@ -139,6 +139,7 @@
 | **PAI-RELATIONSHIP-SUGGEST AI-suggested cross-workspace links** | **CLI** | Cross-table reads + link creation across workspaces |
 | **PAI-METADATA-AUDIT AI metadata audit** | **CLI** | Cross-entry scan + batch UI; touches all workspaces |
 | **PAI-CONFIDENCE-SUGGEST AI-suggested confidence level** | **VS Code ext** | New action on canon entry Edit Mode; requires PCANON-CONFIDENCE ✅ |
+| **PCHAT-FIND Find in current chat** | **VS Code ext** | Inline find-in-page for open chat; Electron findInPage API |
 | **PCHAT-SEARCH Chat history search** | **CLI** | New search module across chat tables |
 | **PCHAT-EXPORT Chat plain-text export** | **VS Code ext** | Export action on existing chat toolbar |
 

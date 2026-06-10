@@ -1642,7 +1642,52 @@ function makeEntryWorkspace(config) {
     if (item.body) {
       const body = document.createElement('div');
       body.className = 'tc-detail-body';
-      body.textContent = item.body;
+
+      if (config.hasSectionMarkers) {
+        // Parse section markers and render body with inline anchors.
+        // The raw "--- Name ---" syntax is storage-only; the user sees styled headings.
+        const markerRe = /^---\s+(.+?)\s+---\s*$/mg;
+        const sectionAnchors = [];
+        let lastIdx = 0, mp;
+        while ((mp = markerRe.exec(item.body)) !== null) {
+          if (mp.index > lastIdx) {
+            body.appendChild(document.createTextNode(item.body.substring(lastIdx, mp.index)));
+          }
+          const anchor = document.createElement('span');
+          anchor.className = 'wl-section-anchor';
+          const heading = document.createElement('span');
+          heading.className = 'wl-section-heading';
+          heading.textContent = mp[1].trim();
+          anchor.appendChild(heading);
+          body.appendChild(anchor);
+          sectionAnchors.push({ name: mp[1].trim(), el: anchor });
+          lastIdx = mp.index + mp[0].length;
+          if (item.body[lastIdx] === '\n') lastIdx++;
+        }
+        if (lastIdx < item.body.length) {
+          body.appendChild(document.createTextNode(item.body.substring(lastIdx)));
+        }
+        if (sectionAnchors.length > 0) {
+          const navStrip = document.createElement('div');
+          navStrip.className = 'wl-section-nav';
+          const navLbl = document.createElement('span');
+          navLbl.className = 'wl-section-nav-label';
+          navLbl.textContent = 'Jump to:';
+          navStrip.appendChild(navLbl);
+          sectionAnchors.forEach(({ name, el }) => {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'wl-section-chip';
+            chip.textContent = name;
+            chip.addEventListener('click', () => el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+            navStrip.appendChild(chip);
+          });
+          rightCol.appendChild(navStrip);
+        }
+      } else {
+        body.textContent = item.body;
+      }
+
       rightCol.appendChild(body);
       // PUI3: selecting text inside the body opens the extract-and-route menu.
       if (window.RevivalExtract && workspaceName) {
@@ -1794,6 +1839,158 @@ function makeEntryWorkspace(config) {
     });
     bodyEdit.addEventListener('input', saveEditDraft);
 
+    // PWLAB-SECTIONS — section insert + jump-to nav for workspaces that support markers.
+    let _sectionInsertRowEdit = null;
+    let _sectionNavEditEl = null;
+    if (config.hasSectionMarkers) {
+      _sectionInsertRowEdit = document.createElement('div');
+      _sectionInsertRowEdit.className = 'wl-section-insert-row';
+      const _seBtn = document.createElement('button');
+      _seBtn.type = 'button';
+      _seBtn.className = 'btn-secondary wl-section-insert-btn';
+      _seBtn.textContent = '§ Section';
+      _seBtn.title = 'Insert a named section marker at cursor';
+      const _seInput = document.createElement('input');
+      _seInput.type = 'text';
+      _seInput.className = 'wl-section-chip-input';
+      _seInput.placeholder = 'Section name…';
+      _seInput.hidden = true;
+      const _seConfirm = document.createElement('button');
+      _seConfirm.type = 'button';
+      _seConfirm.className = 'wl-section-chip-confirm';
+      _seConfirm.textContent = 'Insert';
+      _seConfirm.hidden = true;
+      const _seCancel = document.createElement('button');
+      _seCancel.type = 'button';
+      _seCancel.className = 'wl-section-chip-cancel';
+      _seCancel.textContent = 'Cancel';
+      _seCancel.hidden = true;
+      _sectionInsertRowEdit.append(_seBtn, _seInput, _seConfirm, _seCancel);
+
+      function _seShowInput() {
+        _seBtn.hidden = true; _seInput.hidden = false;
+        _seConfirm.hidden = false; _seCancel.hidden = false;
+        _seInput.value = ''; _seInput.focus();
+      }
+      function _seHideInput() {
+        _seBtn.hidden = false; _seInput.hidden = true;
+        _seConfirm.hidden = true; _seCancel.hidden = true;
+      }
+      function _seDoInsert() {
+        const name = _seInput.value.trim();
+        if (!name) { _seHideInput(); return; }
+        const marker = `--- ${name} ---`;
+        const pos = bodyEdit.selectionStart ?? bodyEdit.value.length;
+        const cur = bodyEdit.value;
+        const before = cur.substring(0, pos);
+        const after = cur.substring(pos);
+        const prefix = (before.length > 0 && !before.endsWith('\n')) ? '\n' : '';
+        const suffix = (after.length > 0 && !after.startsWith('\n')) ? '\n' : '';
+        bodyEdit.value = before + prefix + marker + suffix + after;
+        bodyEdit.setSelectionRange(before.length + prefix.length + marker.length, before.length + prefix.length + marker.length);
+        _seHideInput();
+        saveEditDraft();
+        _updateSectionNavEdit();
+      }
+      _seBtn.addEventListener('click', _seShowInput);
+      _seConfirm.addEventListener('click', _seDoInsert);
+      _seCancel.addEventListener('click', _seHideInput);
+      _seInput.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); _seDoInsert(); }
+        if (ev.key === 'Escape') _seHideInput();
+      });
+
+      _sectionNavEditEl = document.createElement('div');
+      _sectionNavEditEl.className = 'wl-section-nav';
+      _sectionNavEditEl.hidden = true;
+
+      function _scrollEditBodyToIndex(idx) {
+        bodyEdit.focus();
+        bodyEdit.setSelectionRange(idx, idx);
+        const lh = parseFloat(window.getComputedStyle(bodyEdit).lineHeight) || 20;
+        bodyEdit.scrollTop = Math.max(0, (bodyEdit.value.substring(0, idx).split('\n').length - 1) * lh - 60);
+      }
+      function _updateSectionNavEdit() {
+        const text = bodyEdit.value;
+        const re = /^---\s+(.+?)\s+---\s*$/mg;
+        const found = [];
+        let mx;
+        while ((mx = re.exec(text)) !== null) {
+          found.push({ name: mx[1].trim(), index: mx.index, rawMatch: mx[0] });
+        }
+        _sectionNavEditEl.hidden = found.length === 0;
+        _sectionNavEditEl.replaceChildren();
+        if (found.length === 0) return;
+        const lbl = document.createElement('span');
+        lbl.className = 'wl-section-nav-label';
+        lbl.textContent = 'Jump to:';
+        _sectionNavEditEl.appendChild(lbl);
+        found.forEach(({ name, index, rawMatch }) => {
+          const group = document.createElement('span');
+          group.className = 'wl-section-chip-group';
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'wl-section-chip';
+          chip.textContent = name;
+          chip.addEventListener('click', () => _scrollEditBodyToIndex(index));
+          const renBtn = document.createElement('button');
+          renBtn.type = 'button';
+          renBtn.className = 'wl-section-chip-rename';
+          renBtn.title = 'Rename section';
+          renBtn.textContent = '✎';
+          renBtn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.className = 'wl-section-chip-input';
+            inp.value = name;
+            const ok = document.createElement('button');
+            ok.type = 'button';
+            ok.className = 'wl-section-chip-confirm';
+            ok.textContent = '✓';
+            const cancel = document.createElement('button');
+            cancel.type = 'button';
+            cancel.className = 'wl-section-chip-cancel';
+            cancel.textContent = '✕';
+            group.replaceChildren(inp, ok, cancel);
+            inp.focus(); inp.select();
+            function doRen() {
+              const n = inp.value.trim();
+              if (!n || n === name) { _updateSectionNavEdit(); return; }
+              const cur = bodyEdit.value;
+              bodyEdit.value = cur.substring(0, index) + `--- ${n} ---` + cur.substring(index + rawMatch.length);
+              saveEditDraft();
+              _updateSectionNavEdit();
+            }
+            ok.addEventListener('click', doRen);
+            cancel.addEventListener('click', () => _updateSectionNavEdit());
+            inp.addEventListener('keydown', (ev2) => {
+              if (ev2.key === 'Enter') { ev2.preventDefault(); doRen(); }
+              if (ev2.key === 'Escape') _updateSectionNavEdit();
+            });
+          });
+          const delBtn = document.createElement('button');
+          delBtn.type = 'button';
+          delBtn.className = 'wl-section-chip-delete';
+          delBtn.title = 'Delete section marker';
+          delBtn.textContent = '×';
+          delBtn.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const cur = bodyEdit.value;
+            const end = index + rawMatch.length;
+            const trailing = cur[end] === '\n' ? 1 : 0;
+            bodyEdit.value = cur.substring(0, index) + cur.substring(end + trailing);
+            saveEditDraft();
+            _updateSectionNavEdit();
+          });
+          group.append(chip, renBtn, delBtn);
+          _sectionNavEditEl.appendChild(group);
+        });
+      }
+      bodyEdit.addEventListener('input', _updateSectionNavEdit);
+      _updateSectionNavEdit();
+    }
+
     // PAUDIT-6 — workspace-specific extra edit form fields (e.g. OQ tier selector).
     let editExtras = null;
     if (config.editFormExtra) editExtras = config.editFormExtra(item);
@@ -1822,7 +2019,10 @@ function makeEntryWorkspace(config) {
       renderDetail();
     });
 
-    rightCol.append(titleEdit, bodyEdit);
+    rightCol.append(titleEdit);
+    if (_sectionInsertRowEdit) rightCol.appendChild(_sectionInsertRowEdit);
+    rightCol.appendChild(bodyEdit);
+    if (_sectionNavEditEl) rightCol.appendChild(_sectionNavEditEl);
     if (editExtras && editExtras.element) rightCol.appendChild(editExtras.element);
     rightCol.append(status, err, actions);
 
@@ -8995,6 +9195,13 @@ function renderWritingLabPage(section) {
     compareBtn.className = 'btn-secondary wl-compare-btn';
     compareBtn.textContent = 'Compare to Canon';
 
+    // PWLAB-SECTIONS — insert a named section marker at the cursor.
+    const sectionBtn = document.createElement('button');
+    sectionBtn.type = 'button';
+    sectionBtn.className = 'btn-secondary wl-section-insert-btn';
+    sectionBtn.textContent = '§ Section';
+    sectionBtn.title = 'Insert a named section marker at the cursor';
+
     const archiveBtn = document.createElement('button');
     archiveBtn.type = 'button';
     archiveBtn.className = 'btn-secondary';
@@ -9019,7 +9226,7 @@ function renderWritingLabPage(section) {
     if (archivedAtStart) {
       bar.append(status, spacer, ...wlPopoutParts, archiveBtn, deleteBtn);
     } else {
-      bar.append(status, spacer, compareBtn, proposeBtn, ...wlPopoutParts, archiveBtn, deleteBtn);
+      bar.append(status, spacer, sectionBtn, compareBtn, proposeBtn, ...wlPopoutParts, archiveBtn, deleteBtn);
     }
 
     // P44 — source attachment row: always visible below the editor bar.
@@ -9143,7 +9350,60 @@ function renderWritingLabPage(section) {
       sourceAttachBtn.disabled = true;
     }
 
-    rightCol.append(bar, sourcesBar, titleInput, bodyInput);
+    // PWLAB-SECTIONS — inline section-name input row; hidden until sectionBtn clicked.
+    const wlSectionInsertRow = document.createElement('div');
+    wlSectionInsertRow.className = 'wl-section-insert-row';
+    wlSectionInsertRow.hidden = true;
+    const _siInput = document.createElement('input');
+    _siInput.type = 'text';
+    _siInput.className = 'wl-section-chip-input';
+    _siInput.placeholder = 'Section name…';
+    const _siConfirm = document.createElement('button');
+    _siConfirm.type = 'button';
+    _siConfirm.className = 'wl-section-chip-confirm';
+    _siConfirm.textContent = 'Insert';
+    const _siCancel = document.createElement('button');
+    _siCancel.type = 'button';
+    _siCancel.className = 'wl-section-chip-cancel';
+    _siCancel.textContent = 'Cancel';
+    wlSectionInsertRow.append(_siInput, _siConfirm, _siCancel);
+
+    sectionBtn.addEventListener('click', () => {
+      wlSectionInsertRow.hidden = false;
+      _siInput.value = '';
+      _siInput.focus();
+    });
+
+    function doInsertSection() {
+      const name = _siInput.value.trim();
+      if (!name) { wlSectionInsertRow.hidden = true; return; }
+      const marker = `--- ${name} ---`;
+      const pos = bodyInput.selectionStart ?? bodyInput.value.length;
+      const cur = bodyInput.value;
+      const before = cur.substring(0, pos);
+      const after = cur.substring(pos);
+      const prefix = (before.length > 0 && !before.endsWith('\n')) ? '\n' : '';
+      const suffix = (after.length > 0 && !after.startsWith('\n')) ? '\n' : '';
+      bodyInput.value = before + prefix + marker + suffix + after;
+      bodyInput.setSelectionRange(before.length + prefix.length + marker.length, before.length + prefix.length + marker.length);
+      wlSectionInsertRow.hidden = true;
+      updateCounter();
+      scheduleSave();
+    }
+    _siConfirm.addEventListener('click', doInsertSection);
+    _siCancel.addEventListener('click', () => { wlSectionInsertRow.hidden = true; });
+    _siInput.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); doInsertSection(); }
+      if (ev.key === 'Escape') { wlSectionInsertRow.hidden = true; }
+    });
+
+    rightCol.append(bar, wlSectionInsertRow, sourcesBar, titleInput, bodyInput);
+
+    // PWLAB-SECTIONS — jump-to strip for named section markers (--- Name ---).
+    const wlSectionNav = document.createElement('div');
+    wlSectionNav.className = 'wl-section-nav';
+    wlSectionNav.hidden = true;
+    bodyInput.insertAdjacentElement('afterend', wlSectionNav);
 
     // PTAG — tag bar for the open draft. A brand-new untitled draft has no
     // DB row yet, so the bar mounts after the first autosave creates one
@@ -9167,6 +9427,103 @@ function renderWritingLabPage(section) {
       const sections = (bodyInput.value.match(/^---\s+.+\s+---\s*$/mg) || []).length;
       if (wlWordSeg) wlWordSeg.lastChild.textContent = `${words}`;
       if (wlSectionSeg) wlSectionSeg.lastChild.textContent = `${sections}`;
+      updateSectionNav();
+    }
+    function scrollBodyToIndex(idx) {
+      bodyInput.focus();
+      bodyInput.setSelectionRange(idx, idx);
+      const lh = parseFloat(window.getComputedStyle(bodyInput).lineHeight) || 20;
+      bodyInput.scrollTop = Math.max(0, (bodyInput.value.substring(0, idx).split('\n').length - 1) * lh - 60);
+    }
+    function updateSectionNav() {
+      const text = bodyInput.value;
+      const markerRe = /^---\s+(.+?)\s+---\s*$/mg;
+      const found = [];
+      let m;
+      while ((m = markerRe.exec(text)) !== null) {
+        found.push({ name: m[1].trim(), index: m.index, rawMatch: m[0] });
+      }
+      wlSectionNav.hidden = found.length === 0;
+      wlSectionNav.replaceChildren();
+      if (found.length === 0) return;
+      const lbl = document.createElement('span');
+      lbl.className = 'wl-section-nav-label';
+      lbl.textContent = 'Jump to:';
+      wlSectionNav.appendChild(lbl);
+      found.forEach(({ name, index, rawMatch }) => {
+        if (archivedAtStart) {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = 'wl-section-chip';
+          chip.textContent = name;
+          chip.addEventListener('click', () => scrollBodyToIndex(index));
+          wlSectionNav.appendChild(chip);
+          return;
+        }
+        const group = document.createElement('span');
+        group.className = 'wl-section-chip-group';
+
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'wl-section-chip';
+        chip.textContent = name;
+        chip.addEventListener('click', () => scrollBodyToIndex(index));
+
+        const renameBtn = document.createElement('button');
+        renameBtn.type = 'button';
+        renameBtn.className = 'wl-section-chip-rename';
+        renameBtn.title = 'Rename section';
+        renameBtn.textContent = '✎';
+        renameBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const inp = document.createElement('input');
+          inp.type = 'text';
+          inp.className = 'wl-section-chip-input';
+          inp.value = name;
+          const confirmBtn = document.createElement('button');
+          confirmBtn.type = 'button';
+          confirmBtn.className = 'wl-section-chip-confirm';
+          confirmBtn.textContent = '✓';
+          const cancelBtn = document.createElement('button');
+          cancelBtn.type = 'button';
+          cancelBtn.className = 'wl-section-chip-cancel';
+          cancelBtn.textContent = '✕';
+          group.replaceChildren(inp, confirmBtn, cancelBtn);
+          inp.focus(); inp.select();
+          function doRename() {
+            const newName = inp.value.trim();
+            if (!newName || newName === name) { updateSectionNav(); return; }
+            const cur = bodyInput.value;
+            bodyInput.value = cur.substring(0, index) + `--- ${newName} ---` + cur.substring(index + rawMatch.length);
+            updateCounter();
+            scheduleSave();
+          }
+          confirmBtn.addEventListener('click', doRename);
+          cancelBtn.addEventListener('click', () => updateSectionNav());
+          inp.addEventListener('keydown', (ev2) => {
+            if (ev2.key === 'Enter') { ev2.preventDefault(); doRename(); }
+            if (ev2.key === 'Escape') updateSectionNav();
+          });
+        });
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'wl-section-chip-delete';
+        deleteBtn.title = 'Delete section marker';
+        deleteBtn.textContent = '×';
+        deleteBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const cur = bodyInput.value;
+          const end = index + rawMatch.length;
+          const trailing = cur[end] === '\n' ? 1 : 0;
+          bodyInput.value = cur.substring(0, index) + cur.substring(end + trailing);
+          updateCounter();
+          scheduleSave();
+        });
+
+        group.append(chip, renameBtn, deleteBtn);
+        wlSectionNav.appendChild(group);
+      });
     }
     updateCounter();
     setStatus(
@@ -14048,6 +14405,7 @@ const CONTENT_RENDERERS = {
     apiName: 'documents',
     entityKind: 'documents',
     draftPrefix: 'documents',
+    hasSectionMarkers: true,
     addLabel: 'Add Document',
     emptyTitle: 'Long-form documents',
     emptyHint: 'Store series bibles, spec sheets, and any long-form writing that lives outside the Writing Lab drafts.',
@@ -14939,6 +15297,7 @@ const CONTENT_RENDERERS = {
       apiName: 'brainstorm',
       entityKind: 'brainstorm',
       draftPrefix: 'brainstorm',
+      hasSectionMarkers: true,
       addLabel: 'Add Idea',
       emptyTitle: 'Rough ideas, no filter',
       emptyHint: 'Capture anything before it evaporates — threads, sparks, what-ifs. Route the keepers to the right workspace when they\'re ready.',
