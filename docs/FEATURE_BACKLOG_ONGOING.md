@@ -464,7 +464,7 @@ Expands the existing linked entries indicator into a full read-only reference pa
 
 ---
 
-## PKEYSHEET — Keyboard shortcut cheat sheet
+## PKEYSHEET — Keyboard shortcut cheat sheet ✅
 
 - Cmd+? opens a non-modal overlay listing all keyboard shortcuts in the app
 - One-screen layout, organized by context (Global, Canon Bible, Queues, Navigation, etc.)

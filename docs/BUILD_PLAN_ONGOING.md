@@ -805,13 +805,14 @@ Extends the existing episode continuity checker. Do not remove or alter existing
 
 ## Global UX
 
-### PKEYSHEET — Keyboard shortcut cheat sheet
+### PKEYSHEET — Keyboard shortcut cheat sheet ✅
 - Cmd+? opens a non-modal overlay listing all keyboard shortcuts
 - Organized by context (Global, Canon Bible, Queues, Navigation, etc.)
 - Dismissable with Escape or Cmd+?
 - Also accessible from Help menu
 - No new shortcuts — surfaces what PKEY built
 - **Smoke:** Open cheat sheet, confirm all PKEY shortcuts appear; dismiss with Escape, confirm closes; open from Help menu, confirm same overlay
+- **Smoke passed.**
 
 ### PPALETTE-RECENTS — Command palette recents ✅
 - Last 5 entries opened appear at top of Cmd+K palette before typing, labeled "Recent"

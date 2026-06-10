@@ -258,7 +258,7 @@ These features are in `docs/FEATURE_BACKLOG_ONGOING.md` and `docs/BUILD_PLAN_ONG
 - **PBREADCRUMB:** Breadcrumb on linked entry click-through — single back-step ("← Jordan (Characters)").
 - **PWHERE-REF ✅:** "Where is this referenced?" — collapsible `<details>` panel on every entry detail panel. Groups all linked entries by workspace (`wr-ws-heading` sections), each with breadcrumb-aware click-through navigation. Uses `links.for()` data (bidirectional CWA). Renders only when links exist; silent no-op on clean entries.
 - **PNAV-ACTIVITY:** Workspace activity indicator on nav — subtle last-active recency signal per nav item.
-- **PKEYSHEET:** Cmd+? keyboard shortcut cheat sheet — non-modal overlay, dismissable.
+- **PKEYSHEET ✅:** Cmd+? keyboard shortcut cheat sheet — non-modal overlay, dismissable. Also accessible from Help menu.
 - **PPALETTE-RECENTS ✅:** Last 5 opened entries at top of Cmd+K palette before typing. Typing hides recents and shows search results. Session-scoped.
 - **PROUTE-HISTORY:** "Send to" picker history — last 3 destinations at top of route picker.
 - **PPOL3:** Print/PDF export for single entries: Source Material, Brainstorm, Research, Writing Lab, Open Questions analysis history.
