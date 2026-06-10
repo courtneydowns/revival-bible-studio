@@ -498,6 +498,64 @@ function mountBrainstormDevFromSection(host, entityKind, id) {
   }).catch(() => { /* non-fatal */ });
 }
 
+// PWHERE-REF — "Where is this referenced?" read-only panel. Collapsible;
+// renders nothing when there are no links so it never clutters clean entries.
+// Groups all linked entries by workspace with click-through navigation.
+// Uses links.for() (same data as the Attached section) so both host-side and
+// source-side attachments are covered regardless of which direction was used.
+function mountWhereRefPanel(host, entityKind, id) {
+  if (!entityKind || !window.revival.links) return;
+
+  window.revival.links.for(entityKind, id).then((data) => {
+    if (!data || !data.attachments.length) return;
+
+    // Group attachments by workspace.
+    const byWorkspace = {};
+    for (const att of data.attachments) {
+      if (!byWorkspace[att.workspace]) byWorkspace[att.workspace] = [];
+      byWorkspace[att.workspace].push(att);
+    }
+
+    const count = data.attachments.length;
+    const wrap = document.createElement('details');
+    wrap.className = 'wr-section';
+
+    const summary = document.createElement('summary');
+    summary.className = 'wr-summary';
+    summary.textContent = `Linked in ${count} ${count === 1 ? 'entry' : 'entries'}`;
+    wrap.appendChild(summary);
+
+    const body = document.createElement('div');
+    body.className = 'wr-body';
+
+    for (const [workspace, entries] of Object.entries(byWorkspace)) {
+      const heading = document.createElement('div');
+      heading.className = 'wr-ws-heading';
+      heading.textContent = workspace;
+      body.appendChild(heading);
+
+      for (const entry of entries) {
+        const row = document.createElement('div');
+        row.className = 'wr-row';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'wr-goto';
+        btn.textContent = entry.title;
+        btn.title = `Go to ${workspace} → ${entry.title}`;
+        btn.addEventListener('click', () => {
+          const ws = CWA_KIND_TO_WORKSPACE[entry.kind];
+          if (ws) { _breadcrumbPending = _detailContext; route(ws, entry.id); }
+        });
+        row.appendChild(btn);
+        body.appendChild(row);
+      }
+    }
+
+    wrap.appendChild(body);
+    host.appendChild(wrap);
+  }).catch(() => { /* non-fatal */ });
+}
+
 // P36 + global expand — cross-workspace attachment section (all entry workspaces).
 const CWA_HOST_KINDS = new Set([
   'characters', 'episodes', 'open_questions', 'conflicts', 'decisions',
@@ -1582,6 +1640,10 @@ function makeEntryWorkspace(config) {
     // PBRAIN-STRUCT — passive back-reference: brainstorm items that were
     // developed into this entry. Shown on all workspaces that can be targets.
     mountBrainstormDevFromSection(rightCol, entityKind, item.id);
+
+    // PWHERE-REF — "Where is this referenced?" panel: all inbound references
+    // grouped by workspace. Read-only; hidden when there are no refs.
+    mountWhereRefPanel(rightCol, entityKind, item.id);
 
     // P37 — optional workspace-specific detail-panel extension (e.g. relationships section)
     if (config.detailExtra) config.detailExtra(rightCol, item, archivedFlag);

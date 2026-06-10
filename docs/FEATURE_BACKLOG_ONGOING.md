@@ -443,7 +443,7 @@ Lightweight freeform scratchpad available on every entry across all workspaces.
 
 ---
 
-## PWHERE-REF — "Where is this referenced?" panel
+## ✅ PWHERE-REF — "Where is this referenced?" panel
 
 Expands the existing linked entries indicator into a full read-only reference panel.
 

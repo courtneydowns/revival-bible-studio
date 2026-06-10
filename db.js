@@ -5665,6 +5665,57 @@ const links = {
       },
     };
   },
+
+  // PWHERE-REF — returns every entry that references this one, grouped by
+  // workspace. Covers: CWA hosts that attached this entry (this = source)
+  // and brainstorm items developed into this entry.
+  referencedBy(kind, id) {
+    const db = getDb();
+    const refs = [];
+
+    if (CWA_TABLE_BY_KIND[kind]) {
+      const rows = db
+        .prepare(
+          `SELECT host_kind AS kind, host_id AS id
+             FROM cross_workspace_attachments
+            WHERE source_kind = ? AND source_id = ?`
+        )
+        .all(kind, id);
+      for (const row of rows) {
+        const table = CWA_TABLE_BY_KIND[row.kind];
+        const item = table
+          ? db.prepare(`SELECT title FROM ${table} WHERE id = ?`).get(row.id)
+          : null;
+        refs.push({
+          kind: row.kind,
+          id: row.id,
+          title: (item && item.title) || '(untitled)',
+          workspace: WORKSPACE_LABEL_BY_KIND[row.kind] || row.kind,
+        });
+      }
+    }
+
+    const brainstormRefs = db
+      .prepare(
+        'SELECT id, title FROM brainstorm_items WHERE dev_into_kind = ? AND dev_into_id = ? AND archived_at IS NULL'
+      )
+      .all(kind, id)
+      .map((r) => ({
+        kind: 'brainstorm',
+        id: r.id,
+        title: r.title || '(untitled)',
+        workspace: 'Brainstorm',
+      }));
+    refs.push(...brainstormRefs);
+
+    const byWorkspace = {};
+    for (const ref of refs) {
+      if (!byWorkspace[ref.workspace]) byWorkspace[ref.workspace] = [];
+      byWorkspace[ref.workspace].push(ref);
+    }
+
+    return { byWorkspace, count: refs.length };
+  },
 };
 
 // P36 — cross-workspace attachment writes. attach/detach create and remove

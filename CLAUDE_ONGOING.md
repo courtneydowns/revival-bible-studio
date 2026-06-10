@@ -256,7 +256,7 @@ These features are in `docs/FEATURE_BACKLOG_ONGOING.md` and `docs/BUILD_PLAN_ONG
 - **PSCATCHPAD:** Entry-level scratchpad — freeform, collapsed by default, not canon, not routable.
 - **PSESSION-RESUME:** On launch, surface the last entry the user had open. Zero clicks to resume.
 - **PBREADCRUMB:** Breadcrumb on linked entry click-through — single back-step ("← Jordan (Characters)").
-- **PWHERE-REF:** "Where is this referenced?" — dedicated read-only panel showing every workspace referencing this entry. Expands the existing linked entries indicator.
+- **PWHERE-REF ✅:** "Where is this referenced?" — collapsible `<details>` panel on every entry detail panel. Groups all linked entries by workspace (`wr-ws-heading` sections), each with breadcrumb-aware click-through navigation. Uses `links.for()` data (bidirectional CWA). Renders only when links exist; silent no-op on clean entries.
 - **PNAV-ACTIVITY:** Workspace activity indicator on nav — subtle last-active recency signal per nav item.
 - **PKEYSHEET:** Cmd+? keyboard shortcut cheat sheet — non-modal overlay, dismissable.
 - **PPALETTE-RECENTS:** Last 5 opened entries at top of Cmd+K palette before typing.

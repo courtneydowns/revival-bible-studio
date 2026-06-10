@@ -114,7 +114,7 @@
 | ~~**PSESSION-RESUME Session resume on launch**~~ ✅ | **VS Code ext** | Last-entry persistence on app boot |
 | **PSCRATCHPAD Entry-level scratchpad** | **CLI** | New field across all workspaces, schema migration needed |
 | **PBREADCRUMB Back-reference breadcrumb** | **VS Code ext** | Breadcrumb on existing detail panel header |
-| **PWHERE-REF "Where is this referenced?" panel** | **VS Code ext** | Expands existing linked entries indicator |
+| ~~**PWHERE-REF "Where is this referenced?" panel**~~ ✅ | **VS Code ext** | Expands existing linked entries indicator |
 | **PNAV-ACTIVITY Workspace activity indicator** | **VS Code ext** | Subtle recency signal on existing nav component |
 | **PKEYSHEET Keyboard shortcut cheat sheet** | **VS Code ext** | New overlay, wired to Cmd+? and Help menu |
 | **PPALETTE-RECENTS Command palette recents** | **VS Code ext** | Recents section in existing Cmd+K palette |

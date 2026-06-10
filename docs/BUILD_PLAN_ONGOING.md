@@ -786,11 +786,13 @@ Extends the existing episode continuity checker. Do not remove or alter existing
 - **Smoke:** Click through from a Character's back-reference to a linked Decision; confirm breadcrumb shows "← Jordan (Characters)"; click breadcrumb, confirm return to Jordan; navigate elsewhere, confirm breadcrumb clears
 - **Smoke passed.**
 
-### PWHERE-REF — "Where is this referenced?" panel
+### PWHERE-REF — "Where is this referenced?" panel ✅
 - Expands the existing linked entries indicator into a full read-only panel listing every workspace and entry that references this entry
 - Grouped by workspace; each item click-through to the referencing entry
 - Read-only — no actions in this panel
+- **Implementation:** `links.referencedBy` IPC + `db.links.referencedBy()` (CWA + brainstorm dev_into) in db.js; `mountWhereRefPanel` in renderer.js calls `links.for()` and groups `data.attachments` by workspace into a collapsible `<details>` (`.wr-section`). Breadcrumb-aware navigation on click. Mounted on all workspaces after `mountBrainstormDevFromSection`. CSS in index.html.
 - **Smoke:** Link an entry from three different workspaces; open the linked entries panel; confirm all three appear grouped by workspace; click through to one, confirm navigation
+- **Smoke passed.**
 
 ### PNAV-ACTIVITY — Workspace activity indicator
 - Subtle visual recency signal on each nav item — not a badge count, not a number

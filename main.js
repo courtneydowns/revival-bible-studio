@@ -470,6 +470,8 @@ function registerIpc() {
   // PPASSIVE — linked-entries indicator. Read-only: counts + lists the
   // attachments and canon entries that reference a given workspace entry.
   ipcMain.handle('links:for', (_event, kind, id) => db.links.for(kind, id));
+  // PWHERE-REF — inbound references grouped by workspace.
+  ipcMain.handle('links:referencedBy', (_event, kind, id) => db.links.referencedBy(kind, id));
 
   // P36 — cross-workspace attachment writes and picker data.
   ipcMain.handle('crossWorkspace:attach', (_event, hostKind, hostId, sourceKind, sourceId) =>

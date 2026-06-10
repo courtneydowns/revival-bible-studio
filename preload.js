@@ -367,6 +367,8 @@ contextBridge.exposeInMainWorld('revival', {
   // logical name), id = row id. Returns { attachments, canonLinks, counts }.
   links: {
     for: (kind, id) => ipcRenderer.invoke('links:for', kind, id),
+    // PWHERE-REF — inbound references grouped by workspace.
+    referencedBy: (kind, id) => ipcRenderer.invoke('links:referencedBy', kind, id),
   },
   // P36 — cross-workspace attachment writes and picker data.
   crossWorkspace: {
