@@ -778,11 +778,13 @@ Extends the existing episode continuity checker. Do not remove or alter existing
 
 ## Navigation enhancements
 
-### PBREADCRUMB — Back-reference breadcrumb
+### PBREADCRUMB — Back-reference breadcrumb ✅
 - When clicking through to an entry from a linked-entries panel or back-reference, a one-line breadcrumb appears at the top of the detail panel ("← Jordan (Characters)")
 - Single back-step — clicking returns to the origin entry
 - Breadcrumb clears on any other navigation action
+- **Implementation:** `_breadcrumbPending`/`_breadcrumbActive`/`_detailContext` module-level state. `route()` promotes pending → active (or clears both on direct nav). `mountBreadcrumb(host)` inserts `.bc-bar`/`.bc-btn` at top of `rightCol` when active. `showView()` sets `_detailContext` then calls `mountBreadcrumb`. Navigation handlers in `renderLinkedList`, `mountAttachmentsSection`, `mountBrainstormDevFromSection` set `_breadcrumbPending = _detailContext` before calling `route()`. CSS in index.html.
 - **Smoke:** Click through from a Character's back-reference to a linked Decision; confirm breadcrumb shows "← Jordan (Characters)"; click breadcrumb, confirm return to Jordan; navigate elsewhere, confirm breadcrumb clears
+- **Smoke passed.**
 
 ### PWHERE-REF — "Where is this referenced?" panel
 - Expands the existing linked entries indicator into a full read-only panel listing every workspace and entry that references this entry

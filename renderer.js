@@ -77,6 +77,16 @@ let pendingEntrySelection = null;
 const SESSION_RESUME_KEY = 'revival.sessionResume';
 const SESSION_RESUME_OPT_OUT_KEY = 'revival.sessionResumeDisabled';
 
+// PBREADCRUMB — one-step back-breadcrumb for linked-panel navigation.
+// _breadcrumbPending is set (before route()) when clicking a linked-panel goto
+// button. route() promotes it to _breadcrumbActive (or clears both on direct
+// navigation). _detailContext tracks the entry currently shown in any detail
+// panel so linked-panel handlers can capture the origin without needing it
+// threaded through every call site.
+let _breadcrumbPending = null; // { title, workspace, id } — set before route()
+let _breadcrumbActive  = null; // applied to the next rendered detail panel
+let _detailContext     = null; // { title, workspace, id } of current detail
+
 function recordLastOpen(workspace, id) {
   if (!workspace || id == null) return;
   try {
@@ -342,7 +352,7 @@ function renderLinkedList(listHost, data) {
       titleBtn.title = `Go to ${it.workspace} → ${it.title}`;
       titleBtn.addEventListener('click', () => {
         const ws = CWA_KIND_TO_WORKSPACE[it.kind];
-        if (ws) route(ws, it.id);
+        if (ws) { _breadcrumbPending = _detailContext; route(ws, it.id); }
       });
       row.appendChild(titleBtn);
       const src = document.createElement('span');
@@ -382,7 +392,7 @@ function renderLinkedList(listHost, data) {
       titleBtn.className = 'tc-linked-goto';
       titleBtn.textContent = it.title;
       titleBtn.title = `Go to Brainstorm → ${it.title}`;
-      titleBtn.addEventListener('click', () => route('Brainstorm', it.id));
+      titleBtn.addEventListener('click', () => { _breadcrumbPending = _detailContext; route('Brainstorm', it.id); });
       row.appendChild(titleBtn);
       const src = document.createElement('span');
       src.className = 'tc-linked-src';
@@ -391,6 +401,24 @@ function renderLinkedList(listHost, data) {
       listHost.appendChild(row);
     }
   }
+}
+
+// PBREADCRUMB — renders the one-line back-breadcrumb at the top of a detail
+// panel if _breadcrumbActive is set. No-op otherwise. Clicking returns the
+// user to the origin entry and clears the breadcrumb via route().
+function mountBreadcrumb(host) {
+  if (!_breadcrumbActive) return;
+  const bc = _breadcrumbActive;
+  const bar = document.createElement('div');
+  bar.className = 'bc-bar';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'bc-btn';
+  btn.textContent = `← ${bc.title} (${bc.workspace})`;
+  btn.title = `Back to ${bc.title}`;
+  btn.addEventListener('click', () => route(bc.workspace, bc.id));
+  bar.appendChild(btn);
+  host.insertBefore(bar, host.firstChild);
 }
 
 // Passive count that expands to the linked list on click. Mounts immediately
@@ -462,7 +490,7 @@ function mountBrainstormDevFromSection(host, entityKind, id) {
       btn.className = 'tc-linked-goto';
       btn.textContent = ref.title;
       btn.title = `Go to Brainstorm → ${ref.title}`;
-      btn.addEventListener('click', () => route('Brainstorm', ref.id));
+      btn.addEventListener('click', () => { _breadcrumbPending = _detailContext; route('Brainstorm', ref.id); });
       row.appendChild(btn);
       section.appendChild(row);
     }
@@ -737,7 +765,7 @@ function mountAttachmentsSection(host, entityKind, id) {
       titleBtn.title = `Go to ${att.workspace}`;
       titleBtn.addEventListener('click', () => {
         const ws = CWA_KIND_TO_WORKSPACE[att.kind];
-        if (ws) route(ws, att.id);
+        if (ws) { _breadcrumbPending = _detailContext; route(ws, att.id); }
       });
       row.appendChild(titleBtn);
 
@@ -1393,6 +1421,11 @@ function makeEntryWorkspace(config) {
 
     // PHOME: opening an entry records it in the session recently-viewed list.
     if (workspaceName) recordRecentlyViewed(workspaceName, item.id, item.title);
+
+    // PBREADCRUMB: record context for linked-panel back-navigation, then
+    // render the breadcrumb if one is active from a prior linked-panel click.
+    _detailContext = workspaceName ? { title: item.title, workspace: workspaceName, id: item.id } : null;
+    mountBreadcrumb(rightCol);
 
     const h = document.createElement('h2');
     h.className = 'tc-detail-header';
@@ -15994,6 +16027,11 @@ themeToggle.addEventListener('click', () => {
 applyTheme(loadTheme());
 
 function route(name, entryId) {
+  // PBREADCRUMB: promote the pending breadcrumb (set by linked-panel clicks)
+  // to active, or clear it on any direct navigation where nothing was pending.
+  _breadcrumbActive = _breadcrumbPending;
+  _breadcrumbPending = null;
+  _detailContext = null; // cleared here; reset by showView when new panel mounts
   // PHOME: an optional entryId pre-selects an entry once the target workspace
   // mounts (one-click return from Home's recently-viewed). A plain navigation
   // clears any stale request so it can't leak into the wrong page.
