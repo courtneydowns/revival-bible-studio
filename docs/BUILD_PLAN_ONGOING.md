@@ -551,12 +551,13 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 - **Smoke:** Open a Writing Lab draft. Open the category picker — confirm all seeded categories present in correct order. Insert "Act One" → confirm jump-to list appears. Insert "Act One" again → confirm duplicate warning fires and insert is blocked. Insert "Scene" with a custom name edit → confirm custom name appears in jump-to list. Click each section name → confirm scroll. Open Settings → rename "Placeholder" to "To Revisit" → return to draft → confirm existing marker updated. Open Settings → delete "To Revisit" → confirm warning fires. Confirm section count in status bar. Confirm Brainstorm entry shows picker with empty list and "Add new…" option.
 - **Smoke passed 2026-06-10.** All 19 automated checks green.
 
-### PWLAB-CANON-COMPARE — Writing Lab draft vs. canon comparison
+### PWLAB-CANON-COMPARE — Writing Lab draft vs. canon comparison ✅
 - On-demand action from any Writing Lab draft: Claude reads the draft body and surfaces details that diverge from locked canon entries
 - Results as a flagged list with source citations (canon entry + approximate draft location)
 - User reviews each flag; can route to Conflicts or Open Questions, or dismiss
 - Never runs automatically; never touches canon
 - **Smoke:** Write a draft with a deliberate canon divergence; run comparison; confirm flag surfaces with correct canon entry cited; route flag to Conflicts, confirm entry created; dismiss another flag, confirm it clears
+- **Smoke passed 2026-06-10.** All 15 automated checks green.
 
 ---
 
