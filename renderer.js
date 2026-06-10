@@ -1865,20 +1865,86 @@ function makeEntryWorkspace(config) {
       _seCancel.className = 'wl-section-chip-cancel';
       _seCancel.textContent = 'Cancel';
       _seCancel.hidden = true;
-      _sectionInsertRowEdit.append(_seBtn, _seInput, _seConfirm, _seCancel);
+      const _seDupWarn = document.createElement('span');
+      _seDupWarn.className = 'wl-section-dup-warn';
+      _seDupWarn.hidden = true;
+      _sectionInsertRowEdit.append(_seBtn, _seInput, _seConfirm, _seCancel, _seDupWarn);
 
-      function _seShowInput() {
-        _seBtn.hidden = true; _seInput.hidden = false;
-        _seConfirm.hidden = false; _seCancel.hidden = false;
-        _seInput.value = ''; _seInput.focus();
+      // Floating category picker for this edit form.
+      const _sePicker = document.createElement('div');
+      _sePicker.className = 'wl-section-picker';
+      _sePicker.hidden = true;
+      document.body.appendChild(_sePicker);
+      let _seAddNew = false;
+      const _seWs = entityKind || 'writing_lab';
+
+      function _seHidePicker() { _sePicker.hidden = true; _sePicker.innerHTML = ''; }
+      async function _seShowPicker() {
+        if (!_sePicker.hidden) { _seHidePicker(); return; }
+        _sePicker.innerHTML = '';
+        let cats = [];
+        try { cats = await window.revival.sectionCategories.list(_seWs); } catch {}
+        cats.forEach((cat) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'wl-section-picker-item';
+          btn.textContent = cat.name;
+          btn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            _seAddNew = false;
+            _seInput.value = cat.name;
+            _seDupWarn.hidden = true;
+            _seBtn.hidden = true; _seInput.hidden = false;
+            _seConfirm.hidden = false; _seCancel.hidden = false;
+            _seHidePicker();
+            _seInput.focus(); _seInput.select();
+          });
+          _sePicker.appendChild(btn);
+        });
+        const addNewBtn = document.createElement('button');
+        addNewBtn.type = 'button';
+        addNewBtn.className = 'wl-section-picker-item wl-section-picker-addnew';
+        addNewBtn.textContent = '+ Add new…';
+        addNewBtn.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          _seAddNew = true;
+          _seInput.value = '';
+          _seDupWarn.hidden = true;
+          _seBtn.hidden = true; _seInput.hidden = false;
+          _seConfirm.hidden = false; _seCancel.hidden = false;
+          _seHidePicker();
+          _seInput.focus();
+        });
+        _sePicker.appendChild(addNewBtn);
+        const rect = _seBtn.getBoundingClientRect();
+        _sePicker.style.top = `${rect.bottom + 4}px`;
+        _sePicker.style.left = `${rect.left}px`;
+        _sePicker.hidden = false;
       }
+      const _sePickerDocClose = (e) => {
+        if (!_sePicker.hidden && !_sePicker.contains(e.target) && e.target !== _seBtn) _seHidePicker();
+      };
+      document.addEventListener('click', _sePickerDocClose);
+
       function _seHideInput() {
         _seBtn.hidden = false; _seInput.hidden = true;
         _seConfirm.hidden = true; _seCancel.hidden = true;
+        _seDupWarn.hidden = true; _seAddNew = false;
       }
       function _seDoInsert() {
         const name = _seInput.value.trim();
         if (!name) { _seHideInput(); return; }
+        // Duplicate guard.
+        const dupRe = /^---\s+(.+?)\s+---\s*$/mg;
+        const existing = new Set();
+        let _dm;
+        while ((_dm = dupRe.exec(bodyEdit.value)) !== null) existing.add(_dm[1].trim());
+        if (existing.has(name)) {
+          _seDupWarn.textContent = `A section named "${name}" already exists.`;
+          _seDupWarn.hidden = false;
+          return;
+        }
+        _seDupWarn.hidden = true;
         const marker = `--- ${name} ---`;
         const pos = bodyEdit.selectionStart ?? bodyEdit.value.length;
         const cur = bodyEdit.value;
@@ -1888,11 +1954,15 @@ function makeEntryWorkspace(config) {
         const suffix = (after.length > 0 && !after.startsWith('\n')) ? '\n' : '';
         bodyEdit.value = before + prefix + marker + suffix + after;
         bodyEdit.setSelectionRange(before.length + prefix.length + marker.length, before.length + prefix.length + marker.length);
+        if (_seAddNew) {
+          window.revival.sectionCategories.add(_seWs, name).catch(() => {});
+          _seAddNew = false;
+        }
         _seHideInput();
         saveEditDraft();
         _updateSectionNavEdit();
       }
-      _seBtn.addEventListener('click', _seShowInput);
+      _seBtn.addEventListener('click', _seShowPicker);
       _seConfirm.addEventListener('click', _seDoInsert);
       _seCancel.addEventListener('click', _seHideInput);
       _seInput.addEventListener('keydown', (ev) => {
@@ -2030,6 +2100,18 @@ function makeEntryWorkspace(config) {
     // so the user can manage links without saving and switching back to detail.
     if (entityKind && CWA_HOST_KINDS.has(entityKind) && window.revival.crossWorkspace) {
       mountAttachmentsSection(rightCol, entityKind, item.id);
+    }
+
+    // PWLAB-SECTIONS cleanup: tear down floating picker when edit view is replaced.
+    if (config.hasSectionMarkers && _sectionInsertRowEdit) {
+      const _sePickerObs = new MutationObserver(() => {
+        if (!_sectionInsertRowEdit.isConnected) {
+          _sePicker.remove();
+          document.removeEventListener('click', _sePickerDocClose);
+          _sePickerObs.disconnect();
+        }
+      });
+      _sePickerObs.observe(rightCol, { childList: true });
     }
 
     titleEdit.focus();
@@ -7211,11 +7293,198 @@ function renderSettingsPage(section) {
   renderSessionResume(section);
   renderManageTags(section);
   renderNeedsAttentionSettings(section);
+  renderWlSectionCategories(section);
   renderConfigBackup(section);
   renderPanicExport(section);
   renderCanonExport(section);
   renderSessionLog(section);
   renderAppHealth(section);
+}
+
+// --- Settings: Writing Lab section categories (PWLAB-SECTIONS) ---------------
+// Manage the named categories available in the § Section picker.
+// Rename syncs all existing "--- Name ---" markers in Writing Lab drafts.
+// Delete warns if any current drafts use the category.
+function renderWlSectionCategories(section) {
+  const api = window.revival.sectionCategories;
+  const WS = 'writing_lab';
+
+  const block = document.createElement('div');
+  block.className = 'entry-form settings-block';
+
+  const heading = document.createElement('h2');
+  heading.className = 'settings-heading';
+  heading.textContent = 'Writing Lab Section Categories';
+
+  const desc = document.createElement('p');
+  desc.className = 'settings-desc';
+  desc.textContent = 'Categories available in the § Section picker. Renaming a category updates any existing markers in your drafts.';
+
+  const listEl = document.createElement('div');
+  listEl.className = 'wl-cats-list';
+
+  const status = document.createElement('p');
+  status.className = 'draft-status';
+
+  // Add new form
+  const addRow = document.createElement('div');
+  addRow.className = 'wl-cats-add-row';
+  const addInput = document.createElement('input');
+  addInput.type = 'text';
+  addInput.className = 'wl-section-chip-input';
+  addInput.placeholder = 'New category name…';
+  addInput.style.marginRight = '6px';
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'btn-secondary';
+  addBtn.textContent = 'Add';
+  addRow.append(addInput, addBtn);
+
+  block.append(heading, desc, listEl, addRow, status);
+  section.appendChild(block);
+
+  async function reload() {
+    listEl.innerHTML = '';
+    let cats = [];
+    try { cats = await api.list(WS); } catch (e) {
+      setStatus(status, `Could not load categories: ${e.message || e}`);
+      return;
+    }
+    if (cats.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'settings-desc';
+      empty.style.fontStyle = 'italic';
+      empty.textContent = 'No categories yet.';
+      listEl.appendChild(empty);
+      return;
+    }
+    cats.forEach((cat) => {
+      const row = document.createElement('div');
+      row.className = 'wl-cats-row';
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'wl-cats-name';
+      nameSpan.textContent = cat.name;
+
+      const renameBtn = document.createElement('button');
+      renameBtn.type = 'button';
+      renameBtn.className = 'btn-secondary';
+      renameBtn.style.fontSize = '11px';
+      renameBtn.style.padding = '2px 8px';
+      renameBtn.textContent = 'Rename';
+      renameBtn.addEventListener('click', () => {
+        row.innerHTML = '';
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'wl-section-chip-input';
+        inp.value = cat.name;
+        inp.style.marginRight = '6px';
+        const saveBtn = document.createElement('button');
+        saveBtn.type = 'button';
+        saveBtn.className = 'wl-section-chip-confirm';
+        saveBtn.textContent = 'Save';
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'wl-section-chip-cancel';
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.style.marginLeft = '4px';
+        row.append(inp, saveBtn, cancelBtn);
+        inp.focus(); inp.select();
+
+        async function doRename() {
+          const newName = inp.value.trim();
+          if (!newName || newName === cat.name) { await reload(); return; }
+          saveBtn.disabled = true;
+          try {
+            await api.renameAndSync(WS, cat.name, newName);
+            setStatus(status, `Renamed "${cat.name}" → "${newName}" and updated existing markers.`);
+            await reload();
+          } catch (e) {
+            setStatus(status, `Could not rename: ${e.message || e}`);
+            await reload();
+          }
+        }
+        saveBtn.addEventListener('click', doRename);
+        cancelBtn.addEventListener('click', () => reload());
+        inp.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter') { ev.preventDefault(); doRename(); }
+          if (ev.key === 'Escape') reload();
+        });
+      });
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'btn-secondary';
+      deleteBtn.style.fontSize = '11px';
+      deleteBtn.style.padding = '2px 8px';
+      deleteBtn.style.color = 'var(--danger, #c0392b)';
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.addEventListener('click', async () => {
+        deleteBtn.disabled = true;
+        let count = 0;
+        try { count = await api.countUsed(WS, cat.name); } catch {}
+        const confirm_ = document.createElement('div');
+        confirm_.className = 'wl-cats-confirm';
+        const msg = document.createElement('span');
+        msg.style.fontSize = '12px';
+        msg.style.marginRight = '8px';
+        msg.textContent = count > 0
+          ? `"${cat.name}" is used in ${count} draft${count === 1 ? '' : 's'}. Section markers will remain but won't match any category. Delete anyway?`
+          : `Delete "${cat.name}"?`;
+        const yesBtn = document.createElement('button');
+        yesBtn.type = 'button';
+        yesBtn.className = 'btn-secondary';
+        yesBtn.style.fontSize = '11px';
+        yesBtn.style.padding = '2px 8px';
+        yesBtn.style.color = 'var(--danger, #c0392b)';
+        yesBtn.textContent = 'Delete';
+        const noBtn = document.createElement('button');
+        noBtn.type = 'button';
+        noBtn.className = 'btn-secondary';
+        noBtn.style.fontSize = '11px';
+        noBtn.style.padding = '2px 8px';
+        noBtn.style.marginLeft = '4px';
+        noBtn.textContent = 'Cancel';
+        confirm_.append(msg, yesBtn, noBtn);
+        row.replaceWith(confirm_);
+
+        yesBtn.addEventListener('click', async () => {
+          yesBtn.disabled = true;
+          try {
+            await api.delete(WS, cat.name);
+            setStatus(status, `Deleted "${cat.name}".`);
+          } catch (e) {
+            setStatus(status, `Could not delete: ${e.message || e}`);
+          }
+          await reload();
+        });
+        noBtn.addEventListener('click', () => reload());
+      });
+
+      row.append(nameSpan, renameBtn, deleteBtn);
+      listEl.appendChild(row);
+    });
+  }
+
+  addBtn.addEventListener('click', async () => {
+    const name = addInput.value.trim();
+    if (!name) return;
+    addBtn.disabled = true;
+    try {
+      await api.add(WS, name);
+      addInput.value = '';
+      setStatus(status, `Added "${name}".`);
+      await reload();
+    } catch (e) {
+      setStatus(status, `Could not add: ${e.message || e}`);
+    }
+    addBtn.disabled = false;
+  });
+  addInput.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); addBtn.click(); }
+  });
+
+  reload();
 }
 
 // --- Settings: Session Log (PSESSION-LOG) ------------------------------------
@@ -9350,7 +9619,7 @@ function renderWritingLabPage(section) {
       sourceAttachBtn.disabled = true;
     }
 
-    // PWLAB-SECTIONS — inline section-name input row; hidden until sectionBtn clicked.
+    // PWLAB-SECTIONS — inline section-name input row; hidden until a category is picked.
     const wlSectionInsertRow = document.createElement('div');
     wlSectionInsertRow.className = 'wl-section-insert-row';
     wlSectionInsertRow.hidden = true;
@@ -9366,17 +9635,85 @@ function renderWritingLabPage(section) {
     _siCancel.type = 'button';
     _siCancel.className = 'wl-section-chip-cancel';
     _siCancel.textContent = 'Cancel';
-    wlSectionInsertRow.append(_siInput, _siConfirm, _siCancel);
+    const _siDupWarn = document.createElement('span');
+    _siDupWarn.className = 'wl-section-dup-warn';
+    _siDupWarn.hidden = true;
+    wlSectionInsertRow.append(_siInput, _siConfirm, _siCancel, _siDupWarn);
 
-    sectionBtn.addEventListener('click', () => {
-      wlSectionInsertRow.hidden = false;
-      _siInput.value = '';
-      _siInput.focus();
-    });
+    // PWLAB-SECTIONS — floating category picker; appears below the § Section button.
+    const wlSectionPicker = document.createElement('div');
+    wlSectionPicker.className = 'wl-section-picker';
+    wlSectionPicker.hidden = true;
+    document.body.appendChild(wlSectionPicker);
+    let _siAddNew = false;
+
+    function _hideWlPicker() {
+      wlSectionPicker.hidden = true;
+      wlSectionPicker.innerHTML = '';
+    }
+    async function _showWlPicker() {
+      if (!wlSectionPicker.hidden) { _hideWlPicker(); return; }
+      wlSectionPicker.innerHTML = '';
+      let cats = [];
+      try { cats = await window.revival.sectionCategories.list('writing_lab'); } catch {}
+      cats.forEach((cat) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'wl-section-picker-item';
+        btn.textContent = cat.name;
+        btn.addEventListener('mousedown', (e) => {
+          e.preventDefault();
+          _siAddNew = false;
+          _siInput.value = cat.name;
+          _siDupWarn.hidden = true;
+          wlSectionInsertRow.hidden = false;
+          _hideWlPicker();
+          _siInput.focus();
+          _siInput.select();
+        });
+        wlSectionPicker.appendChild(btn);
+      });
+      const addNewBtn = document.createElement('button');
+      addNewBtn.type = 'button';
+      addNewBtn.className = 'wl-section-picker-item wl-section-picker-addnew';
+      addNewBtn.textContent = '+ Add new…';
+      addNewBtn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        _siAddNew = true;
+        _siInput.value = '';
+        _siDupWarn.hidden = true;
+        wlSectionInsertRow.hidden = false;
+        _hideWlPicker();
+        _siInput.focus();
+      });
+      wlSectionPicker.appendChild(addNewBtn);
+      const rect = sectionBtn.getBoundingClientRect();
+      wlSectionPicker.style.top = `${rect.bottom + 4}px`;
+      wlSectionPicker.style.left = `${rect.left}px`;
+      wlSectionPicker.hidden = false;
+    }
+    sectionBtn.addEventListener('click', _showWlPicker);
+    const _wlPickerDocClose = (e) => {
+      if (!wlSectionPicker.hidden && !wlSectionPicker.contains(e.target) && e.target !== sectionBtn) {
+        _hideWlPicker();
+      }
+    };
+    document.addEventListener('click', _wlPickerDocClose);
 
     function doInsertSection() {
       const name = _siInput.value.trim();
-      if (!name) { wlSectionInsertRow.hidden = true; return; }
+      if (!name) { wlSectionInsertRow.hidden = true; _siAddNew = false; return; }
+      // Duplicate guard: check if this name already exists in the current draft body.
+      const existingRe = /^---\s+(.+?)\s+---\s*$/mg;
+      const existingNames = new Set();
+      let _m;
+      while ((_m = existingRe.exec(bodyInput.value)) !== null) existingNames.add(_m[1].trim());
+      if (existingNames.has(name)) {
+        _siDupWarn.textContent = `A section named "${name}" already exists in this draft.`;
+        _siDupWarn.hidden = false;
+        return;
+      }
+      _siDupWarn.hidden = true;
       const marker = `--- ${name} ---`;
       const pos = bodyInput.selectionStart ?? bodyInput.value.length;
       const cur = bodyInput.value;
@@ -9386,15 +9723,23 @@ function renderWritingLabPage(section) {
       const suffix = (after.length > 0 && !after.startsWith('\n')) ? '\n' : '';
       bodyInput.value = before + prefix + marker + suffix + after;
       bodyInput.setSelectionRange(before.length + prefix.length + marker.length, before.length + prefix.length + marker.length);
+      if (_siAddNew) {
+        window.revival.sectionCategories.add('writing_lab', name).catch(() => {});
+        _siAddNew = false;
+      }
       wlSectionInsertRow.hidden = true;
       updateCounter();
       scheduleSave();
     }
     _siConfirm.addEventListener('click', doInsertSection);
-    _siCancel.addEventListener('click', () => { wlSectionInsertRow.hidden = true; });
+    _siCancel.addEventListener('click', () => {
+      wlSectionInsertRow.hidden = true;
+      _siDupWarn.hidden = true;
+      _siAddNew = false;
+    });
     _siInput.addEventListener('keydown', (ev) => {
       if (ev.key === 'Enter') { ev.preventDefault(); doInsertSection(); }
-      if (ev.key === 'Escape') { wlSectionInsertRow.hidden = true; }
+      if (ev.key === 'Escape') { wlSectionInsertRow.hidden = true; _siDupWarn.hidden = true; _siAddNew = false; }
     });
 
     rightCol.append(bar, wlSectionInsertRow, sourcesBar, titleInput, bodyInput);
@@ -10215,6 +10560,21 @@ function renderWritingLabPage(section) {
       }
     });
     _editorObserver.observe(rightCol, { childList: true });
+
+    // PWLAB-SECTIONS cleanup: remove section category picker + listener when the
+    // Writing Lab workspace is navigated away from. Observes the top-level
+    // content container (cleared by route()) rather than rightCol (cleared by
+    // openEditor) so workspace-level navigation is also caught.
+    const _sectionPickerObserver = new MutationObserver(() => {
+      if (!bar.isConnected) {
+        wlSectionPicker.remove();
+        document.removeEventListener('click', _wlPickerDocClose);
+        _sectionPickerObserver.disconnect();
+      }
+    });
+    const _contentEl = document.getElementById('content');
+    if (_contentEl) _sectionPickerObserver.observe(_contentEl, { childList: true });
+    else _sectionPickerObserver.observe(document.body, { childList: true });
   }
 
   function renderDetail() {

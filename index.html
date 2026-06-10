@@ -2532,7 +2532,33 @@
         border-radius: 4px; padding: 2px 7px; cursor: pointer; color: var(--muted);
       }
       .wl-section-chip-cancel:hover { border-color: var(--accent); color: var(--text); }
+      .wl-section-picker {
+        position: fixed; z-index: 9999;
+        background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.22); min-width: 180px; max-width: 260px;
+        padding: 4px 0; overflow-y: auto; max-height: 280px;
+      }
+      .wl-section-picker-item {
+        display: block; width: 100%; text-align: left;
+        font: inherit; font-size: 13px; color: var(--text);
+        background: none; border: none; padding: 6px 12px; cursor: pointer;
+      }
+      .wl-section-picker-item:hover { background: var(--hover); }
+      .wl-section-picker-addnew {
+        color: var(--accent); border-top: 1px solid var(--border); margin-top: 2px;
+      }
+      .wl-section-dup-warn {
+        font-size: 11px; color: var(--danger, #c0392b); margin-left: 4px;
+      }
       .wl-section-anchor { display: block; margin: 1.1em 0 0.15em; }
+      /* PWLAB-SECTIONS — Settings categories manager */
+      .wl-cats-list { margin-bottom: 10px; }
+      .wl-cats-row, .wl-cats-confirm {
+        display: flex; align-items: center; gap: 6px;
+        padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+      }
+      .wl-cats-name { flex: 1; }
+      .wl-cats-add-row { display: flex; align-items: center; margin-top: 6px; }
       .wl-section-heading {
         display: inline-block; font-size: 10px; font-weight: 700;
         letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted);

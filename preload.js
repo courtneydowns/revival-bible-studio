@@ -409,6 +409,14 @@ contextBridge.exposeInMainWorld('revival', {
     get: (kind, id) => ipcRenderer.invoke('scratchpad:get', kind, id),
     set: (kind, id, content) => ipcRenderer.invoke('scratchpad:set', kind, id, content),
   },
+  // PWLAB-SECTIONS — named section categories per workspace.
+  sectionCategories: {
+    list:          (ws)              => ipcRenderer.invoke('sectionCategories:list', ws),
+    add:           (ws, name)        => ipcRenderer.invoke('sectionCategories:add', ws, name),
+    renameAndSync: (ws, old_, new_)  => ipcRenderer.invoke('sectionCategories:renameAndSync', ws, old_, new_),
+    delete:        (ws, name)        => ipcRenderer.invoke('sectionCategories:delete', ws, name),
+    countUsed:     (ws, name)        => ipcRenderer.invoke('sectionCategories:countUsed', ws, name),
+  },
   // PSESSION-LOG — audit trail. finalize() saves the current session and
   // starts a fresh one; list() returns all past logs; export(id) writes a
   // plain-text file and reveals the folder.

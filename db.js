@@ -1958,6 +1958,34 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '061_pwlab_sections',
+    up(db) {
+      // PWLAB-SECTIONS — per-workspace named section categories. Writing Lab is
+      // seeded at migration; Brainstorm and Documents start empty (extensible
+      // later without a new migration). Markers in entry bodies use the storage
+      // format "--- Name ---" which is never exposed to the user directly.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS section_categories (
+          id            INTEGER PRIMARY KEY,
+          workspace     TEXT    NOT NULL,
+          name          TEXT    NOT NULL,
+          display_order INTEGER NOT NULL DEFAULT 0,
+          created_at    TEXT    NOT NULL,
+          UNIQUE (workspace, name)
+        );
+      `);
+      const now = new Date().toISOString();
+      const ins = db.prepare(
+        'INSERT OR IGNORE INTO section_categories (workspace, name, display_order, created_at) VALUES (?, ?, ?, ?)'
+      );
+      [
+        'Cold Open', 'Act One', 'Act Two', 'Act Three', 'Coda',
+        'Scene', 'Quiet Devastation', 'Rewatch Layer', 'Consequence Scene', 'Dialogue', 'Montage',
+        'Picking Up Here', 'Needs Work', 'Placeholder',
+      ].forEach((name, i) => ins.run('writing_lab', name, i, now));
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -6559,6 +6587,57 @@ const health = {
   },
 };
 
+// PWLAB-SECTIONS — named section categories per workspace. Backing table:
+// section_categories. Rename syncs the raw "--- Name ---" markers in entry
+// bodies so existing drafts stay consistent without a manual find-replace.
+const _SECTION_TABLE_MAP = {
+  writing_lab: 'writing_lab_drafts',
+  brainstorm:  'brainstorm',
+  documents:   'documents',
+};
+const sectionCategories = {
+  list(workspace) {
+    return getDb()
+      .prepare('SELECT * FROM section_categories WHERE workspace = ? ORDER BY display_order, id')
+      .all(workspace);
+  },
+  add(workspace, name) {
+    const db = getDb();
+    const { m } = db
+      .prepare('SELECT COALESCE(MAX(display_order), -1) AS m FROM section_categories WHERE workspace = ?')
+      .get(workspace);
+    return db
+      .prepare('INSERT OR IGNORE INTO section_categories (workspace, name, display_order, created_at) VALUES (?, ?, ?, ?)')
+      .run(workspace, name, m + 1, new Date().toISOString());
+  },
+  renameAndSync(workspace, oldName, newName) {
+    if (!newName || newName === oldName) return;
+    const db = getDb();
+    const table = _SECTION_TABLE_MAP[workspace];
+    db.transaction(() => {
+      db.prepare('UPDATE section_categories SET name = ? WHERE workspace = ? AND name = ?')
+        .run(newName, workspace, oldName);
+      if (table) {
+        db.prepare(`UPDATE ${table} SET body = REPLACE(body, ?, ?)`)
+          .run(`--- ${oldName} ---`, `--- ${newName} ---`);
+      }
+    })();
+  },
+  delete(workspace, name) {
+    return getDb()
+      .prepare('DELETE FROM section_categories WHERE workspace = ? AND name = ?')
+      .run(workspace, name);
+  },
+  countUsed(workspace, name) {
+    const table = _SECTION_TABLE_MAP[workspace];
+    if (!table) return 0;
+    const row = getDb()
+      .prepare(`SELECT COUNT(*) AS cnt FROM ${table} WHERE instr(body, ?) > 0`)
+      .get(`--- ${name} ---`);
+    return row.cnt;
+  },
+};
+
 // PSCRATCHPAD — freeform per-entry scratchpad. Stored outside the entry row so
 // it is never returned by list()/search() and never included in text exports.
 const scratchpad = {
@@ -6632,4 +6711,5 @@ module.exports = {
   health,
   configBackup,
   scratchpad,
+  sectionCategories,
 };

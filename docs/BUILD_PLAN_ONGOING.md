@@ -535,13 +535,21 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 ## Writing Lab enhancements
 
 ### PWLAB-SECTIONS — Writing Lab section markers (redesigned) ✅
-- Toolbar button (or keyboard shortcut) → inline name prompt → named section marker inserted at cursor. No manual syntax — `--- Name ---` format is storage only, never exposed to the user.
-- Jump-to list appears in the detail panel sidebar as soon as at least one section exists. Click a name → scrolls to that section.
-- Available on: Writing Lab, Brainstorm, Documents. Not on other workspaces — entries there are typically too short to need it.
-- Section count shown passively in Writing Lab status bar (already spec'd). No status bar change needed for Brainstorm or Documents.
-- Rename and delete section markers from the jump-to list.
-- **Smoke:** Writing Lab: insert three sections via button with distinct names; confirm jump-to list appears with all three; click each, confirm scroll to correct position; confirm section count in status bar updates. Brainstorm: insert a section, confirm list appears. Documents: insert a section, confirm list appears.
-- Smoke passed.
+**Tool:** CLI
+- Toolbar button (or keyboard shortcut) opens a category picker. Selecting a category pre-fills the section name — editable before inserting. No manual syntax. `--- Name ---` format is storage only, never exposed.
+- Duplicate guard: if a section with that name already exists in the current entry, warn and block the insert. User must rename before proceeding.
+- Jump-to list appears in the detail panel sidebar as soon as at least one section exists. Click a name → scrolls to that section. Rename and delete from the jump-to list.
+- Section count shown passively in Writing Lab status bar.
+- Available on: Writing Lab (full category picker + seeded list). Brainstorm and Documents get the same picker with an empty list for now — extensible later without migration.
+- **Schema:** `section_categories` table with `workspace` column. Writing Lab seeded at migration. Brainstorm and Documents rows added when ready.
+- **Seeded Writing Lab categories (grouped, not user-visible grouping — display order only):**
+  - Cold Open, Act One, Act Two, Act Three, Coda
+  - Scene, Quiet Devastation, Rewatch Layer, Consequence Scene, Dialogue, Montage
+  - Picking Up Here, Needs Work, Placeholder
+- **Inline add:** "Add new…" option at bottom of picker → type name → creates category and inserts section in one step.
+- **Settings — Writing Lab section categories manager:** add, rename, delete. Renaming updates all existing section markers that used that category name. Deleting warns if any markers currently use it; user confirms before delete proceeds.
+- **Smoke:** Open a Writing Lab draft. Open the category picker — confirm all seeded categories present in correct order. Insert "Act One" → confirm jump-to list appears. Insert "Act One" again → confirm duplicate warning fires and insert is blocked. Insert "Scene" with a custom name edit → confirm custom name appears in jump-to list. Click each section name → confirm scroll. Open Settings → rename "Placeholder" to "To Revisit" → return to draft → confirm existing marker updated. Open Settings → delete "To Revisit" → confirm warning fires. Confirm section count in status bar. Confirm Brainstorm entry shows picker with empty list and "Add new…" option.
+- **Smoke passed 2026-06-10.** All 19 automated checks green.
 
 ### PWLAB-CANON-COMPARE — Writing Lab draft vs. canon comparison
 - On-demand action from any Writing Lab draft: Claude reads the draft body and surfaces details that diverge from locked canon entries

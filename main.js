@@ -2028,6 +2028,13 @@ function registerIpc() {
   // PSCRATCHPAD — per-entry scratchpad, not searchable / not exported.
   ipcMain.handle('scratchpad:get', (_event, kind, id) => db.scratchpad.get(kind, id));
   ipcMain.handle('scratchpad:set', (_event, kind, id, content) => db.scratchpad.set(kind, id, content));
+
+  // PWLAB-SECTIONS — section category management.
+  ipcMain.handle('sectionCategories:list',          (_e, ws)              => db.sectionCategories.list(ws));
+  ipcMain.handle('sectionCategories:add',           (_e, ws, name)        => db.sectionCategories.add(ws, name));
+  ipcMain.handle('sectionCategories:renameAndSync', (_e, ws, old_, new_)  => db.sectionCategories.renameAndSync(ws, old_, new_));
+  ipcMain.handle('sectionCategories:delete',        (_e, ws, name)        => db.sectionCategories.delete(ws, name));
+  ipcMain.handle('sectionCategories:countUsed',     (_e, ws, name)        => db.sectionCategories.countUsed(ws, name));
   ipcMain.handle('sessionLog:export', (_e, id) => {
     const log = db.sessionLogs.get(id);
     if (!log) throw new Error('Session log not found.');
