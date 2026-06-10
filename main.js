@@ -2020,6 +2020,10 @@ function registerIpc() {
     return db.health.getStats(dbPath);
   });
   ipcMain.handle('health:cleanupOrphans', () => db.health.cleanupOrphans());
+
+  // PSCRATCHPAD — per-entry scratchpad, not searchable / not exported.
+  ipcMain.handle('scratchpad:get', (_event, kind, id) => db.scratchpad.get(kind, id));
+  ipcMain.handle('scratchpad:set', (_event, kind, id, content) => db.scratchpad.set(kind, id, content));
   ipcMain.handle('sessionLog:export', (_e, id) => {
     const log = db.sessionLogs.get(id);
     if (!log) throw new Error('Session log not found.');

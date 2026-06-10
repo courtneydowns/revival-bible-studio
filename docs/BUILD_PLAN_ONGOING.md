@@ -767,7 +767,7 @@ Extends the existing episode continuity checker. Do not remove or alter existing
 - **Smoke:** Open an entry; quit app; relaunch; confirm the same entry is open; archive that entry; relaunch; confirm fallback to Home
 - **Smoke passed.**
 
-### PSCRATCHPAD — Entry-level scratchpad
+### PSCRATCHPAD — Entry-level scratchpad ✅
 - Every entry across all workspaces gets a freeform scratchpad section, collapsed by default
 - Not autosaved to body, not canon, not routable, not exported as part of the entry
 - Persists with the entry across app restarts

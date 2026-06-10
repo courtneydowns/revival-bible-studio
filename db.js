@@ -1941,6 +1941,23 @@ const MIGRATIONS = [
       `);
     },
   },
+  {
+    name: '060_pscratchpad',
+    up(db) {
+      // PSCRATCHPAD — per-entry freeform scratchpad. Not part of the entry body,
+      // not searched, not exported in readable outputs. Persists across restarts.
+      // Composite PK on (entry_kind, entry_id) — one row per entry.
+      db.exec(`
+        CREATE TABLE entry_scratchpad (
+          entry_kind TEXT    NOT NULL,
+          entry_id   INTEGER NOT NULL,
+          content    TEXT    NOT NULL DEFAULT '',
+          updated_at TEXT    NOT NULL,
+          PRIMARY KEY (entry_kind, entry_id)
+        );
+      `);
+    },
+  },
 ];
 
 function getDbPath(userDataPath) {
@@ -6491,6 +6508,27 @@ const health = {
   },
 };
 
+// PSCRATCHPAD — freeform per-entry scratchpad. Stored outside the entry row so
+// it is never returned by list()/search() and never included in text exports.
+const scratchpad = {
+  get(kind, id) {
+    const db = getDb();
+    const row = db
+      .prepare('SELECT content FROM entry_scratchpad WHERE entry_kind = ? AND entry_id = ?')
+      .get(kind, id);
+    return row ? row.content : '';
+  },
+  set(kind, id, content) {
+    const db = getDb();
+    db.prepare(`
+      INSERT INTO entry_scratchpad (entry_kind, entry_id, content, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT (entry_kind, entry_id)
+      DO UPDATE SET content = excluded.content, updated_at = excluded.updated_at
+    `).run(kind, id, content || '', new Date().toISOString());
+  },
+};
+
 module.exports = {
   initDatabase,
   getDb,
@@ -6542,4 +6580,5 @@ module.exports = {
   sessionLogs,
   health,
   configBackup,
+  scratchpad,
 };

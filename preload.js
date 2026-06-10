@@ -400,6 +400,11 @@ contextBridge.exposeInMainWorld('revival', {
     getStats:       () => ipcRenderer.invoke('health:getStats'),
     cleanupOrphans: () => ipcRenderer.invoke('health:cleanupOrphans'),
   },
+  // PSCRATCHPAD — per-entry freeform scratchpad. Not searched, not exported.
+  scratchpad: {
+    get: (kind, id) => ipcRenderer.invoke('scratchpad:get', kind, id),
+    set: (kind, id, content) => ipcRenderer.invoke('scratchpad:set', kind, id, content),
+  },
   // PSESSION-LOG — audit trail. finalize() saves the current session and
   // starts a fresh one; list() returns all past logs; export(id) writes a
   // plain-text file and reveals the folder.

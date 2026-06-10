@@ -608,6 +608,73 @@ function buildAttachmentPicker(hostKind, hostId, onAttached, onClose) {
   return picker;
 }
 
+// PSCRATCHPAD — collapsed freeform scratchpad on every entry detail panel.
+// Content is stored in entry_scratchpad (separate table), so it never
+// appears in title/body searches or any text export.
+function mountScratchpad(host, entityKind, itemId) {
+  if (!entityKind || !itemId || !window.revival.scratchpad) return;
+
+  const section = document.createElement('details');
+  section.className = 'scratchpad-section';
+
+  const summary = document.createElement('summary');
+  summary.className = 'scratchpad-toggle';
+  summary.textContent = 'Scratchpad';
+  section.appendChild(summary);
+
+  const inner = document.createElement('div');
+  inner.className = 'scratchpad-inner';
+
+  const textarea = document.createElement('textarea');
+  textarea.className = 'scratchpad-textarea';
+  textarea.placeholder = 'Private notes — not saved to the entry body, not searched or exported';
+  textarea.rows = 5;
+  inner.appendChild(textarea);
+
+  const status = document.createElement('div');
+  status.className = 'scratchpad-status';
+  inner.appendChild(status);
+
+  section.appendChild(inner);
+  host.appendChild(section);
+
+  let loaded = false;
+  let saveTimer = null;
+
+  async function load() {
+    if (loaded) return;
+    loaded = true;
+    try {
+      const content = await window.revival.scratchpad.get(entityKind, itemId);
+      textarea.value = content || '';
+    } catch {}
+  }
+
+  async function save() {
+    try {
+      await window.revival.scratchpad.set(entityKind, itemId, textarea.value);
+      setStatus(status, '');
+    } catch {
+      setStatus(status, 'Save failed');
+    }
+  }
+
+  section.addEventListener('toggle', () => {
+    if (section.open) load();
+  });
+
+  textarea.addEventListener('input', () => {
+    clearTimeout(saveTimer);
+    setStatus(status, 'Saving…');
+    saveTimer = setTimeout(save, 600);
+  });
+
+  textarea.addEventListener('blur', () => {
+    clearTimeout(saveTimer);
+    if (loaded) save();
+  });
+}
+
 function mountAttachmentsSection(host, entityKind, id) {
   if (!entityKind || !window.revival.links || !window.revival.crossWorkspace) return;
 
@@ -1485,6 +1552,9 @@ function makeEntryWorkspace(config) {
 
     // P37 — optional workspace-specific detail-panel extension (e.g. relationships section)
     if (config.detailExtra) config.detailExtra(rightCol, item, archivedFlag);
+
+    // PSCRATCHPAD — freeform scratchpad, collapsed by default.
+    mountScratchpad(rightCol, entityKind, item.id);
 
     rightCol.appendChild(buildStatusBar(workspaceName, item, archivedFlag));
   }
@@ -9626,6 +9696,8 @@ function renderWritingLabPage(section) {
     // Both are gated on item existing — new unsaved drafts have no DB row yet.
     if (item) {
       mountAttachmentsSection(rightCol, 'writing_lab', item.id);
+      // PSCRATCHPAD — freeform scratchpad on Writing Lab drafts.
+      mountScratchpad(rightCol, 'writing_lab', item.id);
       const wlStatusBar = buildStatusBar('Writing Lab', item, archivedAtStart);
       // PAUDIT-5: append updateable word-count and section-count segments.
       const mkSeg = (label, value) => {

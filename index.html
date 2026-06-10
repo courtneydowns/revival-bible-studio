@@ -1473,6 +1473,50 @@
         font-size: 13px; color: var(--accent); cursor: pointer; text-align: left;
       }
       .tc-linked-goto:hover { text-decoration: underline; }
+      /* PSCRATCHPAD — collapsed freeform scratchpad on every entry detail panel. */
+      .scratchpad-section {
+        margin-top: 20px;
+        border: 1px dashed var(--border);
+        border-radius: 6px;
+        padding: 0 12px;
+      }
+      .scratchpad-section[open] { padding-bottom: 10px; }
+      .scratchpad-toggle {
+        cursor: pointer;
+        font-size: 12px;
+        color: var(--muted);
+        list-style: none;
+        user-select: none;
+        padding: 8px 0;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .scratchpad-toggle::-webkit-details-marker { display: none; }
+      .scratchpad-toggle::before {
+        content: '▶';
+        font-size: 8px;
+        display: inline-block;
+        transition: transform 0.15s;
+      }
+      .scratchpad-section[open] .scratchpad-toggle::before { transform: rotate(90deg); }
+      .scratchpad-inner { display: flex; flex-direction: column; gap: 6px; padding-top: 6px; }
+      .scratchpad-textarea {
+        width: 100%;
+        resize: vertical;
+        min-height: 80px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 13px;
+        line-height: 1.5;
+        padding: 8px;
+        box-sizing: border-box;
+      }
+      .scratchpad-textarea:focus { outline: none; border-color: var(--accent); }
+      .scratchpad-status { font-size: 11px; color: var(--muted); min-height: 14px; }
       /* P36 — interactive cross-workspace attachment section. */
       .cwa-section { margin-top: 16px; }
       .cwa-header {
