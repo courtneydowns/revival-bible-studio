@@ -563,12 +563,13 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ## Episode enhancements
 
-### PEPISODE-PREVON — "Previously on" canon snapshot
+### PEPISODE-PREVON — "Previously on" canon snapshot ✅
 - On any Episode entry, one-click generates a read-only summary of what canon facts are locked as of the prior episode
 - Generated from existing canon data — no new input required
 - Displayed in a collapsed panel on the episode detail
 - Exportable as plain text
 - **Smoke:** Seed canon entries across two episodes; open Episode 2; generate "Previously on"; confirm summary reflects only canon locked as of Episode 1; export, confirm output
+- **Smoke passed 2026-06-10.** All 20 automated checks green.
 
 ---
 

@@ -101,7 +101,7 @@
 | **PAUDIT-10 Writing Lab new-draft word count** | **VS Code ext** ✅ | Added else-branch status bar for new drafts; wlWordSeg/wlSectionSeg now set before first autosave |
 | **PWLAB-SECTIONS Writing Lab section markers (redesigned)** | **CLI** ✅ | Schema migration + category picker + jump-to list on Writing Lab, Brainstorm, Documents; Settings manager. Smoke passed 2026-06-10. |
 | **PWLAB-CANON-COMPARE Draft vs. canon comparison** | **CLI** ✅ | New AI action wired into Writing Lab, reads full canon |
-| **PEPISODE-PREVON "Previously on" snapshot** | **VS Code ext** | Generated panel on existing Episode detail |
+| **PEPISODE-PREVON "Previously on" snapshot** | **VS Code ext** ✅ | Generated panel on existing Episode detail. Smoke passed 2026-06-10. |
 | **PRESEARCH-USED Research "Used in" indicator** | **VS Code ext** | Passive badge on existing Research list + detail |
 | **PARC-A Character arc tracker: written** | **CLI** | New read-only view, cross-table queries |
 | **PARC-B Character arc tracker: visual** | **CLI** | New visual component, horizontal timeline |
