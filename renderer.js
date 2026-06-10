@@ -9817,22 +9817,31 @@ function renderWritingLabPage(section) {
 
     // PPOL2b-12 — linked-entries indicator (same passive pattern as other workspaces).
     // PPOL2b-03 / PAUDIT-5 — status bar with word count and section count.
-    // Both are gated on item existing — new unsaved drafts have no DB row yet.
+    // Attachments and scratchpad require a saved DB row; status bar with counters works for new drafts too.
+    const mkSeg = (label, value) => {
+      const s = document.createElement('span');
+      s.className = 'tc-statusbar-seg';
+      const k = document.createElement('span');
+      k.className = 'tc-statusbar-key';
+      k.textContent = label;
+      s.append(k, document.createTextNode(value));
+      return s;
+    };
     if (item) {
       mountAttachmentsSection(rightCol, 'writing_lab', item.id);
       // PSCRATCHPAD — freeform scratchpad on Writing Lab drafts.
       mountScratchpad(rightCol, 'writing_lab', item.id);
       const wlStatusBar = buildStatusBar('Writing Lab', item, archivedAtStart);
       // PAUDIT-5: append updateable word-count and section-count segments.
-      const mkSeg = (label, value) => {
-        const s = document.createElement('span');
-        s.className = 'tc-statusbar-seg';
-        const k = document.createElement('span');
-        k.className = 'tc-statusbar-key';
-        k.textContent = label;
-        s.append(k, document.createTextNode(value));
-        return s;
-      };
+      wlWordSeg = mkSeg('Words', String(wordCount(bodyInput.value)));
+      wlSectionSeg = mkSeg('Sections', String((bodyInput.value.match(/^---\s+.+\s+---\s*$/mg) || []).length));
+      wlStatusBar.append(wlWordSeg, wlSectionSeg);
+      rightCol.appendChild(wlStatusBar);
+    } else {
+      // PAUDIT-10: new draft — no DB row yet so buildStatusBar can't run, but word/section
+      // count should still update live from keystroke 1.
+      const wlStatusBar = document.createElement('div');
+      wlStatusBar.className = 'tc-statusbar';
       wlWordSeg = mkSeg('Words', String(wordCount(bodyInput.value)));
       wlSectionSeg = mkSeg('Sections', String((bodyInput.value.match(/^---\s+.+\s+---\s*$/mg) || []).length));
       wlStatusBar.append(wlWordSeg, wlSectionSeg);

@@ -98,7 +98,7 @@
 | **POQ-DEPENDS Open Question dependencies** | **VS Code ext** ✅ | Dependency field + block indicator on existing Open Questions entry |
 | **PDRAFT-LOCK Character/Episode draft lock** | **VS Code ext** ✅ | Discovered complete during full-app audit 2026-06-10; IPCs, panel, badge all confirmed wired |
 | **PAUDIT-9 Canon Review back-link key + WL word count + Conflicts badge age** | **VS Code ext** ✅ | All three items already correct; no code changes needed — verified and smoked |
-| **PAUDIT-10 Writing Lab new-draft word count** | **VS Code ext** | Fix status bar gate for new unsaved drafts |
+| **PAUDIT-10 Writing Lab new-draft word count** | **VS Code ext** ✅ | Added else-branch status bar for new drafts; wlWordSeg/wlSectionSeg now set before first autosave |
 | **PWLAB-SECTIONS Writing Lab section markers** | **VS Code ext** | Section marker insertion + jump-to list on existing Writing Lab page |
 | **PWLAB-CANON-COMPARE Draft vs. canon comparison** | **CLI** | New AI action wired into Writing Lab, reads full canon |
 | **PEPISODE-PREVON "Previously on" snapshot** | **VS Code ext** | Generated panel on existing Episode detail |

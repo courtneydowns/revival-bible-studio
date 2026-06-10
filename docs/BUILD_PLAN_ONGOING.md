@@ -423,10 +423,11 @@ Three small renderer.js / db.js fixes surfaced by full-app audit (2026-06-10):
 - **Conflicts nav badge age:** Verified — `conflictsOldestDays: ageDays(co.oldest)` already returned by `navBadges()` at db.js:3670. No code change needed.
 - **Smoke passed 2026-06-10.** All three items confirmed correct; no code changes required.
 
-### PAUDIT-10 — Writing Lab new-draft word count
+### PAUDIT-10 — Writing Lab new-draft word count ✅
 **Tool:** VS Code ext
 - Fix status bar gate at renderer.js ~L9827: word count and section count should appear from keystroke 1, not only after first autosave. New draft (`currentId == null`) currently silently no-ops the status bar counter update because the gate requires `item` to exist.
 - **Smoke:** Open Writing Lab → create a new draft → type text before any autosave triggers → confirm word count appears in status bar immediately.
+- **Smoke passed 2026-06-10.**
 
 ---
 
