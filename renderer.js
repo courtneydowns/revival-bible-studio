@@ -72,6 +72,18 @@ const RECENT_VIEWED_KEY = 'revival.recentlyViewed';
 const RECENT_VIEWED_CAP = 8;
 let pendingEntrySelection = null;
 
+// PSESSION-RESUME: persist the last-opened entry across app restarts so the
+// user lands where they left off. SESSION_RESUME_OPT_OUT_KEY disables this.
+const SESSION_RESUME_KEY = 'revival.sessionResume';
+const SESSION_RESUME_OPT_OUT_KEY = 'revival.sessionResumeDisabled';
+
+function recordLastOpen(workspace, id) {
+  if (!workspace || id == null) return;
+  try {
+    localStorage.setItem(SESSION_RESUME_KEY, JSON.stringify({ workspace, id }));
+  } catch { /* storage full or private mode */ }
+}
+
 function getRecentlyViewed() {
   try {
     const arr = JSON.parse(sessionStorage.getItem(RECENT_VIEWED_KEY));
@@ -91,6 +103,7 @@ function recordRecentlyViewed(workspace, id, title) {
     RECENT_VIEWED_KEY,
     JSON.stringify(rest.slice(0, RECENT_VIEWED_CAP))
   );
+  recordLastOpen(workspace, id);
 }
 
 function setActiveWorkspaceRefresh(name, refresh) {
@@ -1663,10 +1676,18 @@ function makeEntryWorkspace(config) {
     }
     // PHOME: one-click return — a recently-viewed click routed here with a
     // pending entry id. Select it if it still exists, then consume the request.
+    // PSESSION-RESUME: same mechanism for launch-time resume; if the entry was
+    // deleted or archived since last session, fall back to Home.
     if (pendingEntrySelection && pendingEntrySelection.workspace === workspaceName) {
       const target = pendingEntrySelection.id;
+      const wasSessionResume = pendingEntrySelection.fromSessionResume;
       pendingEntrySelection = null;
-      if (findItem(target)) selectedId = target;
+      if (findItem(target)) {
+        selectedId = target;
+      } else if (wasSessionResume) {
+        route('Home');
+        return;
+      }
     }
     renderList();
     renderDetail();
@@ -6676,6 +6697,49 @@ function renderApiKeyBlock(section) {
 // --- Settings: Project Rules (P20) -----------------------------------------
 // Always-on, always-visible guidance Claude receives. Stored in SQLite (via the
 // settings IPC) so it survives restarts — there is no hidden project memory.
+// --- Settings: Session Resume (PSESSION-RESUME) ----------------------------
+function renderSessionResume(section) {
+  const block = document.createElement('div');
+  block.className = 'entry-form settings-block';
+
+  const heading = document.createElement('h2');
+  heading.className = 'settings-heading';
+  heading.textContent = 'Session Behavior';
+
+  const desc = document.createElement('p');
+  desc.className = 'settings-desc';
+  desc.textContent =
+    'When enabled, the app reopens the last entry you had open instead of going to Home. ' +
+    'If that entry was deleted or archived, it falls back to Home automatically.';
+
+  const row = document.createElement('label');
+  row.style.cssText = 'display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;';
+
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = localStorage.getItem(SESSION_RESUME_OPT_OUT_KEY) !== 'true';
+
+  const labelText = document.createElement('span');
+  labelText.textContent = 'Resume where I left off on launch';
+
+  row.append(cb, labelText);
+
+  const statusEl = document.createElement('p');
+  statusEl.className = 'draft-status';
+
+  cb.addEventListener('change', () => {
+    if (cb.checked) {
+      localStorage.removeItem(SESSION_RESUME_OPT_OUT_KEY);
+    } else {
+      localStorage.setItem(SESSION_RESUME_OPT_OUT_KEY, 'true');
+    }
+    setStatus(statusEl, cb.checked ? 'Enabled. Takes effect on next launch.' : 'Disabled. App will start at Home.');
+  });
+
+  block.append(heading, desc, row, statusEl);
+  section.appendChild(block);
+}
+
 // The textarea always shows the saved value verbatim; nothing persists until
 // the user clicks Save, and "Unsaved changes" makes the draft/saved distinction
 // explicit (autosave principle: preservation, not silent finalization).
@@ -6750,6 +6814,7 @@ function renderSettingsPage(section) {
   // P39 — Claude API key block.
   renderApiKeyBlock(section);
 
+  renderSessionResume(section);
   renderManageTags(section);
   renderNeedsAttentionSettings(section);
   renderConfigBackup(section);
@@ -8611,6 +8676,7 @@ function renderWritingLabPage(section) {
       if (selectedId === item.id) return;
       if (activeFlush) await activeFlush();
       selectedId = item.id;
+      recordLastOpen('Writing Lab', item.id);
       renderList();
       renderDetail();
     });
@@ -9637,6 +9703,18 @@ function renderWritingLabPage(section) {
       !findItem(selectedId)
     ) {
       selectedId = null;
+    }
+    // PSESSION-RESUME: restore last-open draft on launch.
+    if (pendingEntrySelection && pendingEntrySelection.workspace === 'Writing Lab') {
+      const target = pendingEntrySelection.id;
+      const wasSessionResume = pendingEntrySelection.fromSessionResume;
+      pendingEntrySelection = null;
+      if (findItem(target)) {
+        selectedId = target;
+      } else if (wasSessionResume) {
+        route('Home');
+        return;
+      }
     }
     renderList();
     renderDetail();
@@ -18033,4 +18111,25 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-route('Home');
+// PSESSION-RESUME: restore the last-open entry on launch unless the user
+// opted out. Falls back to Home if no saved entry or opt-out is set.
+(function initLaunch() {
+  const optOut = localStorage.getItem(SESSION_RESUME_OPT_OUT_KEY) === 'true';
+  if (!optOut) {
+    try {
+      const raw = localStorage.getItem(SESSION_RESUME_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved && saved.workspace && saved.id != null) {
+          // route() overwrites pendingEntrySelection at its first line, so
+          // pass the id through route() then patch fromSessionResume on the
+          // object route() created (before loadList's first await resolves).
+          route(saved.workspace, saved.id);
+          if (pendingEntrySelection) pendingEntrySelection.fromSessionResume = true;
+          return;
+        }
+      }
+    } catch { /* malformed — fall through to Home */ }
+  }
+  route('Home');
+}());

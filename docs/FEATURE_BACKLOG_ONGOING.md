@@ -426,7 +426,7 @@ Lightweight freeform scratchpad available on every entry across all workspaces.
 
 ---
 
-## PSESSION-RESUME — Session resume on launch
+## ✅ PSESSION-RESUME — Session resume on launch
 
 - On app launch, surface the last entry the user had open rather than defaulting to Home
 - Zero clicks to get back into flow

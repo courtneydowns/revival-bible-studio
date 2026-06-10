@@ -760,11 +760,12 @@ Extends the existing episode continuity checker. Do not remove or alter existing
 
 ## Workflow continuity
 
-### PSESSION-RESUME — Session resume on launch
+### ✅ PSESSION-RESUME — Session resume on launch
 - On app launch, surface the last entry the user had open rather than defaulting to Home
 - If the last entry was deleted or archived, fall back to Home
 - Opt-out available in Settings for users who prefer to start at Home
 - **Smoke:** Open an entry; quit app; relaunch; confirm the same entry is open; archive that entry; relaunch; confirm fallback to Home
+- **Smoke passed.**
 
 ### PSCRATCHPAD — Entry-level scratchpad
 - Every entry across all workspaces gets a freeform scratchpad section, collapsed by default
