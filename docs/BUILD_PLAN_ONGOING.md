@@ -415,13 +415,13 @@ Remove dead IPC bridges confirmed by the audit as having no renderer callers. Mu
 
 ## Full-app audit
 
-### PAUDIT-9 — Canon Review back-link key + Writing Lab legacy word count + Conflicts badge age
+### PAUDIT-9 — Canon Review back-link key + Writing Lab legacy word count + Conflicts badge age ✅
 **Tool:** VS Code ext
 Three small renderer.js / db.js fixes surfaced by full-app audit (2026-06-10):
-- **Canon Review back-link key:** `CR_SOURCE_KIND_TO_WORKSPACE` map in renderer.js (~L5391) missing `decisions` key (only has `decisions_workspace`). `CANON_SOURCE_KIND_TO_WS` at ~L2877 includes `decisions: 'Decisions'` — the two maps are inconsistent. Back-link navigation from a Canon Review proposal whose `source_kind` is `'decisions'` silently fails. Add the missing key.
-- **Writing Lab legacy word count:** `wc` element in Writing Lab `openEditor()` action bar (~L8866) may be a pre-PAUDIT-5 duplicate of the status bar word count. Visually verify — if duplicate, remove; if still visible in a second slot, leave and log in POLISH_NOTES_ONGOING.md.
-- **Conflicts nav badge age:** Verify `navBadges()` in db.js returns `conflictsOldestDays`. If absent, add it so the Conflicts badge renders in "N · Xd" format per PSTALE spec. If present, no change needed.
-- **Smoke:** Open a Canon Review proposal sourced from a Decision → click source back-link → confirm navigation to correct Decision entry. Open Writing Lab draft → confirm no duplicate word count visible in action bar. Check Conflicts nav badge shows "N · Xd" format.
+- **Canon Review back-link key:** Verified — `decisions: 'Decisions'` already present in `CR_SOURCE_KIND_TO_WORKSPACE` at renderer.js:5388. Both maps consistent. AUDIT_GAPS.md had a static-read miss. No code change needed.
+- **Writing Lab legacy word count:** Verified — the `wc` element (~L8858) is in `buildListItem()` (left-column list item), not in `openEditor()` action bar. `openEditor()` has no legacy word count. No duplicate; no code change needed.
+- **Conflicts nav badge age:** Verified — `conflictsOldestDays: ageDays(co.oldest)` already returned by `navBadges()` at db.js:3670. No code change needed.
+- **Smoke passed 2026-06-10.** All three items confirmed correct; no code changes required.
 
 ### PAUDIT-10 — Writing Lab new-draft word count
 **Tool:** VS Code ext
