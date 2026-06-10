@@ -101,20 +101,52 @@
     'Episodes': 'episodes_workspace',
   };
 
+  // PROUTE-HISTORY — session-scoped list of the last 3 route destinations.
+  // Cleared on app quit (in-memory only). Drives the "Recent" section at the
+  // top of the picker.
+  let _recentKeys = [];
+  let _recentSection = null;
+
+  function pushRecentRoute(key) {
+    _recentKeys = [key, ..._recentKeys.filter((k) => k !== key)].slice(0, 3);
+  }
+
+  function refreshRecentSection() {
+    if (!_recentSection) return;
+    _recentSection.innerHTML = '';
+    _recentSection.hidden = _recentKeys.length === 0;
+    if (_recentKeys.length === 0) return;
+    const header = document.createElement('div');
+    header.className = 'extract-menu-recent-header';
+    header.textContent = 'Recent';
+    _recentSection.appendChild(header);
+    for (const key of _recentKeys) {
+      const route = ROUTES.find((r) => r.key === key);
+      if (!route) continue;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'extract-menu-item';
+      btn.dataset.routeKey = route.key;
+      btn.textContent = route.label;
+      btn.addEventListener('mousedown', (e) => e.preventDefault());
+      btn.addEventListener('click', () => runRoute(route));
+      _recentSection.appendChild(btn);
+    }
+  }
+
   // Shared singleton menu + toast. Both float over the page; built lazily so
   // popout/renderer cost nothing until the user actually selects something.
   let menuEl = null;
   let toastEl = null;
   let activeSource = null;
   let routing = false;
-  // Only one detail body is on-screen at a time. The renderer / popout re-set
-  // this every time a new entry is shown — older hosts are simply dropped.
-  // A document-level mouseup listener (registered once below) checks the
-  // active host on every release, which avoids the "mouseup landed on .tc-right
-  // padding" miss that a host-scoped listener has when a selection drag
-  // overshoots the body element.
-  let currentHost = null;
-  let currentSourceContext = null;
+  // Multi-host map: any number of body elements can be registered at once.
+  // Chat renders one <p> per message and calls attach() for each; all are
+  // eligible sources simultaneously. A WeakMap holds host → sourceContext so
+  // detached elements are garbage-collected automatically. A parallel Set
+  // holds the live keys so we can iterate when a mouseup fires.
+  const _hostContextMap = new WeakMap();
+  const _hostSet = new Set();
 
   function ensureMenu() {
     if (menuEl) return menuEl;
@@ -127,6 +159,11 @@
     label.className = 'extract-menu-label';
     label.textContent = 'Route to…';
     menuEl.appendChild(label);
+
+    _recentSection = document.createElement('div');
+    _recentSection.className = 'extract-menu-recent';
+    _recentSection.hidden = true;
+    menuEl.appendChild(_recentSection);
 
     const list = document.createElement('div');
     list.className = 'extract-menu-list';
@@ -204,6 +241,7 @@
       } catch {
         // notifyChanged is fire-and-forget; ignore any IPC hiccups.
       }
+      pushRecentRoute(route.key);
       showToast(`Routed to ${route.label}.`);
       hideMenu();
       // Drop the highlight so the just-routed text doesn't look like it's
@@ -228,6 +266,7 @@
   // viewport so it never falls off-screen.
   function positionMenu(rect) {
     ensureMenu();
+    refreshRecentSection();
     menuEl.hidden = false;
     // Reset first so the previous-position offsets don't influence the
     // measurement.
@@ -263,16 +302,8 @@
 
   function handleSelectionEnd(host, sourceContext) {
     const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) {
-      hideMenu();
-      return;
-    }
-    if (!selectionInside(sel, host)) {
-      hideMenu();
-      return;
-    }
-    const text = sel.toString();
-    if (!text || !text.trim()) {
+    const text = sel ? sel.toString() : '';
+    if (!text.trim()) {
       hideMenu();
       return;
     }
@@ -291,32 +322,62 @@
     positionMenu(rect);
   }
 
-  // Register a detail body + its source attribution as the active extract
-  // target. The document-level mouseup listener below uses this to decide
-  // whether the current selection is route-eligible. No teardown needed —
-  // a later attach() simply replaces the registration.
+  // Register a body element + its source attribution as an eligible extract
+  // source. Multiple hosts can be active at once (chat renders one <p> per
+  // message). The returned cleanup removes this host from the registry.
   function attach(host, sourceContext) {
     if (!host || !sourceContext) return () => {};
-    currentHost = host;
-    currentSourceContext = sourceContext;
+    console.log('[extract] attach:', host.className, host.tagName, sourceContext.workspace);
+    _hostContextMap.set(host, sourceContext);
+    _hostSet.add(host);
     return () => {
-      if (currentHost === host) {
-        currentHost = null;
-        currentSourceContext = null;
-      }
+      _hostSet.delete(host);
+      _hostContextMap.delete(host);
     };
   }
 
   // Document-level mouseup: any release anywhere in the window prompts a
-  // selection check against the currently attached host. Captures the case
-  // where a selection drag finishes on .tc-right's padding (just outside the
-  // body element) — a host-scoped listener would miss those.
+  // selection check against all registered hosts. Captures the case where a
+  // selection drag finishes on .tc-right's padding (just outside the body
+  // element) — a host-scoped listener would miss those.
   function maybeShowFromCurrent() {
-    if (!currentHost || !currentSourceContext) {
+    const sel = window.getSelection();
+    const selText = sel ? sel.toString().trim() : '';
+    const range0 = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+    const cac = range0 ? range0.commonAncestorContainer : null;
+    const cacEl = cac ? (cac.nodeType === 3 ? cac.parentElement : cac) : null;
+    const detailBodies = document.querySelectorAll('.tc-detail-body');
+    console.log('[extract] maybeShow — hostSet.size:', _hostSet.size, 'selText:', JSON.stringify(selText.slice(0, 40)), 'cacEl:', cacEl ? cacEl.className + '/' + cacEl.tagName : 'none', 'tc-detail-body count:', detailBodies.length);
+    if (_hostSet.size === 0) {
       hideMenu();
       return;
     }
-    handleSelectionEnd(currentHost, currentSourceContext);
+    if (!sel || !selText) {
+      hideMenu();
+      return;
+    }
+    // Walk up from the selection's anchor node (where the drag started) to find
+    // a registered host that is still in the DOM. This handles the case where
+    // the selection ends on the host's padding — commonAncestorContainer would
+    // resolve to the container above the body, but anchorNode stays inside it.
+    const anchorNode = sel.anchorNode;
+    let anchorEl = anchorNode
+      ? (anchorNode.nodeType === 3 ? anchorNode.parentElement : anchorNode)
+      : null;
+    let matchHost = null;
+    while (anchorEl) {
+      if (_hostSet.has(anchorEl) && document.contains(anchorEl)) {
+        matchHost = anchorEl;
+        break;
+      }
+      anchorEl = anchorEl.parentElement;
+    }
+    console.log('[extract] maybeShow — anchorEl walk:', matchHost ? matchHost.className : 'none');
+    if (!matchHost) {
+      hideMenu();
+      return;
+    }
+    handleSelectionEnd(matchHost, _hostContextMap.get(matchHost));
   }
   document.addEventListener('mouseup', () => {
     // setTimeout so the selection is finalized before we read it.
@@ -344,7 +405,7 @@
   document.addEventListener('selectionchange', () => {
     if (!menuEl || menuEl.hidden) return;
     const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) hideMenu();
+    if (!sel || !sel.toString().trim()) hideMenu();
   });
   // Scroll/resize would leave the menu visually detached from the selection.
   // Cheaper to hide than to reposition continuously.

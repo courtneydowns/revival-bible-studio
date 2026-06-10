@@ -3500,6 +3500,20 @@
         background: var(--hover);
         color: var(--accent);
       }
+      .extract-menu-recent { display: flex; flex-direction: column; gap: 2px; }
+      .extract-menu-recent[hidden] { display: none; }
+      .extract-menu-recent-header {
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        padding: 4px 4px 2px;
+      }
+      .extract-menu-recent + .extract-menu-list {
+        border-top: 1px solid var(--border);
+        padding-top: 4px;
+        margin-top: 2px;
+      }
 
       .extract-toast {
         position: fixed;

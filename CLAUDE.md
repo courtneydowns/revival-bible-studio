@@ -107,6 +107,7 @@ Do not invent new top-level workspaces.
 - Resolved items from other workspaces (Decisions, Open Questions, Conflicts, Brainstorm, Research) can be **attached/linked** to a character — see Cross-workspace attachments below.
 - Settled character facts that should become canon flow to **Canon Bible via Canon Review**. Same approval discipline as everything else. No direct writes to Canon Bible.
 - Canon Bible holds the **locked reference version** of canonical character facts. Characters workspace is where you *work on* characters; Canon Bible is where settled truth lives.
+- Each character entry supports a **draft-lock state** — marks the entry as stable for a named draft/season, read-only until explicitly unlocked. Distinct from Canon Bible locking. (PDRAFT-LOCK — complete.)
 - Standard lifecycle: edit, delete (for mistakes), collapsed archive section at bottom of the same page. No separate archive page.
 
 ---
@@ -117,6 +118,7 @@ Do not invent new top-level workspaces.
 - Each episode has a **status field:** Outline / Draft / Locked. User-set. Filters the episode list. Feeds Needs Attention panel.
 - Canon facts that emerge from an episode flow to **Canon Bible via Canon Review**. Same approval discipline.
 - Canon Bible holds the locked canonical version of episode facts. Episodes workspace is where the drafting work happens.
+- Each episode entry supports a **draft-lock state** — marks the entry as stable for a named draft/season, read-only until explicitly unlocked. Distinct from Canon Bible locking. (PDRAFT-LOCK — complete.)
 - Standard lifecycle: edit, delete (for mistakes), collapsed archive section at bottom of the same page.
 
 ---
@@ -239,7 +241,6 @@ The Flanagan filter feature applies THE_FLANAGAN_MASTER document as an analytica
 
 These features are in `docs/FEATURE_BACKLOG_ONGOING.md` and `docs/BUILD_PLAN_ONGOING.md`. Do not implement any of these without an explicit build instruction. Listed here so Claude Code does not contradict them in design decisions.
 
-- **PDRAFT-LOCK:** Characters and Episodes get a "locked for this draft" state distinct from archive.
 - **PARC-A / PARC-B:** Character arc tracker — written timeline (list) and visual timeline (horizontal scroll). Read-only, generated from existing data. Character status field feeds these views.
 - **PEPISODE-STRUCT:** Per-episode structure checklist (Flanagan Master episodic rules) + optional AI evaluation.
 - **PLOCKED-SPECIFICS:** Collapsed reference panel on Characters, Episodes, Writing Lab, Canon Bible (Edit Mode), Canon Review — surfaces locked non-negotiables from THE_FLANAGAN_MASTER.
@@ -273,7 +274,6 @@ These features are in `docs/FEATURE_BACKLOG_ONGOING.md` and `docs/BUILD_PLAN_ONG
 - **PCHAT-SEARCH:** Chat history search by keyword, click-through to matched message.
 - **PCHAT-EXPORT:** Chat plain-text export (.txt or .md), distinct from PCHAT-ROUTE.
 - **PPOL2b-SEARCH:** Inline text filter on all 13 workspace left-column lists.
-- **PDRAFT-LOCK:** Character/Episode "locked for this draft" state, distinct from Canon Bible locking.
 - **PSESSION-LOG:** Auto-generated session work log — entries created/approved/archived/analyses run, grouped by workspace. Audit trail only, exportable.
 - **PUNDO:** App-level Cmd+Z undo for destructive actions (archive, delete, resolve, approve, reject). Session-only history, last 20 actions.
 - **PWLAB-VERSIONS:** Writing Lab draft versioning — manual save, named versions, side-by-side diff, restore.

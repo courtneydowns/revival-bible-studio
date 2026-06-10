@@ -96,28 +96,30 @@
 | **PCONFLICT-SEV Conflict severity badge** | **VS Code ext** ✅ | New field on existing Conflicts entry component |
 | **PSTALE Stale item nudges** | **CLI** ✅ | Staleness logic + badge aging, touches nav + all workspaces |
 | **POQ-DEPENDS Open Question dependencies** | **VS Code ext** ✅ | Dependency field + block indicator on existing Open Questions entry |
+| **PDRAFT-LOCK Character/Episode draft lock** | **VS Code ext** ✅ | Discovered complete during full-app audit 2026-06-10; IPCs, panel, badge all confirmed wired |
+| **PAUDIT-9 Canon Review back-link key + WL word count + Conflicts badge age** | **VS Code ext** | Three small renderer.js / db.js fixes from full-app audit |
+| **PAUDIT-10 Writing Lab new-draft word count** | **VS Code ext** | Fix status bar gate for new unsaved drafts |
 | **PWLAB-SECTIONS Writing Lab section markers** | **VS Code ext** | Section marker insertion + jump-to list on existing Writing Lab page |
-| **PWLAB-CANON-COMPARE Draft vs. canon comparison** | **CLI** ✅ | New AI action wired into Writing Lab, reads full canon |
+| **PWLAB-CANON-COMPARE Draft vs. canon comparison** | **CLI** | New AI action wired into Writing Lab, reads full canon |
 | **PEPISODE-PREVON "Previously on" snapshot** | **VS Code ext** | Generated panel on existing Episode detail |
 | **PRESEARCH-USED Research "Used in" indicator** | **VS Code ext** | Passive badge on existing Research list + detail |
-| **PDRAFT-LOCK Character/Episode draft lock** | **VS Code ext** | Lock state on existing entry components |
 | **PARC-A Character arc tracker: written** | **CLI** | New read-only view, cross-table queries |
 | **PARC-B Character arc tracker: visual** | **CLI** | New visual component, horizontal timeline |
 | **PEPISODE-STRUCT Episode structure checklist** | **VS Code ext / CLI** | Checklist panel + AI assist option |
 | **PQUIET Quiet devastation tracker** | **CLI** | New tracker + dashboard view + seeded data |
 | **PLOCKED-SPECIFICS Locked specifics panel** | **VS Code ext** | Reference panel on existing workspace pages |
 | **PEPISODE-CONT AI episode continuity checker** | **CLI** | New AI module, cross-entry reads |
-| ~~**PRESEARCH-CITE Research source citation**~~ ✅ | **VS Code ext** | Source field on existing Research entry |
+| **PRESEARCH-CITE Research source citation** | **VS Code ext** | Source field on existing Research entry |
 | **PEMPTY-STATE Empty state + onboarding** | **VS Code ext** | Empty state copy + first-session guide |
 | **PHEALTH App health indicator** | **VS Code ext** | Read-only panel in Settings |
-| ~~**PCONFIG-BACKUP Config backup/restore**~~ ✅ | **VS Code ext** | Export/import config in Settings |
-| ~~**PSESSION-RESUME Session resume on launch**~~ ✅ | **VS Code ext** | Last-entry persistence on app boot |
+| **PCONFIG-BACKUP Config backup/restore** | **VS Code ext** | Export/import config in Settings |
+| **PSESSION-RESUME Session resume on launch** | **VS Code ext** | Last-entry persistence on app boot |
 | **PSCRATCHPAD Entry-level scratchpad** | **CLI** | New field across all workspaces, schema migration needed |
 | **PBREADCRUMB Back-reference breadcrumb** | **VS Code ext** | Breadcrumb on existing detail panel header |
-| ~~**PWHERE-REF "Where is this referenced?" panel**~~ ✅ | **VS Code ext** | Expands existing linked entries indicator |
+| **PWHERE-REF "Where is this referenced?" panel** | **VS Code ext** | Expands existing linked entries indicator |
 | **PNAV-ACTIVITY Workspace activity indicator** | **VS Code ext** | Subtle recency signal on existing nav component |
-| ~~**PKEYSHEET Keyboard shortcut cheat sheet**~~ ✅ | **VS Code ext** | New overlay, wired to Cmd+? and Help menu |
-| ~~**PPALETTE-RECENTS Command palette recents**~~ ✅ | **VS Code ext** | Recents section in existing Cmd+K palette |
+| **PKEYSHEET Keyboard shortcut cheat sheet** | **VS Code ext** | New overlay, wired to Cmd+? and Help menu |
+| **PPALETTE-RECENTS Command palette recents** | **VS Code ext** | Recents section in existing Cmd+K palette |
 | **PROUTE-HISTORY "Send to" picker history** | **VS Code ext** | History section in existing route picker |
 | **PFLAN-EXPAND Flanagan Filter expansion** | **CLI** | Multi-workspace wiring + Production Check mode |
 | **PAI-WIRE Cross-AI routing** | **CLI** | Four cross-feature connections, multi-file |

@@ -143,6 +143,8 @@ function registerIpc() {
   ipcMain.handle('brainstorm:threads.create', (_event, title) => db.brainstormThreads.create(title));
   ipcMain.handle('brainstorm:threads.update', (_event, id, title) => db.brainstormThreads.update(id, title));
   ipcMain.handle('brainstorm:threads.archive', (_event, id) => db.brainstormThreads.archive(id));
+  ipcMain.handle('brainstorm:threads.listArchived', () => db.brainstormThreads.listArchived());
+  ipcMain.handle('brainstorm:threads.restore', (_event, id) => db.brainstormThreads.restore(id));
   // PBRAIN-STRUCT — item metadata
   ipcMain.handle('brainstorm:setThread', (_event, id, threadId) => db.brainstorm.setThread(id, threadId));
   ipcMain.handle('brainstorm:setDevInto', (_event, id, kind, targetId) => db.brainstorm.setDevInto(id, kind, targetId));

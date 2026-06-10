@@ -3211,12 +3211,8 @@ function renderCanonBiblePage(section) {
   function maybeFlagToast(id, verb) {
     const n = Number(id);
     if (!flaggedEntryIds.has(n)) {
-      console.debug(
-        `[PCONFLICT-2] ${verb} canon #${n}; flaggedEntryIds=[${Array.from(flaggedEntryIds).join(',')}] — no toast`
-      );
       return;
     }
-    console.debug(`[PCONFLICT-2] ${verb} canon #${n} → firing toast`);
     showFlagResolvedToast(
       `${verb} an entry that's part of an open conflict. Re-run detection on Conflicts to auto-archive if resolved.`
     );

@@ -413,6 +413,23 @@ Remove dead IPC bridges confirmed by the audit as having no renderer callers. Mu
 
 ---
 
+## Full-app audit
+
+### PAUDIT-9 — Canon Review back-link key + Writing Lab legacy word count + Conflicts badge age
+**Tool:** VS Code ext
+Three small renderer.js / db.js fixes surfaced by full-app audit (2026-06-10):
+- **Canon Review back-link key:** `CR_SOURCE_KIND_TO_WORKSPACE` map in renderer.js (~L5391) missing `decisions` key (only has `decisions_workspace`). `CANON_SOURCE_KIND_TO_WS` at ~L2877 includes `decisions: 'Decisions'` — the two maps are inconsistent. Back-link navigation from a Canon Review proposal whose `source_kind` is `'decisions'` silently fails. Add the missing key.
+- **Writing Lab legacy word count:** `wc` element in Writing Lab `openEditor()` action bar (~L8866) may be a pre-PAUDIT-5 duplicate of the status bar word count. Visually verify — if duplicate, remove; if still visible in a second slot, leave and log in POLISH_NOTES_ONGOING.md.
+- **Conflicts nav badge age:** Verify `navBadges()` in db.js returns `conflictsOldestDays`. If absent, add it so the Conflicts badge renders in "N · Xd" format per PSTALE spec. If present, no change needed.
+- **Smoke:** Open a Canon Review proposal sourced from a Decision → click source back-link → confirm navigation to correct Decision entry. Open Writing Lab draft → confirm no duplicate word count visible in action bar. Check Conflicts nav badge shows "N · Xd" format.
+
+### PAUDIT-10 — Writing Lab new-draft word count
+**Tool:** VS Code ext
+- Fix status bar gate at renderer.js ~L9827: word count and section count should appear from keystroke 1, not only after first autosave. New draft (`currentId == null`) currently silently no-ops the status bar counter update because the gate requires `item` to exist.
+- **Smoke:** Open Writing Lab → create a new draft → type text before any autosave triggers → confirm word count appears in status bar immediately.
+
+---
+
 ## Cancel button fix (app-wide)
 
 ### PPOL-CANCEL — Cancel / dismiss / close button fix ✅
@@ -524,75 +541,71 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 - Word count and scene/section count shown passively in status bar
 - **Smoke:** Insert three section markers; confirm jump-to list appears with all three; click each, confirm scroll; confirm section count in status bar
 
-### PWLAB-CANON-COMPARE — Writing Lab draft vs. canon comparison ✅
+### PWLAB-CANON-COMPARE — Writing Lab draft vs. canon comparison
 - On-demand action from any Writing Lab draft: Claude reads the draft body and surfaces details that diverge from locked canon entries
 - Results as a flagged list with source citations (canon entry + approximate draft location)
 - User reviews each flag; can route to Conflicts or Open Questions, or dismiss
 - Never runs automatically; never touches canon
 - **Smoke:** Write a draft with a deliberate canon divergence; run comparison; confirm flag surfaces with correct canon entry cited; route flag to Conflicts, confirm entry created; dismiss another flag, confirm it clears
-- **Smoke passed 2026-06-09.**
 
 ---
 
 ## Episode enhancements
 
-### PEPISODE-PREVON — "Previously on" canon snapshot ✅
+### PEPISODE-PREVON — "Previously on" canon snapshot
 - On any Episode entry, one-click generates a read-only summary of what canon facts are locked as of the prior episode
 - Generated from existing canon data — no new input required
 - Displayed in a collapsed panel on the episode detail
 - Exportable as plain text
-- **Implementation:** `episodes.previouslyOn(id)` in db.js queries locked non-retired canon entries with `locked_at < episode.created_at`; also surfaces the prior episode (by created_at) for label context. IPC: `episodes:previouslyOn` + `episodes:previouslyOnExport`. UI: `mountPreviouslyOnPanel` collapsed `<details>` section on episode detail — Generate button on first open, Refresh + Export .txt after results load. Export writes to `~/Documents/revival-bible-studio/previously_on/`.
-- **Smoke passed 2026-06-09.**
+- **Smoke:** Seed canon entries across two episodes; open Episode 2; generate "Previously on"; confirm summary reflects only canon locked as of Episode 1; export, confirm output
 
 ---
 
 ## Research enhancements
 
-### PRESEARCH-USED — Research "Used in" indicator ✅
+### PRESEARCH-USED — Research "Used in" indicator
 - Passive badge on every Research entry showing whether it has been linked or routed anywhere ("linked" vs. "unused")
 - Filterable: filter Research by used vs. unused
-- **Implementation:** `research.list()` / `research.listArchived()` in db.js overridden with EXISTS subquery on `cross_workspace_attachments` (source_kind='research') to add `used` boolean. Research workspace wrapped in IIFE; `matchesExtra` / `isFilterActive` filter hooks added; All/Linked/Unused filter bar in `leftColExtra`; linked/unused badge on every list item title row via `listItemExtra`. CSS in index.html.
-- **Smoke passed.**
+- **Smoke:** Create three Research entries; link one to a Character; route one to Brainstorm; confirm linked and routed entries show "linked" badge; confirm third shows "unused"; filter by unused, confirm only third appears
 
 ---
 
 ## Character/Episode draft lock
 
-### PDRAFT-LOCK — Character/Episode "locked for this draft" state
+### PDRAFT-LOCK — Character/Episode "locked for this draft" state ✅
 - Draft Lock: marks a Character or Episode entry as stable for a named draft/season
 - Read-only until explicitly unlocked — distinct from Canon Bible locking
 - Locked entries show draft-lock badge; visible and searchable, not editable without unlock
 - Unlock requires confirmation + optional note
-- **Smoke:** Draft-lock a Character entry, attempt edit, confirm blocked; unlock with note, confirm editable; confirm lock badge visible in list and detail panel
+- **Note:** Implemented during an earlier phase and discovered complete during full-app audit (2026-06-10). IPCs, preload bridges, `mountDraftLockPanel()`, `isItemDraftLocked()`, and list badge all confirmed present and wired.
+- **Smoke passed 2026-06-10.**
 
 ---
 
 ## Character arc tracker
 
-### PARC-A — Character arc tracker: written timeline ✅
+### PARC-A — Character arc tracker: written timeline
 - Episode-by-episode structured list per character
 - Shows: canon facts locked at this point in their arc, open questions unresolved at this point, decisions affecting them
 - Reads character status field
 - Read-only display generated from existing data — no new data entry
 - Updates automatically as canon and episode entries change
 - Filterable by character, season, arc status
-- **Implementation:** `characters.arcTimeline(charId)` in db.js returns episodes + per-episode canon facts (locked_at ≤ episode.created_at), linked OQs (unresolved at that point via cross_workspace_attachments), and linked decisions. IPC: `characters:arcTimeline`. UI: `setupCharArcTracker` toggle button in Characters left column — hides left col, shows full-width arc panel with character selector dropdown, status filter chips, season filter chips (auto-detected from episode titles), and episode rows (collapsible details). Also fixed pre-existing syntax error: `mountDraftLockPanel` was inside `CONTENT_RENDERERS` object literal; moved to top-level.
-- **Smoke passed 2026-06-09.**
+- **Smoke:** Seed canon entries and episode entries for one character across S1; confirm written timeline generates correctly; make a canon change, confirm timeline updates
 
-### PARC-B — Character arc tracker: visual timeline ✅
+### PARC-B — Character arc tracker: visual timeline
 - Horizontal scroll, season/episode markers on X axis
 - Character state plotted at each marker
 - Color-coded by character; multiple characters togglable
 - Locked canon events: fixed markers; working/draft events: softer markers
 - Click any marker to open the source entry
-- **Implementation:** `setupCharVisualTimeline` in renderer.js; CSS `.vt-*` in index.html. Episodes on X, one row per toggled character. Canon facts: solid filled circle; OQs: outlined rotated square (softer/working); Decisions: solid square if final, outlined if open/tentative. All markers clickable → `route(workspace, id)`. Character chips (All/None/individual) toggle rows live. Arc data cached per character to avoid redundant IPC calls.
-- **Smoke passed 2026-06-09.**
+- **Smoke:** View visual timeline for two characters simultaneously; click a marker, confirm source entry opens; toggle a character off, confirm their markers hide
 
 ---
 
 ## Episode structure
 
-### PEPISODE-STRUCT — Episode structure checklist ✅
+### PEPISODE-STRUCT — Episode structure checklist
 - Per-episode checklist panel derived from Flanagan Master episodic structure rules:
   - [ ] Cold open: in medias res
   - [ ] Act Two: rewatch-layer scene identified
@@ -600,15 +613,14 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
   - [ ] Coda: quiet devastation candidate identified
   - [ ] Quiet devastation: satisfies structural signature
 - Manually checked by user — not auto-evaluated
-- AI-assist option: "Evaluate with AI" — Claude reads episode entry + gives verdict per item. User confirms or overrides each.
-- **Implementation:** Migration `057_pepisode_struct` creates `episode_struct_checklist` table (episode_id, item_key, checked, ai_verdict, ai_rationale, user_override). `db.episodeStruct` repo: get/setChecked/setAiVerdicts/setOverride. IPC: `episodes:structGet`, `episodes:structSetChecked`, `episodes:structSetOverride`, `claude:episodeStructEval`. UI: `mountEpisodeStructPanel` collapsed `<details>` on episode detail — 5 checkboxes (manually checkable, persists immediately), "Evaluate with AI" button triggers Claude, per-item verdict badge + rationale + Confirm/Override buttons. Overrides clear on next AI run. Panel mounted before "Previously on" in detailExtra.
+- AI-assist option: "Evaluate this episode against the checklist" — Claude reads episode entry + gives verdict per item. User confirms or overrides each.
 - **Smoke:** Open an episode entry, manually check three checklist items; run AI assist, confirm it returns per-item verdict; override one AI verdict, confirm override persists
 
 ---
 
 ## Quiet devastation tracker
 
-### PQUIET — Quiet devastation tracker ✅
+### PQUIET — Quiet devastation tracker
 - Per-episode status: No candidate / Candidate identified / Locked
 - Four pre-seeded locked quiet devastations from THE_FLANAGAN_MASTER (Episodes 1, 4, 6, 8) — seeded at migration, not editable
 - Add candidate: link to Writing Lab draft, scene note, or freeform description
@@ -621,113 +633,43 @@ Cancel buttons do not work reliably in virtually every modal, form, dialog, and 
 
 ## Locked specifics panel
 
-### PLOCKED-SPECIFICS — Locked specifics reference panel ✅
+### PLOCKED-SPECIFICS — Locked specifics reference panel
 - Passive reference panel surfacing non-negotiable locked items from THE_FLANAGAN_MASTER
 - Locked specifics included: two physical markers (T-015), mirror motif (T-227), virus-is-not-a-metaphor rule, Spirituality Principle, Found Family Principle, Jordan's no-arrest rule, closing line, Recovery Authenticity Mandate
 - **Where it surfaces:** Characters entries (character-relevant only), Episodes entries, Writing Lab drafts, Canon Bible entries in Edit Mode, Canon Review proposals
 - Displayed as collapsed reference panel — not modal, not blocking. Always available, never intrusive.
 - Filterable: show only specifics relevant to the entry's characters/themes
-- **Implementation:** `LOCKED_SPECIFICS` array + `mountLockedSpecificsPanel(container, {isCharactersEntry})` in renderer.js. Characters: shows only `characterRelevant: true` items (Physical Markers, Mirror Motif, Found Family, Jordan's No-Arrest Rule) with Production/Thematic/Character filter chips. All other surfaces: all 8 specifics, all 5 category chips. Each specific is a nested `<details>` with a category badge. CSS in index.html `.locked-specs-*`.
 - **Smoke:** Open a Characters entry, confirm locked specifics panel present and collapsed; expand it, confirm relevant specifics shown; open a Writing Lab draft, confirm panel present; confirm panel does NOT appear on Source Material or Settings
 
 ---
 
 ## Episode continuity checker
 
-### PEPISODE-CONT — AI episode continuity checker ✅
+### PEPISODE-CONT — AI episode continuity checker
 - On-demand per episode entry: Claude reads episode content + linked character entries (including status field) + relevant canon + prior episode entries
 - Flags: timeline contradictions, character state inconsistencies, arc breaks
 - Results surface as a flagged list with source citations
 - User reviews each flag; can route to Conflicts, Open Questions, or dismiss
 - Never auto-resolves; never touches canon; runs only when user triggers it
-- **Implementation:** `claude:episodeContinuityCheck` IPC in main.js — queries linked characters (CWA both directions), 3 most recent prior episodes, all locked non-retired canon; sends to Claude with typed flag schema (timeline/character_state/arc_break). Preload: `claude.episodeContinuityCheck`. Renderer: `mountEpisodeContinuityPanel` collapsed `<details>` on episode detail — Run button, flag cards with type badge + citation + reason + location, Route to Conflicts / Route to Open Questions / Dismiss per flag. Mounted after "Previously on". CSS: `.ep-cont-*` in index.html.
 - **Smoke:** Create an episode with a deliberate character state inconsistency vs. prior episode; run checker, confirm flag surfaces with correct source citation; route flag to Conflicts, confirm entry created; dismiss another flag, confirm it clears
-- **Smoke passed.**
-
----
-
-### PEPISODE-CONT-2A — Episode continuity checker: cross-episode picker + Canon Review
-**Tool:** CLI
-**Requires:** PEPISODE-CONT ✅
-
-Extends the existing episode continuity checker. Do not remove or alter existing behavior.
-
-**Existing implementation (read before touching anything):**
-- IPC: `claude:episodeContinuityCheck` in main.js — queries linked characters (CWA both directions), 3 most recent prior episodes, all locked non-retired canon; sends to Claude with typed flag schema (timeline/character_state/arc_break)
-- Preload: `claude.episodeContinuityCheck`
-- Renderer: `mountEpisodeContinuityPanel` — collapsed `<details>` on episode detail; Run button, flag cards with type badge + citation + reason + location, Route to Conflicts / Route to Open Questions / Dismiss per flag. Mounted after "Previously on". CSS: `.ep-cont-*` in index.html.
-
-**1. Cross-episode context on Episodes page**
-- Add an optional "Compare against episode" picker to the existing continuity check panel on any Episode entry
-- User can select one other episode from the Episodes list or from canon as additional context
-- Selected episode's content passed to Claude alongside the primary episode entry
-- Original body-text-only path remains intact — picker is additive, not a replacement
-
-**2. Episodes continuity check on Canon Review queue**
-- When a Canon Review proposal is for an episode entry, surface the continuity check action on that proposal's detail panel
-- Same behavior as the Episodes workspace: body text + optional cross-episode picker
-- Never runs automatically — user-triggered only
-
-**All surfaces:**
-- AI suggests; human approves — no flag auto-routes
-- Results display inline in the relevant detail panel
-- Highlight-extract-route available on all output text
-- User-triggered only in every case
-
-**Smoke:**
-1. Open an Episode entry; run continuity check without picker — confirm existing behavior unchanged
-2. Select a second episode from the picker; re-run — confirm both episodes reflected in output
-3. Open a Canon Review proposal for an episode entry; confirm continuity check action present; run it; confirm flags surface
-
----
-
-### PEPISODE-CONT-2B — Episode continuity checker: Writing Lab + Characters
-**Tool:** CLI
-**Requires:** PEPISODE-CONT-2A ✅
-
-**1. Writing Lab drafts**
-- Add continuity check action to Writing Lab draft detail panel
-- Claude reads draft body + locked canon entries + optionally one selected episode entry (same picker pattern as PEPISODE-CONT-2A)
-- Flags: timeline contradictions, character state inconsistencies, arc breaks
-- Results as flagged list with source citations; user can route each flag to Conflicts or Open Questions, or dismiss
-- Never runs automatically
-
-**2. Characters entries**
-- Add continuity check action to Characters entry detail panel
-- Claude reads character body + status field + linked canon facts + any linked episode entries
-- Flags inconsistencies across episodes and canon for that character specifically
-- Results as flagged list with source citations; user can route each flag to Conflicts or Open Questions, or dismiss
-- Never runs automatically
-
-**All surfaces:**
-- AI suggests; human approves — no flag auto-routes
-- Results display inline in the relevant detail panel
-- Highlight-extract-route available on all output text
-- User-triggered only in every case
-
-**Smoke:**
-1. Open a Writing Lab draft; run continuity check; confirm flags surface with canon citations; route one flag to Conflicts
-2. Open a Writing Lab draft; select an episode from the picker; re-run; confirm episode reflected in output
-3. Open a Characters entry; run continuity check; confirm character-specific flags surface with citations; route one flag to Open Questions; dismiss another
 
 ---
 
 ## Research citation
 
-### PRESEARCH-CITE — Research source citation ✅
+### PRESEARCH-CITE — Research source citation
 - Source field on Research entries: freeform text OR link to a Source Material entry (picker)
 - If linked to Source Material: bi-directional visibility
 - Citation visible on list item preview line
 - Filterable: filter Research by cited vs. uncited
 - Exportable: Research export includes citation
 - **Smoke:** Add a freeform citation to a Research entry, confirm visible in list; link to a Source Material entry, confirm bi-directional visibility; filter by cited, confirm only cited entries show
-- Smoke passed.
 
 ---
 
 ## Empty state + onboarding
 
-### PEMPTY-STATE — Empty state + onboarding ✓
+### PEMPTY-STATE — Empty state + onboarding
 - Empty state copy for every workspace: what it's for, what to do first
 - First-session guide: non-modal walkthrough available from Home on first launch
 - Suggested start sequence: Settings (API key + Project Rules) → Source Material → Canon Bible → Open Questions
@@ -738,36 +680,33 @@ Extends the existing episode continuity checker. Do not remove or alter existing
 
 ## App health
 
-### PHEALTH — App health indicator ✅
+### PHEALTH — App health indicator
 - In Settings: migration count + last migration run, SQLite file size, record counts by workspace (read-only)
 - Orphan detection: flag any orphaned records (linked entries whose parent no longer exists)
 - One-click orphan cleanup with confirmation + preview of what will be removed
-- **Implementation:** `db.health.getStats(dbPath)` queries schema_migrations + fs.statSync for file size + COUNT per workspace table + `_detectOrphans()` scanning cross_workspace_attachments (host + source), taggable_tags, flanagan_analyses via LEFT JOIN. `db.health.cleanupOrphans()` deletes in a transaction. IPC: `health:getStats`, `health:cleanupOrphans`. Preload: `window.revival.health`. Renderer: `renderAppHealth(section)` in Settings — "Check Health" button, migration/size/counts table, orphan list with row-count confirm dialog and "Remove N orphan row(s)…" danger button. Auto-reruns check after cleanup.
 - **Smoke:** Confirm health panel shows correct migration count and file size; manually create an orphan in dev; confirm detection flags it; run cleanup with confirmation, confirm orphan removed
 
 ---
 
 ## Config backup
 
-### PCONFIG-BACKUP — Settings config backup/restore ✅
+### PCONFIG-BACKUP — Settings config backup/restore
 - Export: Project Rules text, staleness thresholds, tag library (user-created tags only). API key excluded from export for security.
 - Import: restore config from export file
 - Separate from Panic Export (which covers data)
-- **Implementation:** `db.configBackup.export()` reads `settings.project_rules` + all `tags` where `is_seed=0`. `db.configBackup.import()` restores project rules via UPDATE and merge-creates missing user tags (idempotent, never deletes existing tags). IPC: `config:export` (accepts staleness thresholds from renderer, opens save dialog, writes `revival-config-<timestamp>.json`); `config:import` (open dialog, parse + validate version 1, restore DB, return thresholds). Preload: `window.revival.config.export/import`. Renderer: `renderConfigBackup(section)` in Settings between Needs Attention and Panic Export — Export Config… button bundles localStorage thresholds; Import Config… button applies returned thresholds to localStorage after restore.
-- **Smoke:** Export config, wipe Settings, import from export file, confirm Project Rules and thresholds restored; confirm API key was NOT exported. Smoke passed.
+- **Smoke:** Export config, wipe Settings, import from export file, confirm Project Rules and thresholds restored; confirm API key was NOT exported
 
 ---
 
 ## Workflow continuity
 
-### ✅ PSESSION-RESUME — Session resume on launch
+### PSESSION-RESUME — Session resume on launch
 - On app launch, surface the last entry the user had open rather than defaulting to Home
 - If the last entry was deleted or archived, fall back to Home
 - Opt-out available in Settings for users who prefer to start at Home
 - **Smoke:** Open an entry; quit app; relaunch; confirm the same entry is open; archive that entry; relaunch; confirm fallback to Home
-- **Smoke passed.**
 
-### PSCRATCHPAD — Entry-level scratchpad ✅
+### PSCRATCHPAD — Entry-level scratchpad
 - Every entry across all workspaces gets a freeform scratchpad section, collapsed by default
 - Not autosaved to body, not canon, not routable, not exported as part of the entry
 - Persists with the entry across app restarts
@@ -778,48 +717,41 @@ Extends the existing episode continuity checker. Do not remove or alter existing
 
 ## Navigation enhancements
 
-### PBREADCRUMB — Back-reference breadcrumb ✅
+### PBREADCRUMB — Back-reference breadcrumb
 - When clicking through to an entry from a linked-entries panel or back-reference, a one-line breadcrumb appears at the top of the detail panel ("← Jordan (Characters)")
 - Single back-step — clicking returns to the origin entry
 - Breadcrumb clears on any other navigation action
-- **Implementation:** `_breadcrumbPending`/`_breadcrumbActive`/`_detailContext` module-level state. `route()` promotes pending → active (or clears both on direct nav). `mountBreadcrumb(host)` inserts `.bc-bar`/`.bc-btn` at top of `rightCol` when active. `showView()` sets `_detailContext` then calls `mountBreadcrumb`. Navigation handlers in `renderLinkedList`, `mountAttachmentsSection`, `mountBrainstormDevFromSection` set `_breadcrumbPending = _detailContext` before calling `route()`. CSS in index.html.
 - **Smoke:** Click through from a Character's back-reference to a linked Decision; confirm breadcrumb shows "← Jordan (Characters)"; click breadcrumb, confirm return to Jordan; navigate elsewhere, confirm breadcrumb clears
-- **Smoke passed.**
 
-### PWHERE-REF — "Where is this referenced?" panel ✅
+### PWHERE-REF — "Where is this referenced?" panel
 - Expands the existing linked entries indicator into a full read-only panel listing every workspace and entry that references this entry
 - Grouped by workspace; each item click-through to the referencing entry
 - Read-only — no actions in this panel
-- **Implementation:** `links.referencedBy` IPC + `db.links.referencedBy()` (CWA + brainstorm dev_into) in db.js; `mountWhereRefPanel` in renderer.js calls `links.for()` and groups `data.attachments` by workspace into a collapsible `<details>` (`.wr-section`). Breadcrumb-aware navigation on click. Mounted on all workspaces after `mountBrainstormDevFromSection`. CSS in index.html.
 - **Smoke:** Link an entry from three different workspaces; open the linked entries panel; confirm all three appear grouped by workspace; click through to one, confirm navigation
-- **Smoke passed.**
 
-### PNAV-ACTIVITY — Workspace activity indicator ✅
+### PNAV-ACTIVITY — Workspace activity indicator
 - Subtle visual recency signal on each nav item — not a badge count, not a number
 - Shows when you were last active in that workspace
 - Aids reorientation at session start
-- **Implementation:** `WORKSPACE_ACTIVITY_KEY` in localStorage (`revival.workspaceActivity`) stores `{ workspaceName: isoTimestamp }`. `recordWorkspaceActivity(name)` called on every `route()`. `refreshNavActivity()` reads the map and sets recency class on each `.nav-activity-dot` span (absolutely positioned, 5px circle, bottom-right of button). Four opacity tiers: today (0.9), 1–6d (0.55), 7–29d (0.25), 30d+ (0.12). Button `title` tooltip updated to "WorkspaceName\nLast active: today/yesterday/Nd ago". Never-visited workspaces: no dot.
-- **Smoke passed.**
+- **Smoke:** Visit three workspaces; quit and relaunch; confirm activity indicators reflect the three visited workspaces; confirm unvisited workspaces show no indicator
 
 ---
 
 ## Global UX
 
-### PKEYSHEET — Keyboard shortcut cheat sheet ✅
+### PKEYSHEET — Keyboard shortcut cheat sheet
 - Cmd+? opens a non-modal overlay listing all keyboard shortcuts
 - Organized by context (Global, Canon Bible, Queues, Navigation, etc.)
 - Dismissable with Escape or Cmd+?
 - Also accessible from Help menu
 - No new shortcuts — surfaces what PKEY built
 - **Smoke:** Open cheat sheet, confirm all PKEY shortcuts appear; dismiss with Escape, confirm closes; open from Help menu, confirm same overlay
-- **Smoke passed.**
 
-### PPALETTE-RECENTS — Command palette recents ✅
+### PPALETTE-RECENTS — Command palette recents
 - Last 5 entries opened appear at top of Cmd+K palette before typing, labeled "Recent"
 - Typing immediately hides recents and shows search results
 - Session-scoped — clears on app quit
 - **Smoke:** Open 5 entries; open Cmd+K; confirm all 5 appear as recents; type a query, confirm recents hide and search results show
-- **Smoke passed.**
 
 ### PROUTE-HISTORY — "Send to" picker history
 - Last 3 route destinations appear at top of the highlight-extract-route picker, labeled "Recent"

@@ -82,9 +82,11 @@ contextBridge.exposeInMainWorld('revival', {
     // PBRAIN-STRUCT — threads
     threads: {
       list: () => ipcRenderer.invoke('brainstorm:threads.list'),
+      listArchived: () => ipcRenderer.invoke('brainstorm:threads.listArchived'),
       create: (title) => ipcRenderer.invoke('brainstorm:threads.create', title),
       update: (id, title) => ipcRenderer.invoke('brainstorm:threads.update', id, title),
       archive: (id) => ipcRenderer.invoke('brainstorm:threads.archive', id),
+      restore: (id) => ipcRenderer.invoke('brainstorm:threads.restore', id),
     },
     // PBRAIN-STRUCT — item metadata
     setThread: (id, threadId) => ipcRenderer.invoke('brainstorm:setThread', id, threadId),
