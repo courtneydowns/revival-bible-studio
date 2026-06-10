@@ -437,6 +437,26 @@
       /* PSTALE: hide age suffix on collapsed rail where space is tight */
       #nav.collapsed .nav-badge .nb-age { display: none; }
 
+      /* PNAV-ACTIVITY: recency dot — a small circle at the bottom-right of each
+         nav button. Hidden by default; recency classes make it visible. */
+      .nav-activity-dot {
+        position: absolute;
+        bottom: 5px;
+        right: 6px;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--accent);
+        display: none;
+        pointer-events: none;
+      }
+      /* today: full opacity; recent (1–6d): dimmed; old (7–29d): faint;
+         stale (30d+): barely visible. */
+      .nav-activity-dot.act-today  { display: block; opacity: 0.9; }
+      .nav-activity-dot.act-recent { display: block; opacity: 0.55; }
+      .nav-activity-dot.act-old    { display: block; opacity: 0.25; }
+      .nav-activity-dot.act-stale  { display: block; opacity: 0.12; }
+
       /* Theme toggle (P4): a small sun/moon icon sitting just to the right of
          the Panic Export bolt, top-left. Matches the bolt's compact, faded
          style so the two read as a small corner cluster, not chrome. */

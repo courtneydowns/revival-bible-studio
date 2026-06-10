@@ -794,11 +794,12 @@ Extends the existing episode continuity checker. Do not remove or alter existing
 - **Smoke:** Link an entry from three different workspaces; open the linked entries panel; confirm all three appear grouped by workspace; click through to one, confirm navigation
 - **Smoke passed.**
 
-### PNAV-ACTIVITY — Workspace activity indicator
+### PNAV-ACTIVITY — Workspace activity indicator ✅
 - Subtle visual recency signal on each nav item — not a badge count, not a number
 - Shows when you were last active in that workspace
 - Aids reorientation at session start
-- **Smoke:** Visit three workspaces; quit and relaunch; confirm activity indicators reflect the three visited workspaces; confirm unvisited workspaces show no indicator
+- **Implementation:** `WORKSPACE_ACTIVITY_KEY` in localStorage (`revival.workspaceActivity`) stores `{ workspaceName: isoTimestamp }`. `recordWorkspaceActivity(name)` called on every `route()`. `refreshNavActivity()` reads the map and sets recency class on each `.nav-activity-dot` span (absolutely positioned, 5px circle, bottom-right of button). Four opacity tiers: today (0.9), 1–6d (0.55), 7–29d (0.25), 30d+ (0.12). Button `title` tooltip updated to "WorkspaceName\nLast active: today/yesterday/Nd ago". Never-visited workspaces: no dot.
+- **Smoke passed.**
 
 ---
 

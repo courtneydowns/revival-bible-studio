@@ -77,6 +77,39 @@ let pendingEntrySelection = null;
 const SESSION_RESUME_KEY = 'revival.sessionResume';
 const SESSION_RESUME_OPT_OUT_KEY = 'revival.sessionResumeDisabled';
 
+// PNAV-ACTIVITY: persist per-workspace last-visit timestamps across restarts.
+// Stored as { workspaceName: isoTimestampString }.
+const WORKSPACE_ACTIVITY_KEY = 'revival.workspaceActivity';
+
+function getWorkspaceActivity() {
+  try {
+    const v = JSON.parse(localStorage.getItem(WORKSPACE_ACTIVITY_KEY));
+    return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+  } catch {
+    return {};
+  }
+}
+
+function recordWorkspaceActivity(name) {
+  if (!name) return;
+  try {
+    const map = getWorkspaceActivity();
+    map[name] = new Date().toISOString();
+    localStorage.setItem(WORKSPACE_ACTIVITY_KEY, JSON.stringify(map));
+  } catch { /* storage full or private mode */ }
+}
+
+// Returns recency class and tooltip label for a stored ISO timestamp.
+function _activityMeta(iso) {
+  if (!iso) return null;
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (days === 0)  return { cls: 'act-today',  label: 'today' };
+  if (days === 1)  return { cls: 'act-recent', label: 'yesterday' };
+  if (days < 7)   return { cls: 'act-recent', label: `${days}d ago` };
+  if (days < 30)  return { cls: 'act-old',    label: `${days}d ago` };
+  return             { cls: 'act-stale',  label: `${days}d ago` };
+}
+
 // PBREADCRUMB — one-step back-breadcrumb for linked-panel navigation.
 // _breadcrumbPending is set (before route()) when clicking a linked-panel goto
 // button. route() promotes it to _breadcrumbActive (or clears both on direct
@@ -16108,6 +16141,9 @@ function route(name, entryId) {
   content.innerHTML = '';
   content.appendChild(renderWorkspacePage(name));
   refreshNavBadges();
+  // PNAV-ACTIVITY: record the visit and refresh all recency dots.
+  recordWorkspaceActivity(name);
+  refreshNavActivity();
 }
 
 // PUI2: listen for popout commits in other windows and refresh the active
@@ -16150,6 +16186,8 @@ const NAV_BADGE_KEYS = {
   'Conflicts': 'conflicts',
 };
 const navBadgeEls = {};
+// PNAV-ACTIVITY: dot element per workspace for recency indicator updates.
+const navActivityDotEls = {};
 
 for (const name of WORKSPACES) {
   const btn = document.createElement('button');
@@ -16178,6 +16216,13 @@ for (const name of WORKSPACES) {
     btn.appendChild(badge);
     navBadgeEls[name] = badge;
   }
+  // PNAV-ACTIVITY: recency dot — absolutely positioned, hidden by default.
+  const actDot = document.createElement('span');
+  actDot.className = 'nav-activity-dot';
+  actDot.setAttribute('aria-hidden', 'true');
+  btn.appendChild(actDot);
+  navActivityDotEls[name] = actDot;
+
   btn.addEventListener('click', () => route(name));
   buttons[name] = btn;
   nav.appendChild(btn);
@@ -16207,6 +16252,27 @@ async function refreshNavBadges() {
   }
 }
 refreshNavBadges();
+
+// PNAV-ACTIVITY: update all recency dots from localStorage. Called on init
+// and after every route() so the dot on the just-visited workspace updates
+// immediately. Silent on missing data — no dot shown is a valid state.
+function refreshNavActivity() {
+  const activity = getWorkspaceActivity();
+  for (const name of WORKSPACES) {
+    const dot = navActivityDotEls[name];
+    const btn = buttons[name];
+    if (!dot || !btn) continue;
+    const meta = _activityMeta(activity[name]);
+    dot.className = 'nav-activity-dot' + (meta ? ' ' + meta.cls : '');
+    if (meta) {
+      // Append last-active info to the button's title tooltip.
+      btn.title = `${name}\nLast active: ${meta.label}`;
+    } else {
+      btn.title = name;
+    }
+  }
+}
+refreshNavActivity();
 
 // --- Collapsible nav --------------------------------------------------------
 // Collapsed = icon-only rail; expanded = full labels. The choice persists
