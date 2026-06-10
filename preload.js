@@ -415,6 +415,14 @@ contextBridge.exposeInMainWorld('revival', {
     list:     () => ipcRenderer.invoke('sessionLog:list'),
     export:   (id) => ipcRenderer.invoke('sessionLog:export', id),
   },
+  // PKEYSHEET — main → renderer signal to open the keyboard shortcut sheet.
+  app: {
+    onOpenKeySheet: (callback) => {
+      const handler = () => callback();
+      ipcRenderer.on('app:openKeySheet', handler);
+      return () => ipcRenderer.removeListener('app:openKeySheet', handler);
+    },
+  },
   // PUI2: open a single-entry popout window, and a tiny pub-sub so popout
   // saves are reflected in the main window (and vice-versa). notifyChanged is
   // fire-and-forget; onChanged returns the unsubscribe handle so a workspace

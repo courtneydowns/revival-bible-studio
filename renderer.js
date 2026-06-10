@@ -18223,10 +18223,11 @@ function _palItems(query) {
   const q = (query || '').trim().toLowerCase();
   const items = [];
 
-  // Recent entries (session-scoped; shown first when no query, or filtered)
-  const recents = getRecentlyViewed();
-  for (const r of recents) {
-    if (!q || r.title.toLowerCase().includes(q) || r.workspace.toLowerCase().includes(q)) {
+  // Recent entries: shown only when no query (last 5, session-scoped).
+  // Typing hides recents and shows search results only.
+  if (!q) {
+    const recents = getRecentlyViewed().slice(0, 5);
+    for (const r of recents) {
       items.push({ kind: 'entry', icon: NAV_ICONS_PAL[r.workspace] || '•', label: r.title, sub: r.workspace, workspace: r.workspace, entryId: r.id, section: 'Recent' });
     }
   }
@@ -18348,6 +18349,45 @@ window.addEventListener('keydown', (e) => {
     closePalette();
   }
 });
+
+// PKEYSHEET — keyboard shortcut cheat sheet (Cmd+? or Help > Keyboard Shortcuts)
+// Non-modal overlay; Escape or Cmd+? closes; Help menu sends IPC to open.
+
+const ksOverlay = document.getElementById('ks-overlay');
+const ksClose   = document.getElementById('ks-close');
+
+function openKeySheet() {
+  ksOverlay.hidden = false;
+}
+
+function closeKeySheet() {
+  ksOverlay.hidden = true;
+}
+
+ksClose.addEventListener('click', closeKeySheet);
+ksOverlay.addEventListener('mousedown', (e) => {
+  if (e.target === ksOverlay) closeKeySheet();
+});
+
+window.addEventListener('keydown', (e) => {
+  // Cmd+? — toggle cheat sheet (? is Shift+/ on most keyboards)
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === '?' || e.key === '/')) {
+    e.preventDefault();
+    if (ksOverlay.hidden) {
+      openKeySheet();
+    } else {
+      closeKeySheet();
+    }
+    return;
+  }
+  if (e.key === 'Escape' && !ksOverlay.hidden) {
+    e.preventDefault();
+    closeKeySheet();
+  }
+});
+
+// Help menu → renderer signal
+window.revival.app.onOpenKeySheet(() => openKeySheet());
 
 // PSESSION-RESUME: restore the last-open entry on launch unless the user
 // opted out. Falls back to Home if no saved entry or opt-out is set.

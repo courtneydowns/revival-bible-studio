@@ -813,11 +813,12 @@ Extends the existing episode continuity checker. Do not remove or alter existing
 - No new shortcuts — surfaces what PKEY built
 - **Smoke:** Open cheat sheet, confirm all PKEY shortcuts appear; dismiss with Escape, confirm closes; open from Help menu, confirm same overlay
 
-### PPALETTE-RECENTS — Command palette recents
+### PPALETTE-RECENTS — Command palette recents ✅
 - Last 5 entries opened appear at top of Cmd+K palette before typing, labeled "Recent"
 - Typing immediately hides recents and shows search results
 - Session-scoped — clears on app quit
 - **Smoke:** Open 5 entries; open Cmd+K; confirm all 5 appear as recents; type a query, confirm recents hide and search results show
+- **Smoke passed.**
 
 ### PROUTE-HISTORY — "Send to" picker history
 - Last 3 route destinations appear at top of the highlight-extract-route picker, labeled "Recent"

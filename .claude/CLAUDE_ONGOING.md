@@ -270,7 +270,7 @@ These features are in `docs/FEATURE_BACKLOG_ONGOING.md` and `docs/BUILD_PLAN_ONG
 - **PWHERE-REF:** "Where is this referenced?" — dedicated read-only panel showing every workspace referencing this entry. Expands the existing linked entries indicator.
 - **PNAV-ACTIVITY:** Workspace activity indicator on nav — subtle last-active recency signal per nav item.
 - **PKEYSHEET:** Cmd+? keyboard shortcut cheat sheet — non-modal overlay, dismissable.
-- **PPALETTE-RECENTS:** Last 5 opened entries at top of Cmd+K palette before typing.
+- **PPALETTE-RECENTS ✅:** Last 5 opened entries at top of Cmd+K palette before typing. Typing hides recents and shows search results. Session-scoped.
 - **PROUTE-HISTORY:** "Send to" picker history — last 3 destinations at top of route picker.
 - **POQ-DEPENDS:** Open Question dependency links — mark one question as depending on another. Soft block indicator in list.
 - **PPOL3:** Print/PDF export for single entries: Source Material, Brainstorm, Research, Writing Lab, Open Questions analysis history.

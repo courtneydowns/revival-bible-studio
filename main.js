@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const db = require('./db');
@@ -2077,11 +2077,49 @@ function registerIpc() {
   });
 }
 
+// PKEYSHEET — Help menu: "Keyboard Shortcuts" opens the in-app cheat sheet.
+function buildAppMenu() {
+  const template = [
+    ...(process.platform === 'darwin' ? [{
+      label: app.name,
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    }] : []),
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    { role: 'windowMenu' },
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'Keyboard Shortcuts',
+          accelerator: 'CmdOrCtrl+?',
+          click() {
+            const win = BrowserWindow.getFocusedWindow();
+            if (win) win.webContents.send('app:openKeySheet');
+          },
+        },
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
 app.whenReady().then(() => {
   const { dbPath, applied } = db.initDatabase(app.getPath('userData'));
   console.log(`[db] ready at ${dbPath} (${applied} migration(s) applied this boot)`);
 
   registerIpc();
+  buildAppMenu();
   createWindow();
   sessionStart = new Date().toISOString();
 

@@ -474,7 +474,7 @@ Expands the existing linked entries indicator into a full read-only reference pa
 
 ---
 
-## PPALETTE-RECENTS — Command palette recents
+## PPALETTE-RECENTS — Command palette recents ✅
 
 - Last 5 entries opened appear at the top of the Cmd+K command palette before the user types
 - Labeled "Recent" with workspace context ("Jordan — Characters", "S1E4 — Episodes")
